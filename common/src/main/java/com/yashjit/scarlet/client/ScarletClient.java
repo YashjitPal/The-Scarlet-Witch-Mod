@@ -16,6 +16,9 @@ import com.yashjit.scarlet.client.fx.TownFx;
 import com.yashjit.scarlet.client.fx.TransformationFx;
 import com.yashjit.scarlet.client.hex.HexClient;
 import com.yashjit.scarlet.client.hex.HexScreen;
+import com.yashjit.scarlet.client.hex.OutfitLayer;
+import com.yashjit.scarlet.client.hex.Outfits;
+import com.yashjit.scarlet.client.hex.ResidentsClient;
 import com.yashjit.scarlet.client.magic.CastInput;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.magic.MagicHud;
@@ -28,6 +31,7 @@ import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.network.ChaosImpactPayload;
 import com.yashjit.scarlet.network.HexSyncPayload;
 import com.yashjit.scarlet.network.MagicEventPayload;
+import com.yashjit.scarlet.network.ResidentsPayload;
 import com.yashjit.scarlet.network.ToggleSuitPayload;
 import com.yashjit.scarlet.network.TownBuildPayload;
 import com.yashjit.scarlet.platform.Services;
@@ -50,6 +54,7 @@ public final class ScarletClient {
         ScarletClientConfig.load();
         ClientPlatform platform = ClientServices.PLATFORM;
         CostumeModels.register(platform);
+        platform.registerAvatarLayer(OutfitLayer::new);
         platform.registerAvatarLayer(CostumeLayer::new);
         platform.registerAvatarLayer(MagicLayer::new);
         platform.registerEntityRenderer(ScarletEntities.CHAOS_BOLT, ChaosBoltRenderer::new);
@@ -60,6 +65,7 @@ public final class ScarletClient {
         });
         platform.registerClientbound(HexSyncPayload.TYPE, HexClient::receive);
         platform.registerClientbound(TownBuildPayload.TYPE, TownFx::onBuild);
+        platform.registerClientbound(ResidentsPayload.TYPE, ResidentsClient::receive);
         platform.registerHud(Scarlet.id("magic"), MagicHud::render);
         platform.liftStatusBars(MagicHud::lift);
         platform.onSubmitWorldGeometry(ScarletFx::submit);
@@ -83,6 +89,8 @@ public final class ScarletClient {
             }
         }
         HexClient.tick(minecraft);
+        ResidentsClient.tick(minecraft);
+        Outfits.tick(minecraft);
         SpellWheel.tick(minecraft);
         CastInput.tick(minecraft);
         ScarletFx.tick(minecraft);

@@ -205,11 +205,11 @@ The centerpiece. Inspired by Westview.
 - It **collapses if the caster stops wearing the crown** (death, stolen, or taken off). A few seconds of flickering warning first, so an accident isn't a disaster.
 - When it collapses, **the wall rushes inward and everything it passes over changes back**, like the finale.
 - One hex per caster; while it stands it reserves part of the caster's energy bar.
-- **Shape: a hexagon**, like the Westview anomaly on S.W.O.R.D.'s map. Seen from above it is a regular hexagon, with flat walls facing north and south and corners pointing east and west. The six walls rise straight up from the ground and bend over into a dome, with bright ridges at the corners running up to meet over the middle. The radius is measured to the middle of a wall, so the corners stand about 15% further out, and the dome rises 1.15× the radius. It reaches as far below the cast point as above, so a hex cast on a hill still comes down to the valley.
+- **Shape: a hexagon**, like the Westview anomaly on S.W.O.R.D.'s map. Seen from above it is a regular hexagon, with flat walls facing north and south and corners pointing east and west. It is a hexagon from every side too, never rounded: all flat faces and straight edges. The six walls rise straight up from the ground to a sharp edge at 0.7× the radius, and from there six flat triangular facets slope in to a single point over the middle at 1.25× the radius, with straight ridges running up from the corners to meet at the top. Every edge glows: the corners, the tops of the walls and the roof ridges. The radius is measured to the middle of a wall, so the corners stand about 15% further out. It reaches as far below the cast point as above, so a hex cast on a hill still comes down to the valley.
 
 ### Look
 
-- **From outside:** a shimmering, staticky wall. It is mostly clear, with a faint honeycomb whose cells light up at random, TV-static sparkles, and slow bands rolling down it. It is brighter where seen edge-on and along the corner ridges. Through it, the inside shows in the hex's era colors; outside looks normal. While spreading or collapsing it burns scarlet.
+- **From outside:** a shimmering, staticky wall. It is mostly clear, with a faint honeycomb whose cells light up at random, TV-static sparkles, and slow bands rolling down it. It is brighter where seen edge-on and along its edges. Through it, the inside shows in the hex's era colors; outside looks normal. While spreading or collapsing it burns scarlet.
 - **From inside:** your **whole view is in the era**, like being inside the show.
 - Implemented as a screen shader that reconstructs each pixel's world position. Works on Vulkan and OpenGL.
 

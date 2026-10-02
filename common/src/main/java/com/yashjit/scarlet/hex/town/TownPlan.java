@@ -26,7 +26,7 @@ public final class TownPlan {
     public static final int STREET_PERIOD = STREET_WIDTH + 2 * LOT_DEPTH;
     /** Three lots and a cross street. */
     public static final int BLOCK_PERIOD = 3 * LOT_WIDTH + STREET_WIDTH;
-    /** How tall the tallest house stands over its lot, to keep it under the dome. */
+    /** How tall the tallest house stands over its lot, to keep it under the roof. */
     public static final int HOUSE_HEIGHT = 15;
 
     private final BlockPos center;

@@ -2,6 +2,7 @@ package com.yashjit.scarlet.event;
 
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.hex.Hexes;
+import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.player.SuitUp;
@@ -11,6 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -31,6 +33,9 @@ public final class ScarletEvents {
      * @return false to cancel the damage
      */
     public static boolean allowDamage(LivingEntity entity, DamageSource source, float amount) {
+        if (entity instanceof Mob mob) {
+            Residents.struck(mob, source.getEntity());
+        }
         return !(entity instanceof ServerPlayer player) || !Magic.shieldBlocks(player, source, amount);
     }
 
@@ -47,5 +52,6 @@ public final class ScarletEvents {
         }
         Magic.tick(player);
         Hexes.syncIfNeeded(player);
+        Residents.syncIfNeeded(player);
     }
 }

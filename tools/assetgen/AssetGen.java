@@ -74,7 +74,28 @@ public final class AssetGen {
             icons.add(icon.getValue());
         }
         writePng(zoomSheet(icons, 128), preview.resolve("spell_icons.png"));
-        System.out.println("Crown and costume assets written to " + assets.toAbsolutePath());
+
+        Path entity = assets.resolve("textures/entity");
+        PeopleArt.Outfit[][] residents = PeopleArt.residentWardrobes();
+        PeopleArt.Outfit[][] outfits = PeopleArt.playerWardrobes();
+        for (int era = 0; era < PeopleArt.ERAS.length; era++) {
+            String name = PeopleArt.ERAS[era];
+            PeopleArt.Person[] people = PeopleArt.people(era);
+            List<BufferedImage> row = new ArrayList<>();
+            for (int i = 0; i < people.length; i++) {
+                BufferedImage skin = PeopleArt.resident(people[i], residents[era][i]);
+                writePng(skin, entity.resolve("resident/" + name + "_" + i + ".png"));
+                row.add(PeopleArt.preview(skin, people[i].slim(), 3));
+            }
+            for (int i = 0; i < outfits[era].length; i++) {
+                BufferedImage wide = PeopleArt.outfit(outfits[era][i], false);
+                writePng(wide, entity.resolve("outfit/" + name + "_" + i + ".png"));
+                writePng(PeopleArt.outfit(outfits[era][i], true), entity.resolve("outfit/" + name + "_" + i + "_slim.png"));
+                row.add(PeopleArt.preview(wide, false, 3));
+            }
+            writePng(strip(row), preview.resolve("people_" + name + ".png"));
+        }
+        System.out.println("Crown, costume and people assets written to " + assets.toAbsolutePath());
     }
 
     // ---------------------------------------------------------------- crowns
@@ -558,6 +579,21 @@ public final class AssetGen {
         for (BufferedImage image : images) {
             g.drawImage(image, x, pad, cell, cell, null);
             x += cell + pad;
+        }
+        g.dispose();
+        return sheet;
+    }
+
+    /** Images side by side, at their own size. */
+    static BufferedImage strip(List<BufferedImage> images) {
+        int width = images.stream().mapToInt(BufferedImage::getWidth).sum();
+        int height = images.stream().mapToInt(BufferedImage::getHeight).max().orElse(1);
+        BufferedImage sheet = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = sheet.createGraphics();
+        int x = 0;
+        for (BufferedImage image : images) {
+            g.drawImage(image, x, 0, null);
+            x += image.getWidth();
         }
         g.dispose();
         return sheet;
