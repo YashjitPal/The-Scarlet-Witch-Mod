@@ -255,7 +255,7 @@ The centerpiece. Inspired by Westview.
   - Fitted like armor (chest, legs, shoes) over the skin. Casual, well-fitting and gender neutral.
   - Real armor is hidden while inside but keeps protecting, and reappears outside.
   - The caster's own suit-up costume takes priority over the era outfit.
-- **Everything era-related exists only inside.** In a black-and-white era, people inside are black and white, seen from inside or out. Step out and it falls away with a quick TV-static flicker: normal colors, normal clothes, armor back.
+- **Everything era-related exists only inside.** The era's picture (black and white, warm 70s color, videotape and so on) is only seen from within: from outside, everything in the hex looks normal through the wall. Step out and it falls away with a quick TV-static flicker: normal colors, normal clothes, armor back.
 
 ### Homes and the town
 
