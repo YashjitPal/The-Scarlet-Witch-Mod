@@ -2,7 +2,8 @@
 #extension GL_ARB_separate_shader_objects : require
 
 // The Hex, drawn over the finished world.
-// Outside a Hex, everything seen through its wall is in its era; inside one, the whole view is.
+// From outside only its wall shows, with everything inside looking as it really is; inside one, the whole view is in
+// its era.
 
 uniform sampler2D InSampler;
 uniform sampler2D DepthSampler;
@@ -28,47 +29,40 @@ layout(location = 0) out vec4 fragColor;
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 // blocks across a cell of the wall's honeycomb
 const float CELL = 1.4;
-// The Hex's shape, as HexShape has it, all flat faces: walls standing WALL high per block of radius, then roof facets
-// sloping in to a point HEIGHT high. Opposite walls face the same way, so three directions cover all six.
-const float WALL = 0.7;
-const float HEIGHT = 1.25;
-const float SLOPE = HEIGHT - WALL;
-const int FACE_COUNT = 18;
+// The Hex's shape, as HexShape has it: six walls standing straight up without end. Opposite walls face the same way,
+// so three directions cover all six.
+const int WALLS = 6;
 const vec2 FACES[3] = vec2[3](vec2(0.0, 1.0), vec2(0.8660254, 0.5), vec2(0.8660254, -0.5));
 
-// The direction the camera looks through a point of the screen.
-vec3 ray(vec2 uv) {
+// Where the eye is, relative to the camera. View bobbing moves it a little off the camera with every step, so it is
+// found from the same matrix the world was drawn with: the one point every ray of the screen starts from.
+vec3 eyePosition() {
+    vec4 eye = InvProjView * vec4(0.0, 0.0, 1.0, 0.0);
+    return eye.xyz / eye.w;
+}
+
+// The direction the eye looks through a point of the screen.
+vec3 ray(vec2 uv, vec3 eye) {
     vec4 point = InvProjView * vec4(uv * 2.0 - 1.0, 0.5, 1.0);
-    return normalize(point.xyz / point.w);
+    return normalize(point.xyz / point.w - eye);
 }
 
-// Which way face j looks out across the ground. Faces 0-5 are the walls, 6-11 the roof facets over them and 12-17 the
-// same mirrored underground.
+// Which way wall j faces, out across the ground.
 vec2 faceDirection(int j) {
-    return ((j % 6) < 3 ? 1.0 : -1.0) * FACES[j % 3];
+    return (j < 3 ? 1.0 : -1.0) * FACES[j % 3];
 }
 
-// The plane of face j: a point is inside it where dot(xyz, point) < w times the radius.
-vec4 facePlane(int j) {
-    vec2 f = faceDirection(j);
-    if (j < 6) {
-        return vec4(f.x, 0.0, f.y, 1.0);
-    }
-    return vec4(SLOPE * f.x, j < 12 ? 1.0 : -1.0, SLOPE * f.y, HEIGHT);
-}
-
-// Where the camera's ray along dir is inside a Hex, as distances along it: x going in, y coming out (x >= y when it
-// misses), and the faces it goes in and comes out through, z and w. Every face is flat, so the ray is inside the Hex
-// where it is inside all of their planes.
-vec4 traceHex(vec3 dir, vec3 center, float radius) {
-    vec3 from = -center;
+// Where a ray from origin along dir is inside a Hex, as distances along it: x going in, y coming out (x >= y when it
+// misses), and the walls it goes in and comes out through, z and w. The ray is inside where it is inside all six.
+vec4 traceHex(vec3 origin, vec3 dir, vec3 center, float radius) {
+    vec2 from = (origin - center).xz;
     vec4 span = vec4(-1.0e9, 1.0e9, 0.0, 0.0);
-    for (int j = 0; j < FACE_COUNT; j++) {
-        vec4 plane = facePlane(j);
-        float toward = dot(plane.xyz, dir);
-        float room = plane.w * radius - dot(plane.xyz, from);
+    for (int j = 0; j < WALLS; j++) {
+        vec2 f = faceDirection(j);
+        float toward = dot(f, dir.xz);
+        float room = radius - dot(f, from);
         if (abs(toward) < 1.0e-9) {
-            // running along this face: inside its plane all the way, or never
+            // running along this wall: inside it all the way, or never
             if (room < 0.0) {
                 return vec4(1.0, 0.0, 0.0, 0.0);
             }
@@ -88,11 +82,25 @@ vec4 traceHex(vec3 dir, vec3 center, float radius) {
     return span;
 }
 
-// How far out a point is, as a share of the way from the center to the surface through it: under 1 inside.
+// How far out a point is, as a share of the way from the center to the wall it faces: under 1 inside.
 float shapeLevel(vec3 local, float radius) {
-    float across = max(abs(local.z), max(abs(dot(local.xz, FACES[1])), abs(dot(local.xz, FACES[2])))) / radius;
-    float up = abs(local.y) / radius;
-    return max(across, (up + SLOPE * across) / HEIGHT);
+    return max(abs(local.z), max(abs(dot(local.xz, FACES[1])), abs(dot(local.xz, FACES[2])))) / radius;
+}
+
+// How much of a wall shows at a height over the cast point: all of it up to rise, thinning out over fall until it is
+// gone into the sky.
+float wallFade(float height, float rise, float fall) {
+    return 1.0 - smoothstep(rise, rise + fall, height);
+}
+
+// From outside, a Hex stands tall over everything, the bigger the taller.
+float outsideFade(float height, float radius) {
+    return wallFade(height, radius + 16.0, radius * 1.5 + 32.0);
+}
+
+// From inside, the walls are gone well before they would meet overhead in the distance, so the sky above stays open.
+float insideFade(float height, float radius) {
+    return wallFade(height, radius * 0.3 + 4.0, radius + 8.0);
 }
 
 float hash12(vec2 p) {
@@ -176,47 +184,33 @@ vec2 honeycombAt(vec2 p, float footprint, float time, float lit) {
 }
 
 // The wall: mostly clear, a faint honeycomb with cells lighting up, TV static sparkling over it, bright where it is
-// seen edge-on and along every edge where one face meets the next, with slow bands rolling down it.
-vec4 wallLayer(vec3 hit, vec3 center, float radius, int face, vec3 dir, float pixelAngle, vec2 pixel, float time, vec4 style,
+// seen edge-on and up the corners where one wall meets the next, with slow bands rolling down it.
+vec4 wallLayer(vec3 hit, float travel, vec3 center, float radius, int face, vec3 dir, float pixelAngle, float time, vec4 style,
                float strength) {
     vec3 local = hit - center;
-    vec3 n = normalize(facePlane(face).xyz);
-    float facing = abs(dot(dir, n));
+    vec2 f = faceDirection(face);
+    float facing = abs(dot(dir.xz, f));
     float rim = pow(1.0 - facing, 3.0);
     float flare = style.y;
-    float footprint = length(hit) * pixelAngle / max(facing, 0.2);
+    float footprint = travel * pixelAngle / max(facing, 0.2);
 
-    // the edges: up the corners, along the tops of the walls and up the roof to its point. Whichever other face's
-    // plane lies nearest is the edge the point is closest to.
+    // the corners: how near the next wall over is
     float nearest = 1.0e9;
-    int other = face;
-    for (int j = 0; j < FACE_COUNT; j++) {
-        if (j == face) {
-            continue;
-        }
-        vec4 plane = facePlane(j);
-        float gap = (plane.w * radius - dot(plane.xyz, local)) / length(plane.xyz);
-        if (gap < nearest) {
-            nearest = gap;
-            other = j;
+    for (int j = 0; j < WALLS; j++) {
+        if (j != face) {
+            nearest = min(nearest, radius - dot(faceDirection(j), local.xz));
         }
     }
-    bool eave = (face < 6) != (other < 6);
-    float ridge = (1.0 - smoothstep(0.0, footprint * 1.5 + 0.1, max(nearest, 0.0))) * (eave ? 0.7 : 1.0);
+    float ridge = 1.0 - smoothstep(0.0, footprint * 1.5 + 0.1, max(nearest, 0.0));
 
-    // the honeycomb climbs each wall and carries on up the roof facet above it
-    vec2 f = faceDirection(face);
-    float u = dot(local.xz, vec2(-f.y, f.x));
-    float v = local.y;
-    if (face >= 6) {
-        float climb = (radius - dot(local.xz, f)) * sqrt(1.0 + SLOPE * SLOPE);
-        v = face < 12 ? WALL * radius + climb : -(WALL * radius + climb);
-    }
-    vec2 comb = honeycombAt(vec2(u, v) / CELL + float(face % 6) * 7.31, footprint / CELL, time, flare);
+    vec2 surface = vec2(dot(local.xz, vec2(-f.y, f.x)), local.y);
+    vec2 comb = honeycombAt(surface / CELL + float(face) * 7.31, footprint / CELL, time, flare);
 
-    float frame = floor(time * 30.0);
-    float grain = hash12(floor(pixel) + frame * vec2(13.1, 7.7));
-    float sparkle = smoothstep(0.975, 1.0, hash12(floor(pixel / 1.5) + frame * vec2(5.3, 11.9) + 71.0));
+    // the static clings to the wall, in specks a set size on it, coarser far off so they never shrink below a pixel
+    float speck = exp2(ceil(log2(max(footprint * 1.5, 0.125))));
+    float frame = mod(floor(time * 30.0), 997.0);
+    float grain = hash12(floor(surface / speck) + frame * vec2(13.1, 7.7));
+    float sparkle = smoothstep(0.975, 1.0, hash12(floor(surface / (speck * 2.0)) + frame * vec2(5.3, 11.9) + 71.0));
     float bands = smoothstep(0.55, 1.0, 0.5 + 0.5 * sin(local.y * 0.9 - time * 2.4));
 
     float alpha = 0.04 + 0.35 * rim + 0.12 * comb.x + 0.22 * comb.y + 0.05 * bands + 0.45 * sparkle * (0.35 + rim) + 0.4 * ridge;
@@ -285,9 +279,10 @@ void main() {
 #endif
     vec4 world = InvProjView * vec4(texCoord * 2.0 - 1.0, ndcDepth, 1.0);
     vec3 position = world.xyz / world.w;
-    float dist = length(position);
-    vec3 dir = ray(texCoord);
-    float pixelAngle = length(ray(texCoord + vec2(0.0, 1.0 / screen.y)) - dir);
+    vec3 eye = eyePosition();
+    float dist = length(position - eye);
+    vec3 dir = ray(texCoord, eye);
+    float pixelAngle = length(ray(texCoord + vec2(0.0, 1.0 / screen.y), eye) - dir);
     if (depth <= 0.0) {
         dist = 1.0e9;
     }
@@ -297,8 +292,6 @@ void main() {
 
     int count = int(Camera.w + 0.5);
     int around = int(Camera.x + 0.5) - 1;
-    int throughEra = -1;
-    float throughChannel = 0.0;
     float crossing = 0.0;
     vec4 wall = vec4(0.0);
     for (int i = 0; i < 4; i++) {
@@ -307,8 +300,8 @@ void main() {
         }
         vec3 c = Shapes[i].xyz;
         float r = Shapes[i].w;
-        crossing = max(crossing, 1.0 - smoothstep(0.0, 1.6, abs(shapeLevel(-c, r) - 1.0) * r));
-        vec4 span = traceHex(dir, c, r);
+        crossing = max(crossing, 1.0 - smoothstep(0.0, 1.6, abs(shapeLevel(eye - c, r) - 1.0) * r));
+        vec4 span = traceHex(eye, dir, c, r);
         float t0 = span.x;
         float t1 = span.y;
         if (t0 >= t1 || t1 <= 0.0) {
@@ -317,18 +310,20 @@ void main() {
         if (t0 < 0.0) {
             // from inside: the far side of the wall, faintly, wherever it stands before what you are looking at
             if (t1 < dist) {
-                wall = over(wall, wallLayer(dir * t1, c, r, int(span.w + 0.5), dir, pixelAngle, pixel, time, Styles[i], 0.7));
+                vec3 farSide = eye + dir * t1;
+                vec4 layer = wallLayer(farSide, t1, c, r, int(span.w + 0.5), dir, pixelAngle, time, Styles[i], 0.7);
+                layer.a *= insideFade(farSide.y - c.y, r);
+                wall = over(wall, layer);
             }
         } else if (t0 < dist) {
-            if (throughEra < 0) {
-                throughEra = int(Styles[i].x + 0.5);
-                throughChannel = Styles[i].w;
-            }
+            // from outside: only the wall. What stands inside it looks just as it really is; the era is only seen
+            // from within
+            vec3 entry = eye + dir * t0;
             // burning brighter where the wall meets the ground and whatever stands in it
             float contact = exp(-max(dist - t0, 0.0) * 3.0);
-            vec4 layer = wallLayer(dir * t0, c, r, int(span.z + 0.5), dir, pixelAngle, pixel, time, Styles[i], 1.0);
+            vec4 layer = wallLayer(entry, t0, c, r, int(span.z + 0.5), dir, pixelAngle, time, Styles[i], 1.0);
             layer.rgb = mix(layer.rgb, vec3(1.0, 0.8, 0.84), contact * 0.5);
-            layer.a = clamp(layer.a + contact * 0.4, 0.0, 0.95);
+            layer.a = clamp(layer.a + contact * 0.4, 0.0, 0.95) * outsideFade(entry.y - c.y, r);
             wall = over(wall, layer);
         }
     }
@@ -341,12 +336,12 @@ void main() {
     }
     int insideEra = int(Camera.z + 0.5);
 
-    vec3 color = throughEra >= 0 ? eraLook(scene, throughEra, texCoord, screen, time) : scene;
+    vec3 color = scene;
     if (insideAmount > 0.0) {
         color = mix(color, eraLook(scene, insideEra, texCoord, screen, time), insideAmount);
     }
     // changing era: the picture drops into static for a moment, like a set changing channels
-    float channel = max(around >= 0 ? Styles[around].w * insideAmount : 0.0, throughChannel);
+    float channel = around >= 0 ? Styles[around].w * insideAmount : 0.0;
     if (channel > 0.0) {
         color = mix(color, channelStatic(texCoord, pixel, time), channel * 0.9);
     }

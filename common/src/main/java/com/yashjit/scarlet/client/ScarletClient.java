@@ -16,9 +16,11 @@ import com.yashjit.scarlet.client.fx.TownFx;
 import com.yashjit.scarlet.client.fx.TransformationFx;
 import com.yashjit.scarlet.client.hex.HexClient;
 import com.yashjit.scarlet.client.hex.HexScreen;
+import com.yashjit.scarlet.client.hex.LaughTrack;
 import com.yashjit.scarlet.client.hex.OutfitLayer;
 import com.yashjit.scarlet.client.hex.Outfits;
 import com.yashjit.scarlet.client.hex.ResidentsClient;
+import com.yashjit.scarlet.client.hex.TitleCard;
 import com.yashjit.scarlet.client.magic.CastInput;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.magic.MagicHud;
@@ -67,6 +69,7 @@ public final class ScarletClient {
         platform.registerClientbound(TownBuildPayload.TYPE, TownFx::onBuild);
         platform.registerClientbound(ResidentsPayload.TYPE, ResidentsClient::receive);
         platform.registerHud(Scarlet.id("magic"), MagicHud::render);
+        platform.registerHud(Scarlet.id("title_card"), TitleCard::render);
         platform.liftStatusBars(MagicHud::lift);
         platform.onSubmitWorldGeometry(ScarletFx::submit);
         platform.onSubmitWorldGeometry(BoltFx::submit);
@@ -91,6 +94,8 @@ public final class ScarletClient {
         HexClient.tick(minecraft);
         ResidentsClient.tick(minecraft);
         Outfits.tick(minecraft);
+        TitleCard.tick(minecraft);
+        LaughTrack.tick(minecraft);
         SpellWheel.tick(minecraft);
         CastInput.tick(minecraft);
         ScarletFx.tick(minecraft);

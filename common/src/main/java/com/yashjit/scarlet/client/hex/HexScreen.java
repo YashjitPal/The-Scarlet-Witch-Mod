@@ -31,8 +31,7 @@ import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Draws the Hex over the finished world: the staticky wall, and the era as seen through it, or all around you from
- * inside.
+ * Draws the Hex over the finished world: the staticky wall from outside, and the era all around you from inside.
  *
  * <p>The shader works out where each pixel's surface is in the world from the depth buffer, so walls are cut
  * exactly by whatever stands in front of them. Vanilla wipes the world's depth to draw your hand unless a screen

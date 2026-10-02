@@ -182,7 +182,8 @@ public final class Hexes {
     }
 
     /**
-     * Moves a Hex to another era. Its town makes itself over to match, sweeping out from the middle.
+     * Moves a Hex to another era, beginning its next episode. Its town makes itself over to match, sweeping out from
+     * the middle.
      */
     public static void setEra(ServerLevel level, Hex hex, Era era) {
         if (hex.era == era) {
@@ -190,8 +191,41 @@ public final class Hexes {
         }
         hex.era = era;
         hex.eraSince = level.getGameTime();
+        hex.episode++;
         HexData.of(level).changed();
         play(level, hex.center, SoundEvents.BEACON_POWER_SELECT, 2.5F, 0.6F);
+    }
+
+    /**
+     * Turns episodes mode on or off: while on, the era moves on by itself every morning.
+     */
+    public static void setEpisodes(ServerLevel level, Hex hex, boolean on) {
+        hex.episodes = on;
+        hex.episodeDay = day(level);
+        HexData.of(level).changed();
+    }
+
+    public static void rename(ServerLevel level, Hex hex, String name) {
+        hex.name = name;
+        HexData.of(level).changed();
+    }
+
+    /**
+     * The next morning's episode: the next era on, or after the present, back to the 1950s for a new season.
+     */
+    private static void nextEpisode(ServerLevel level, Hex hex) {
+        Era[] eras = Era.values();
+        int next = hex.era.ordinal() + 1;
+        if (next >= eras.length) {
+            hex.season++;
+            hex.episode = 0;
+            next = 0;
+        }
+        setEra(level, hex, eras[next]);
+    }
+
+    private static long day(ServerLevel level) {
+        return Math.floorDiv(level.getOverworldClockTime(), 24000L);
     }
 
     /**
@@ -261,6 +295,17 @@ public final class Hexes {
                     } else if (hex.phase == Hex.Phase.SPREADING && now - hex.phaseSince >= SPREAD_TICKS) {
                         hex.enter(Hex.Phase.STANDING, now);
                         data.changed();
+                    } else if (hex.episodes && now % 20 == 0) {
+                        long day = day(level);
+                        if (day != hex.episodeDay) {
+                            // a clock turned back with /time only catches the count up
+                            boolean morning = day > hex.episodeDay;
+                            hex.episodeDay = day;
+                            data.setDirty();
+                            if (morning) {
+                                nextEpisode(level, hex);
+                            }
+                        }
                     }
                 }
                 case WARNING -> {

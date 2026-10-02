@@ -112,8 +112,8 @@ public final class HexClient {
             if (radius < 0.05F) {
                 continue;
             }
-            double distance = camera.distanceTo(hex.center());
-            if (distance - HexShape.extent(radius) > reach) {
+            double distance = Math.hypot(camera.x - hex.center().x, camera.z - hex.center().z);
+            if (distance - HexShape.reach(radius) > reach) {
                 continue;
             }
             float flare = flare(hex, now, Math.abs(wall.radius - before) / Math.max(seconds, 1.0E-3F));

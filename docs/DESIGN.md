@@ -205,11 +205,11 @@ The centerpiece. Inspired by Westview.
 - It **collapses if the caster stops wearing the crown** (death, stolen, or taken off). A few seconds of flickering warning first, so an accident isn't a disaster.
 - When it collapses, **the wall rushes inward and everything it passes over changes back**, like the finale.
 - One hex per caster; while it stands it reserves part of the caster's energy bar.
-- **Shape: a hexagon**, like the Westview anomaly on S.W.O.R.D.'s map. Seen from above it is a regular hexagon, with flat walls facing north and south and corners pointing east and west. It is a hexagon from every side too, never rounded: all flat faces and straight edges. The six walls rise straight up from the ground to a sharp edge at 0.7× the radius, and from there six flat triangular facets slope in to a single point over the middle at 1.25× the radius, with straight ridges running up from the corners to meet at the top. Every edge glows: the corners, the tops of the walls and the roof ridges. The radius is measured to the middle of a wall, so the corners stand about 15% further out. It reaches as far below the cast point as above, so a hex cast on a hill still comes down to the valley.
+- **Shape: a hexagon**, like the Westview anomaly on S.W.O.R.D.'s map. Seen from above it is a regular hexagon, with flat walls facing north and south and corners pointing east and west. The six walls stand straight up without end, and nothing closes over the top. Seen from the ground, they rise high over the town (taller for a bigger hex) and fade away into the sky. The corners, where one wall meets the next, glow. The radius is measured to the middle of a wall, so the corners stand about 15% further out. The hex is everything within its walls, as high and as deep as the world goes, so a hex cast on a hill still comes down to the valley.
 
 ### Look
 
-- **From outside:** a shimmering, staticky wall. It is mostly clear, with a faint honeycomb whose cells light up at random, TV-static sparkles, and slow bands rolling down it. It is brighter where seen edge-on and along its edges. Through it, the inside shows in the hex's era colors; outside looks normal. While spreading or collapsing it burns scarlet.
+- **From outside:** a shimmering, staticky wall. It is mostly clear, with a faint honeycomb whose cells light up at random, TV-static sparkles, and slow bands rolling down it. It is brighter where seen edge-on and up its corners. Through it, the town looks just as it really is, in normal colors: the era is only seen from inside. While spreading or collapsing it burns scarlet, and when the era changes the wall flares with static.
 - **From inside:** your **whole view is in the era**, like being inside the show.
 - Implemented as a screen shader that reconstructs each pixel's world position. Works on Vulkan and OpenGL.
 
@@ -227,10 +227,16 @@ The centerpiece. Inspired by Westview.
 ### Extras (all enabled)
 
 - **Old-TV framing** for older eras: 4:3 bars, rounded screen corners.
-- **Title card** with the hex's name (set by the caster) when someone enters, styled for the era.
-- **Episodes:** optional mode where the era moves forward each in-game day.
+- **Title card** when someone comes in, and again when a new episode begins while they're inside: the hex's name (set by the caster with `/scarlet hex name`), the episode and its title, and who stars in it, with the era's theme playing on note blocks.
+  - 1950s: the name glowing white over a darkened screen, a ruled line drawn out under it, credits in small capitals. Harp and bells.
+  - 1960s: a cartoon opening, inked letters bouncing in one at a time with stars twinkling around them. Xylophone and walking bass.
+  - 1970s: bands of orange, gold and brown sweeping in above and below a cream title. Strummed guitar and flute.
+  - 1980s: neon on videotape, a dark band edged in pink and cyan, scanlines, split colors and tracking jumps. Synth arpeggios and a drum machine.
+  - 2000s: every letter slammed in its own tilted box of color. Power chords and fast drums.
+  - Present day: a documentary caption sliding in at the side of the frame. Banjo and handclaps.
+- **Episodes:** every change of era begins the next episode. Episodes mode (`/scarlet hex episodes on`) moves the era forward by itself every morning. After the present day it goes back to the 1950s for a new season.
 - **Era audio:** sounds get muffled like an old TV.
-- **Laugh track** when someone gets hurt inside (with a cooldown).
+- **Laugh track** when someone gets hurt inside, now and then (with a cooldown). Only in the eras filmed before a live audience, the 1950s to the 1980s: the 2000s and the present day are single-camera and silent.
 
 ### Reality warping
 

@@ -26,7 +26,7 @@ public final class TownPlan {
     public static final int STREET_PERIOD = STREET_WIDTH + 2 * LOT_DEPTH;
     /** Three lots and a cross street. */
     public static final int BLOCK_PERIOD = 3 * LOT_WIDTH + STREET_WIDTH;
-    /** How tall the tallest house stands over its lot, to keep it under the roof. */
+    /** How tall the tallest house stands over its lot, for the open air it needs. */
     public static final int HOUSE_HEIGHT = 15;
 
     private final BlockPos center;
@@ -121,16 +121,14 @@ public final class TownPlan {
     }
 
     /**
-     * Whether a part fits wholly inside a Hex of the given radius, its tallest point included.
+     * Whether a part's whole footprint lies inside a Hex of the given radius.
      */
     public static boolean fits(Part part, Vec3 center, float radius, int groundY) {
-        int height = part.kind().height();
         double inset = 0.5;
         for (int corner = 0; corner < 4; corner++) {
             double x = (corner & 1) == 0 ? part.minX() + inset : part.maxX() + 1 - inset;
             double z = (corner & 2) == 0 ? part.minZ() + inset : part.maxZ() + 1 - inset;
-            if (!HexShape.contains(center, radius, new Vec3(x, groundY + height, z))
-                    || !HexShape.contains(center, radius, new Vec3(x, groundY - 1, z))) {
+            if (!HexShape.contains(center, radius, new Vec3(x, groundY, z))) {
                 return false;
             }
         }
