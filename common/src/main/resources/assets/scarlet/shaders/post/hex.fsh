@@ -28,9 +28,12 @@ layout(location = 0) out vec4 fragColor;
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 // blocks across a cell of the wall's honeycomb
 const float CELL = 1.4;
-// The Hex's shape, as HexShape has it: how high the dome rises per block of radius, and which ways its walls face.
-// Opposite walls face the same way, so three directions cover all six.
-const float HEIGHT = 1.15;
+// The Hex's shape, as HexShape has it, all flat faces: walls standing WALL high per block of radius, then roof facets
+// sloping in to a point HEIGHT high. Opposite walls face the same way, so three directions cover all six.
+const float WALL = 0.7;
+const float HEIGHT = 1.25;
+const float SLOPE = HEIGHT - WALL;
+const int FACE_COUNT = 18;
 const vec2 FACES[3] = vec2[3](vec2(0.0, 1.0), vec2(0.8660254, 0.5), vec2(0.8660254, -0.5));
 
 // The direction the camera looks through a point of the screen.
@@ -39,50 +42,57 @@ vec3 ray(vec2 uv) {
     return normalize(point.xyz / point.w);
 }
 
+// Which way face j looks out across the ground. Faces 0-5 are the walls, 6-11 the roof facets over them and 12-17 the
+// same mirrored underground.
+vec2 faceDirection(int j) {
+    return ((j % 6) < 3 ? 1.0 : -1.0) * FACES[j % 3];
+}
+
+// The plane of face j: a point is inside it where dot(xyz, point) < w times the radius.
+vec4 facePlane(int j) {
+    vec2 f = faceDirection(j);
+    if (j < 6) {
+        return vec4(f.x, 0.0, f.y, 1.0);
+    }
+    return vec4(SLOPE * f.x, j < 12 ? 1.0 : -1.0, SLOPE * f.y, HEIGHT);
+}
+
 // Where the camera's ray along dir is inside a Hex, as distances along it: x going in, y coming out (x >= y when it
-// misses), and the walls it goes in and comes out through, z and w. The Hex is where three elliptic cylinders
-// overlap, so the ray is inside it where it is inside all three.
+// misses), and the faces it goes in and comes out through, z and w. Every face is flat, so the ray is inside the Hex
+// where it is inside all of their planes.
 vec4 traceHex(vec3 dir, vec3 center, float radius) {
     vec3 from = -center;
-    float height = radius * HEIGHT;
     vec4 span = vec4(-1.0e9, 1.0e9, 0.0, 0.0);
-    for (int k = 0; k < 3; k++) {
-        vec2 u = vec2(dot(dir.xz, FACES[k]), dot(from.xz, FACES[k])) / radius;
-        vec2 v = vec2(dir.y, from.y) / height;
-        float a = u.x * u.x + v.x * v.x;
-        float b = u.x * u.y + v.x * v.y;
-        float c = u.y * u.y + v.y * v.y - 1.0;
-        if (a < 1.0e-12) {
-            // running along this cylinder: inside it all the way, or never
-            if (c < 0.0) {
-                continue;
+    for (int j = 0; j < FACE_COUNT; j++) {
+        vec4 plane = facePlane(j);
+        float toward = dot(plane.xyz, dir);
+        float room = plane.w * radius - dot(plane.xyz, from);
+        if (abs(toward) < 1.0e-9) {
+            // running along this face: inside its plane all the way, or never
+            if (room < 0.0) {
+                return vec4(1.0, 0.0, 0.0, 0.0);
             }
-            return vec4(1.0, 0.0, 0.0, 0.0);
+            continue;
         }
-        float disc = b * b - a * c;
-        if (disc <= 0.0) {
-            return vec4(1.0, 0.0, 0.0, 0.0);
-        }
-        float root = sqrt(disc);
-        float t0 = (-b - root) / a;
-        float t1 = (-b + root) / a;
-        if (t0 > span.x) {
-            span.x = t0;
-            span.z = float(k);
-        }
-        if (t1 < span.y) {
-            span.y = t1;
-            span.w = float(k);
+        float t = room / toward;
+        if (toward < 0.0) {
+            if (t > span.x) {
+                span.x = t;
+                span.z = float(j);
+            }
+        } else if (t < span.y) {
+            span.y = t;
+            span.w = float(j);
         }
     }
     return span;
 }
 
-// How far out a point is, as a share of the way from the center to the wall through it: under 1 inside.
+// How far out a point is, as a share of the way from the center to the surface through it: under 1 inside.
 float shapeLevel(vec3 local, float radius) {
     float across = max(abs(local.z), max(abs(dot(local.xz, FACES[1])), abs(dot(local.xz, FACES[2])))) / radius;
-    float up = local.y / (radius * HEIGHT);
-    return sqrt(across * across + up * up);
+    float up = abs(local.y) / radius;
+    return max(across, (up + SLOPE * across) / HEIGHT);
 }
 
 float hash12(vec2 p) {
@@ -166,44 +176,52 @@ vec2 honeycombAt(vec2 p, float footprint, float time, float lit) {
 }
 
 // The wall: mostly clear, a faint honeycomb with cells lighting up, TV static sparkling over it, bright where it is
-// seen edge-on and along the ridges at its corners, with slow bands rolling down it.
+// seen edge-on and along every edge where one face meets the next, with slow bands rolling down it.
 vec4 wallLayer(vec3 hit, vec3 center, float radius, int face, vec3 dir, float pixelAngle, vec2 pixel, float time, vec4 style,
                float strength) {
     vec3 local = hit - center;
-    float height = radius * HEIGHT;
-    vec2 out2 = FACES[face];
-    float across = dot(local.xz, out2) / (radius * radius);
-    vec3 n = normalize(vec3(out2.x * across, local.y / (height * height), out2.y * across));
+    vec3 n = normalize(facePlane(face).xyz);
     float facing = abs(dot(dir, n));
     float rim = pow(1.0 - facing, 3.0);
     float flare = style.y;
     float footprint = length(hit) * pixelAngle / max(facing, 0.2);
 
-    // the corners, where one wall meets the next, ridges running up to meet over the middle
-    vec3 spans = vec3(abs(local.z), abs(dot(local.xz, FACES[1])), abs(dot(local.xz, FACES[2])));
-    float widest = max(spans.x, max(spans.y, spans.z));
-    float next = spans.x + spans.y + spans.z - widest - min(spans.x, min(spans.y, spans.z));
-    float ridge = 1.0 - smoothstep(0.0, footprint * 1.5 + 0.1, widest - next);
+    // the edges: up the corners, along the tops of the walls and up the roof to its point. Whichever other face's
+    // plane lies nearest is the edge the point is closest to.
+    float nearest = 1.0e9;
+    int other = face;
+    for (int j = 0; j < FACE_COUNT; j++) {
+        if (j == face) {
+            continue;
+        }
+        vec4 plane = facePlane(j);
+        float gap = (plane.w * radius - dot(plane.xyz, local)) / length(plane.xyz);
+        if (gap < nearest) {
+            nearest = gap;
+            other = j;
+        }
+    }
+    bool eave = (face < 6) != (other < 6);
+    float ridge = (1.0 - smoothstep(0.0, footprint * 1.5 + 0.1, max(nearest, 0.0))) * (eave ? 0.7 : 1.0);
 
-    // the honeycomb climbs each wall, and lies flat over the top
-    float overhead = smoothstep(0.55, 0.85, abs(n.y));
-    vec2 comb = vec2(0.0);
-    if (overhead < 1.0) {
-        vec2 up = vec2(dot(local.xz, vec2(-out2.y, out2.x)), local.y);
-        comb += honeycombAt(up / CELL + float(face) * 7.31, footprint / CELL, time, flare) * (1.0 - overhead);
+    // the honeycomb climbs each wall and carries on up the roof facet above it
+    vec2 f = faceDirection(face);
+    float u = dot(local.xz, vec2(-f.y, f.x));
+    float v = local.y;
+    if (face >= 6) {
+        float climb = (radius - dot(local.xz, f)) * sqrt(1.0 + SLOPE * SLOPE);
+        v = face < 12 ? WALL * radius + climb : -(WALL * radius + climb);
     }
-    if (overhead > 0.0) {
-        comb += honeycombAt(local.xz / CELL + 31.0, footprint / CELL, time, flare) * overhead;
-    }
+    vec2 comb = honeycombAt(vec2(u, v) / CELL + float(face % 6) * 7.31, footprint / CELL, time, flare);
 
     float frame = floor(time * 30.0);
     float grain = hash12(floor(pixel) + frame * vec2(13.1, 7.7));
     float sparkle = smoothstep(0.975, 1.0, hash12(floor(pixel / 1.5) + frame * vec2(5.3, 11.9) + 71.0));
     float bands = smoothstep(0.55, 1.0, 0.5 + 0.5 * sin(local.y * 0.9 - time * 2.4));
 
-    float alpha = 0.04 + 0.45 * rim + 0.12 * comb.x + 0.22 * comb.y + 0.05 * bands + 0.45 * sparkle * (0.35 + rim) + 0.4 * ridge;
+    float alpha = 0.04 + 0.35 * rim + 0.12 * comb.x + 0.22 * comb.y + 0.05 * bands + 0.45 * sparkle * (0.35 + rim) + 0.4 * ridge;
     alpha *= 0.85 + 0.3 * grain;
-    vec3 color = mix(vec3(0.94, 0.93, 0.98), vec3(1.0, 0.62, 0.7), clamp(rim * 0.7 + comb.y * 0.6, 0.0, 1.0));
+    vec3 color = mix(vec3(0.94, 0.93, 0.98), vec3(1.0, 0.62, 0.7), clamp(rim * 0.4 + comb.y * 0.6, 0.0, 1.0));
     color = mix(color, vec3(1.0, 0.9, 0.93), ridge * 0.6);
     color += (grain - 0.5) * 0.12;
 

@@ -11,7 +11,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One caster's Hex: a hexagonal dome of rewritten reality around the point it was cast from, shaped as
+ * One caster's Hex: a hexagon of rewritten reality around the point it was cast from, shaped as
  * {@link HexShape} describes. It stays there whether or not the caster does. Server only; clients see
  * {@link HexSnapshot}s.
  */

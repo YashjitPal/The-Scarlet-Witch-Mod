@@ -142,20 +142,43 @@ public final class Hexes {
      * inward as it collapses, and otherwise at the Hex's radius.
      */
     public static float wallRadius(Hex hex, double now) {
-        float t = (float) (now - hex.phaseSince);
-        return switch (hex.phase) {
+        return wallRadius(hex.phase, now - hex.phaseSince, hex.radius, hex.phaseRadius);
+    }
+
+    /**
+     * The same for a Hex as a client knows it.
+     */
+    public static float wallRadius(HexSnapshot hex, double now) {
+        return wallRadius(hex.phaseValue(), now - hex.phaseSince(), hex.radius(), hex.phaseRadius());
+    }
+
+    private static float wallRadius(Hex.Phase phase, double sincePhase, float radius, float phaseRadius) {
+        float t = (float) sincePhase;
+        return switch (phase) {
             case FOUNDING -> 0.0F;
             case SPREADING -> {
                 float k = Math.clamp(t / SPREAD_TICKS, 0.0F, 1.0F);
                 float out = 1.0F - (1.0F - k) * (1.0F - k) * (1.0F - k);
-                yield hex.radius * out;
+                yield radius * out;
             }
             case COLLAPSING -> {
                 float k = Math.clamp(t / COLLAPSE_TICKS, 0.0F, 1.0F);
-                yield hex.phaseRadius * (1.0F - k * k * k);
+                yield phaseRadius * (1.0F - k * k * k);
             }
-            default -> hex.radius;
+            default -> radius;
         };
+    }
+
+    /**
+     * The Hex a point is inside on this client, if any.
+     */
+    public static @Nullable HexSnapshot clientHexAt(Vec3 point, double now) {
+        for (HexSnapshot hex : client.hexes()) {
+            if (HexShape.contains(hex.center(), wallRadius(hex, now), point)) {
+                return hex;
+            }
+        }
+        return null;
     }
 
     /**
@@ -206,6 +229,7 @@ public final class Hexes {
         if (now % 20 == 0 && !data.pending().isEmpty()) {
             putBackLeftovers(level, data);
         }
+        Residents.tick(level, data, now);
         if (data.all().isEmpty()) {
             return;
         }

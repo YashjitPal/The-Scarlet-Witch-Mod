@@ -21,5 +21,6 @@ public final class ScarletNetwork {
         registry.clientbound(MagicEventPayload.TYPE, MagicEventPayload.STREAM_CODEC);
         registry.clientbound(HexSyncPayload.TYPE, HexSyncPayload.STREAM_CODEC);
         registry.clientbound(TownBuildPayload.TYPE, TownBuildPayload.STREAM_CODEC);
+        registry.clientbound(ResidentsPayload.TYPE, ResidentsPayload.STREAM_CODEC);
     }
 }
