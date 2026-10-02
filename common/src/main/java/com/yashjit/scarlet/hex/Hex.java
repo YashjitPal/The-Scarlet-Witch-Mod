@@ -18,6 +18,8 @@ import org.jspecify.annotations.Nullable;
 public final class Hex {
 
     public static final String DEFAULT_NAME = "Westview";
+    /** The longest name a Hex can be given, to fit its title card. */
+    public static final int MAX_NAME_LENGTH = 24;
 
     public static final Codec<Hex> CODEC = RecordCodecBuilder.create(i -> i.group(
             UUIDUtil.CODEC.fieldOf("caster").forGetter(hex -> hex.caster),
@@ -30,10 +32,19 @@ public final class Hex {
             Codec.LONG.optionalFieldOf("phase_since", 0L).forGetter(hex -> hex.phaseSince),
             Codec.FLOAT.optionalFieldOf("phase_radius", 0.0F).forGetter(hex -> hex.phaseRadius),
             Codec.LONG.optionalFieldOf("era_since", 0L).forGetter(hex -> hex.eraSince),
+            Codec.INT.optionalFieldOf("episode", 1).forGetter(hex -> hex.episode),
+            Codec.INT.optionalFieldOf("season", 1).forGetter(hex -> hex.season),
+            Codec.BOOL.optionalFieldOf("episodes", false).forGetter(hex -> hex.episodes),
+            Codec.LONG.optionalFieldOf("episode_day", 0L).forGetter(hex -> hex.episodeDay),
             HexTown.CODEC.optionalFieldOf("town").forGetter(hex -> Optional.ofNullable(hex.town))
-    ).apply(i, (caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius, eraSince, town) -> {
+    ).apply(i, (caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius, eraSince, episode, season, episodes,
+                episodeDay, town) -> {
         Hex hex = new Hex(caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius);
         hex.eraSince = eraSince;
+        hex.episode = episode;
+        hex.season = season;
+        hex.episodes = episodes;
+        hex.episodeDay = episodeDay;
         hex.town = town.orElse(null);
         return hex;
     }));
@@ -50,6 +61,14 @@ public final class Hex {
     float phaseRadius;
     /** When the era last changed, for the channel-change flicker. */
     long eraSince;
+    /** Which episode is on: the first when cast, then the next with every change of era. */
+    int episode = 1;
+    /** Which season is on. Running past the present back to the 1950s begins the next. */
+    int season = 1;
+    /** Whether the era moves on by itself every morning, one episode a day. */
+    boolean episodes;
+    /** The day the current episode began, in episodes mode. */
+    long episodeDay;
     @Nullable HexTown town;
 
     Hex(UUID caster, String casterName, Vec3 center, float radius, Era era, String name, Phase phase, long phaseSince, float phaseRadius) {
@@ -88,6 +107,18 @@ public final class Hex {
         return phase;
     }
 
+    public int episode() {
+        return episode;
+    }
+
+    public int season() {
+        return season;
+    }
+
+    public boolean episodes() {
+        return episodes;
+    }
+
     public @Nullable HexTown town() {
         return town;
     }
@@ -103,7 +134,8 @@ public final class Hex {
     }
 
     HexSnapshot snapshot() {
-        return new HexSnapshot(caster, casterName, center, radius, era.ordinal(), name, phase.ordinal(), phaseSince, phaseRadius, eraSince);
+        return new HexSnapshot(caster, casterName, center, radius, era.ordinal(), name, phase.ordinal(), phaseSince, phaseRadius, eraSince,
+                episode, season);
     }
 
     public enum Phase implements StringRepresentable {

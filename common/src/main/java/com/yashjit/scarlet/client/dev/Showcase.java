@@ -374,6 +374,9 @@ public final class Showcase {
                     .command("time set noon")
                     .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
                     .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    // cast from the middle of a block, with a line of gold under where the south wall will stand
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5")
+                    .command("execute at @a run fill ~-6 ~-1 ~24 ~6 ~-1 ~24 minecraft:gold_block")
                     .command("execute at @a run summon minecraft:pig ~3 ~ ~5 {NoAI:1b}")
                     .command("execute at @a run fill ~-4 ~ ~8 ~-1 ~3 ~8 minecraft:red_wool")
                     .command("execute at @a run fill ~1 ~ ~8 ~4 ~3 ~8 minecraft:lime_wool")
@@ -386,10 +389,19 @@ public final class Showcase {
                     .look(75, 40, 58, 1.0).shot("hex_above", 4)
                     .look(95, 0, 4, 14.0).shot("hex_side_flat", 4)
                     .look(95, 90, 4, 14.0).shot("hex_side_corner", 4)
-                    .look(95, 60, 22, 10.0).shot("hex_side_high", 4)
-                    .look(14, 0, -60, 22.0).shot("hex_roof_inside", 4)
+                    .look(160, 60, 10, 40.0).shot("hex_far", 4)
+                    .look(14, 0, -60, 22.0).shot("hex_sky_inside", 4)
                     .look(5, 30, 10, 1.2).shot("hex_inside_third", 4)
                     .playerCamera().hideHud(false).shot("hex_inside", 8).hideHud(true)
+                    // walking up to the wall from outside, view bobbing and all: its foot should stay on the gold line
+                    .command("execute as @a at @s run tp @s ~ ~ ~31 180 30")
+                    .then(minecraft -> {
+                    }, 10)
+                    .shot("hex_walk_still", 2)
+                    .walk(true).shot("hex_walk_a", 4).shot("hex_walk_b", 3).shot("hex_walk_c", 3).shot("hex_walk_d", 3).walk(false)
+                    .then(minecraft -> {
+                    }, 10)
+                    .command("execute as @a at @s run tp @s ~ ~ ~-28 0 0")
                     .hold(true).then(minecraft -> {
                     }, 40)
                     .hold(false).look(52, 25, 14, 1.0).shot("hex_grown", 20)
@@ -471,6 +483,31 @@ public final class Showcase {
                     .command("execute as @a at @s run scarlet hex dispel").shot("residents_fall_a", 25).shot("residents_fall_b", 40)
                     .command("kill @e[type=!minecraft:player]")
                     .command("difficulty peaceful");
+            case "episodes" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("time set noon")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute at @a run fill ~-1 ~ ~6 ~1 ~2 ~6 minecraft:blue_wool")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX)
+                    .playerCamera().hideHud(false)
+                    .tap().shot("card_50s_a", 22).shot("card_50s_b", 30).shot("card_50s_c", 40)
+                    .command("execute as @a at @s run scarlet hex era 1960s").shot("card_60s_a", 40).shot("card_60s_b", 30)
+                    .command("execute as @a at @s run scarlet hex era 1970s").shot("card_70s_a", 40).shot("card_70s_b", 30)
+                    .command("execute as @a at @s run scarlet hex era 1980s").shot("card_80s_a", 40).shot("card_80s_b", 30)
+                    .command("execute as @a at @s run scarlet hex era 2000s").shot("card_2000s_a", 40).shot("card_2000s_b", 30)
+                    .command("execute as @a at @s run scarlet hex era present").shot("card_present_a", 40).shot("card_present_b", 30)
+                    .then(minecraft -> {
+                    }, 80)
+                    .command("execute as @a at @s run scarlet hex name Scarlet Falls")
+                    .command("execute as @a at @s run scarlet hex episodes on")
+                    .command("time add 24000").shot("card_season_a", 60).shot("card_season_b", 30)
+                    .hideHud(true)
+                    .command("execute as @a at @s run scarlet hex dispel").then(minecraft -> {
+                    }, 80);
             case "play" -> s
                     .command("item replace entity @a armor.head with scarlet:witch_tiara")
                     .command("give @a scarlet:warlock_crown");

@@ -78,8 +78,9 @@ public final class Residents {
             if (wall < 1.0F) {
                 continue;
             }
-            double reach = HexShape.extent(wall);
-            AABB box = new AABB(hex.center, hex.center).inflate(reach);
+            double reach = HexShape.reach(wall);
+            AABB box = new AABB(hex.center.x - reach, level.getMinY(), hex.center.z - reach, hex.center.x + reach, level.getMaxY() + 1,
+                    hex.center.z + reach);
             for (Mob mob : level.getEntitiesOfClass(Mob.class, box, mob -> mob.isAlive() && mob.is(CAN_LIVE_HERE))) {
                 if (!HexShape.contains(hex.center, wall, mob.position()) || isAwake(mob)) {
                     continue;
