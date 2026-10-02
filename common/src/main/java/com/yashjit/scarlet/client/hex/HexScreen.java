@@ -181,7 +181,7 @@ public final class HexScreen {
             for (int i = 0; i < MAX_HEXES; i++) {
                 if (i < hexes.size()) {
                     HexClient.Shown hex = hexes.get(i);
-                    builder.putVec4(hex.era().ordinal(), hex.flare(), hex.warning(), 1.0F);
+                    builder.putVec4(hex.era().ordinal(), hex.flare(), hex.warning(), hex.channel());
                 } else {
                     builder.putVec4(0.0F, 0.0F, 0.0F, 0.0F);
                 }

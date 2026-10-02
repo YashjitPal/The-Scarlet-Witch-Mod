@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.neoforge;
 
 import com.yashjit.scarlet.Scarlet;
+import com.yashjit.scarlet.command.ScarletCommands;
 import com.yashjit.scarlet.event.ScarletEvents;
 import com.yashjit.scarlet.neoforge.platform.NeoForgePlayerDataService;
 import com.yashjit.scarlet.neoforge.platform.NeoForgeRegistryService;
@@ -11,6 +12,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEquipmentChangeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -30,6 +32,7 @@ public final class ScarletNeoForge {
         NeoForge.EVENT_BUS.addListener(ScarletNeoForge::onEquipmentChange);
         NeoForge.EVENT_BUS.addListener(ScarletNeoForge::onIncomingDamage);
         NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post event) -> ScarletEvents.onServerTick(event.getServer()));
+        NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> ScarletCommands.register(event.getDispatcher()));
     }
 
     private static void onIncomingDamage(LivingIncomingDamageEvent event) {

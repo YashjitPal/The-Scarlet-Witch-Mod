@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.hex;
 
 import com.yashjit.scarlet.crown.CrownItem;
+import com.yashjit.scarlet.hex.town.HexTown;
 import com.yashjit.scarlet.network.HexSyncPayload;
 import com.yashjit.scarlet.platform.Services;
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -42,6 +44,8 @@ public final class Hexes {
     /** Energy held back from the caster's bar while their Hex stands. */
     public static final float RESERVE = 40.0F;
     public static final int SPREAD_TICKS = 70;
+    /** Longest the Hex waits for its caster's home to finish before bursting out anyway. */
+    public static final int FOUNDING_LIMIT = 200;
     public static final int WARNING_TICKS = 100;
     public static final int COLLAPSE_TICKS = 50;
     /** Ticks between updates sent while a Hex keeps changing, such as while it is being resized. */
@@ -105,6 +109,9 @@ public final class Hexes {
     }
 
     /**
+     * Casts a Hex where the player stands. If they build, their home rises first, right in front of them, and the Hex
+     * bursts out of it once it stands.
+     *
      * @return whether a Hex was cast; a caster with one standing anywhere cannot cast another
      */
     public static boolean cast(ServerPlayer player, long now) {
@@ -112,13 +119,56 @@ public final class Hexes {
         if (find(level.getServer(), player.getUUID()) != null) {
             return false;
         }
+        HexBuild build = Services.PLAYER_DATA.get(player).hexBuild();
         Hex hex = new Hex(player.getUUID(), player.getGameProfile().name(), player.position(), CAST_RADIUS, Era.FIFTIES, Hex.DEFAULT_NAME,
                 Hex.Phase.SPREADING, now, 0.0F);
+        if (build != HexBuild.NOTHING) {
+            hex.town = new HexTown(build, player.getDirection(), player.getUUID().getLeastSignificantBits() ^ now * 31L, hex.era);
+            if (hex.town.foundHome(level, hex.center, hex.era, now) > 0) {
+                hex.enter(Hex.Phase.FOUNDING, now);
+            }
+        }
         HexData.of(level).add(hex);
         play(level, hex.center, SoundEvents.BEACON_ACTIVATE, 3.0F, 0.5F);
         play(level, hex.center, SoundEvents.RESPAWN_ANCHOR_SET_SPAWN, 2.0F, 0.6F);
-        play(level, hex.center, SoundEvents.LIGHTNING_BOLT_THUNDER, 0.5F, 1.8F);
+        if (hex.phase == Hex.Phase.SPREADING) {
+            play(level, hex.center, SoundEvents.LIGHTNING_BOLT_THUNDER, 0.5F, 1.8F);
+        }
         return true;
+    }
+
+    /**
+     * How far out the wall stands at a moment: nowhere while the home is founded, easing out as it spreads, falling
+     * inward as it collapses, and otherwise at the Hex's radius.
+     */
+    public static float wallRadius(Hex hex, double now) {
+        float t = (float) (now - hex.phaseSince);
+        return switch (hex.phase) {
+            case FOUNDING -> 0.0F;
+            case SPREADING -> {
+                float k = Math.clamp(t / SPREAD_TICKS, 0.0F, 1.0F);
+                float out = 1.0F - (1.0F - k) * (1.0F - k) * (1.0F - k);
+                yield hex.radius * out;
+            }
+            case COLLAPSING -> {
+                float k = Math.clamp(t / COLLAPSE_TICKS, 0.0F, 1.0F);
+                yield hex.phaseRadius * (1.0F - k * k * k);
+            }
+            default -> hex.radius;
+        };
+    }
+
+    /**
+     * Moves a Hex to another era. Its town makes itself over to match, sweeping out from the middle.
+     */
+    public static void setEra(ServerLevel level, Hex hex, Era era) {
+        if (hex.era == era) {
+            return;
+        }
+        hex.era = era;
+        hex.eraSince = level.getGameTime();
+        HexData.of(level).changed();
+        play(level, hex.center, SoundEvents.BEACON_POWER_SELECT, 2.5F, 0.6F);
     }
 
     /**
@@ -130,7 +180,7 @@ public final class Hexes {
         ServerLevel level = player.level();
         HexData data = HexData.of(level);
         Hex hex = data.byCaster(player.getUUID());
-        if (hex == null || hex.phase == Hex.Phase.COLLAPSING) {
+        if (hex == null || hex.phase == Hex.Phase.COLLAPSING || hex.phase == Hex.Phase.FOUNDING) {
             return false;
         }
         float next = hex.radius + delta;
@@ -152,10 +202,13 @@ public final class Hexes {
 
     public static void tick(ServerLevel level) {
         HexData data = HexData.of(level);
+        long now = level.getGameTime();
+        if (now % 20 == 0 && !data.pending().isEmpty()) {
+            putBackLeftovers(level, data);
+        }
         if (data.all().isEmpty()) {
             return;
         }
-        long now = level.getGameTime();
         List<Hex> fallen = new ArrayList<>();
         for (Hex hex : data.all()) {
             ServerPlayer caster = level.getServer().getPlayerList().getPlayer(hex.caster);
@@ -165,6 +218,18 @@ public final class Hexes {
                 hex.casterName = caster.getGameProfile().name();
             }
             switch (hex.phase) {
+                case FOUNDING -> {
+                    if (!crowned) {
+                        hex.enter(Hex.Phase.WARNING, now);
+                        data.changed();
+                    } else if (hex.town == null || hex.town.isHomeFinished(BlockPos.containing(hex.center)) || now - hex.phaseSince >= FOUNDING_LIMIT) {
+                        // the home stands: the Hex bursts out of it
+                        hex.enter(Hex.Phase.SPREADING, now);
+                        data.changed();
+                        play(level, hex.center, SoundEvents.LIGHTNING_BOLT_THUNDER, 0.6F, 1.8F);
+                        play(level, hex.center, SoundEvents.BEACON_ACTIVATE, 3.0F, 0.7F);
+                    }
+                }
                 case SPREADING, STANDING -> {
                     if (!crowned) {
                         hex.enter(Hex.Phase.WARNING, now);
@@ -188,9 +253,25 @@ public final class Hexes {
                     }
                 }
             }
+            if (hex.town != null) {
+                hex.town.tick(level, hex.center, wallRadius(hex, now), hex.radius, hex.era, hex.phase == Hex.Phase.COLLAPSING, now);
+                if (hex.town.takeChanged()) {
+                    data.setDirty();
+                }
+            }
         }
         for (Hex hex : fallen) {
+            takeDownTown(level, data, hex);
             data.remove(hex);
+        }
+    }
+
+    /**
+     * Lets a Hex go: it falls as it would without its caster's crown, wall rushing in.
+     */
+    public static void release(ServerLevel level, Hex hex) {
+        if (hex.phase != Hex.Phase.COLLAPSING) {
+            collapse(level, HexData.of(level), hex, level.getGameTime());
         }
     }
 
@@ -200,7 +281,30 @@ public final class Hexes {
     public static void dispelAll(ServerLevel level) {
         HexData data = HexData.of(level);
         for (Hex hex : List.copyOf(data.all())) {
+            takeDownTown(level, data, hex);
             data.remove(hex);
+        }
+    }
+
+    /**
+     * Puts back everything a Hex's town built. What lies in chunks that aren't loaded goes back when they are.
+     */
+    private static void takeDownTown(ServerLevel level, HexData data, Hex hex) {
+        if (hex.town != null) {
+            hex.town.restoreAll(level, data.pending()::put);
+            data.setDirty();
+        }
+    }
+
+    private static void putBackLeftovers(ServerLevel level, HexData data) {
+        var iterator = data.pending().long2ObjectEntrySet().fastIterator();
+        int budget = 2048;
+        while (iterator.hasNext() && budget-- > 0) {
+            var entry = iterator.next();
+            if (HexTown.putBackLeftover(level, entry.getLongKey(), entry.getValue())) {
+                iterator.remove();
+                data.setDirty();
+            }
         }
     }
 

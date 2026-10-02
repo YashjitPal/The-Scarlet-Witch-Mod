@@ -13,7 +13,7 @@ layout(std140) uniform HexView {
     mat4 InvProjView;
     // xyz: center relative to the camera, w: radius, out to the middle of each wall
     vec4 Shapes[4];
-    // x: era, y: how brightly the front burns, z: warning flicker, w: unused
+    // x: era, y: how brightly the front burns, z: warning flicker, w: the static of an era change
     vec4 Styles[4];
     // x: 1 + index of the Hex around the camera (0 for none), y: how far into it the view has turned, z: its era, w: count
     vec4 Camera;
@@ -216,7 +216,19 @@ vec4 wallLayer(vec3 hit, vec3 center, float radius, int face, vec3 dir, float pi
         float roll = hash12(vec2(floor(time * 12.0), 3.0));
         alpha *= roll < warning * 0.6 ? 0.15 : 1.0 + warning * 0.5;
     }
+
+    // changing era, the whole wall flares with static
+    float channel = style.w;
+    color = mix(color, vec3(grain), channel * 0.8);
+    alpha = mix(alpha, 0.75, channel * 0.8);
     return vec4(clamp(color, 0.0, 1.0), clamp(alpha * strength, 0.0, 0.9));
+}
+
+// The snow of a set between channels, with bars rolling up through it.
+vec3 channelStatic(vec2 uv, vec2 pixel, float time) {
+    float s = hash12(floor(pixel / 2.0) + floor(time * 30.0) * vec2(7.0, 3.0));
+    float bars = 0.75 + 0.25 * smoothstep(0.0, 0.25, abs(fract(uv.y * 2.0 + time * 3.0) - 0.5));
+    return vec3(s * bars);
 }
 
 vec4 over(vec4 below, vec4 above) {
@@ -268,6 +280,7 @@ void main() {
     int count = int(Camera.w + 0.5);
     int around = int(Camera.x + 0.5) - 1;
     int throughEra = -1;
+    float throughChannel = 0.0;
     float crossing = 0.0;
     vec4 wall = vec4(0.0);
     for (int i = 0; i < 4; i++) {
@@ -291,6 +304,7 @@ void main() {
         } else if (t0 < dist) {
             if (throughEra < 0) {
                 throughEra = int(Styles[i].x + 0.5);
+                throughChannel = Styles[i].w;
             }
             // burning brighter where the wall meets the ground and whatever stands in it
             float contact = exp(-max(dist - t0, 0.0) * 3.0);
@@ -312,6 +326,11 @@ void main() {
     vec3 color = throughEra >= 0 ? eraLook(scene, throughEra, texCoord, screen, time) : scene;
     if (insideAmount > 0.0) {
         color = mix(color, eraLook(scene, insideEra, texCoord, screen, time), insideAmount);
+    }
+    // changing era: the picture drops into static for a moment, like a set changing channels
+    float channel = max(around >= 0 ? Styles[around].w * insideAmount : 0.0, throughChannel);
+    if (channel > 0.0) {
+        color = mix(color, channelStatic(texCoord, pixel, time), channel * 0.9);
     }
     color = mix(color, wall.rgb, wall.a);
 

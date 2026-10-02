@@ -12,6 +12,7 @@ import com.yashjit.scarlet.client.fx.CastFx;
 import com.yashjit.scarlet.client.fx.LevitationFx;
 import com.yashjit.scarlet.client.fx.ScarletFx;
 import com.yashjit.scarlet.client.fx.ShieldFx;
+import com.yashjit.scarlet.client.fx.TownFx;
 import com.yashjit.scarlet.client.fx.TransformationFx;
 import com.yashjit.scarlet.client.hex.HexClient;
 import com.yashjit.scarlet.client.hex.HexScreen;
@@ -28,6 +29,7 @@ import com.yashjit.scarlet.network.ChaosImpactPayload;
 import com.yashjit.scarlet.network.HexSyncPayload;
 import com.yashjit.scarlet.network.MagicEventPayload;
 import com.yashjit.scarlet.network.ToggleSuitPayload;
+import com.yashjit.scarlet.network.TownBuildPayload;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.registry.ScarletEntities;
 import net.minecraft.client.Minecraft;
@@ -57,12 +59,14 @@ public final class ScarletClient {
             LevitationFx.onEvent(payload);
         });
         platform.registerClientbound(HexSyncPayload.TYPE, HexClient::receive);
+        platform.registerClientbound(TownBuildPayload.TYPE, TownFx::onBuild);
         platform.registerHud(Scarlet.id("magic"), MagicHud::render);
         platform.liftStatusBars(MagicHud::lift);
         platform.onSubmitWorldGeometry(ScarletFx::submit);
         platform.onSubmitWorldGeometry(BoltFx::submit);
         platform.onSubmitWorldGeometry(ShieldFx::submit);
         platform.onSubmitWorldGeometry(LevitationFx::submit);
+        platform.onSubmitWorldGeometry(TownFx::submit);
     }
 
     public static void onClientTick(Minecraft minecraft) {
@@ -87,6 +91,7 @@ public final class ScarletClient {
         BoltFx.tick(minecraft);
         ShieldFx.tick(minecraft);
         LevitationFx.tick(minecraft);
+        TownFx.tick(minecraft);
         if (minecraft.level != null && minecraft.level.getGameTime() % 100 == 0) {
             CastGestures.prune(minecraft.level);
             PoseBlends.prune(minecraft.level);
