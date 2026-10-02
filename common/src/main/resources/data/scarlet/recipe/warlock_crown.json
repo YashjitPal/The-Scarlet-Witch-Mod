@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "A": "minecraft:amethyst_shard",
+    "G": "minecraft:gold_ingot",
+    "R": "minecraft:redstone"
+  },
+  "pattern": [
+    "RAR",
+    "GGG"
+  ],
+  "result": {
+    "id": "scarlet:warlock_crown"
+  }
+}

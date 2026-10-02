@@ -1,0 +1,44 @@
+{
+  "item.scarlet.witch_tiara": "Tiara of the Scarlet Witch",
+  "item.scarlet.warlock_crown": "Crown of the Scarlet Warlock",
+  "item.scarlet.crown.lore": "Chaos answers to whoever wears it.",
+  "item.scarlet.crown.mastery": "Mastery %s",
+  "item.scarlet.crown.mastery.progress": "%s%% to the next rank",
+  "item.scarlet.crown.mastery.max": "Fully mastered",
+
+  "entity.scarlet.chaos_bolt": "Chaos Bolt",
+
+  "itemGroup.scarlet": "Scarlet Witch",
+
+  "key.category.scarlet.main": "Scarlet Witch",
+  "key.scarlet.suit_up": "Suit Up",
+  "key.scarlet.spell_wheel": "Spell Wheel",
+
+  "spell.scarlet.chaos_bolt": "Chaos Bolt",
+  "spell.scarlet.chaos_shield": "Chaos Shield",
+  "spell.scarlet.levitation": "Levitation",
+  "spell.scarlet.telekinesis": "Telekinesis",
+  "spell.scarlet.red_mist": "Red Mist",
+  "spell.scarlet.shockwave": "Shockwave",
+  "spell.scarlet.mind_control": "Mind Control",
+  "spell.scarlet.rune_trap": "Rune Trap",
+
+  "spell.scarlet.locked": "Unlocks at mastery %s",
+  "spell.scarlet.unavailable": "Still awakening",
+  "spell.scarlet.hex": "The Hex",
+  "era.scarlet.1950s": "1950s",
+  "era.scarlet.1960s": "1960s",
+  "era.scarlet.1970s": "1970s",
+  "era.scarlet.1980s": "1980s",
+  "era.scarlet.2000s": "2000s",
+  "era.scarlet.present": "Present day",
+  "tag.item.scarlet.crowns": "Crowns",
+  "spell.scarlet.cost": "%s energy",
+  "spell.scarlet.cost.channel": "%s energy a second",
+
+  "message.scarlet.suit_up.need_crown": "Wear a crown to suit up.",
+
+  "death.attack.scarlet.chaos_bolt": "%1$s was unmade by %2$s's chaos magic",
+  "death.attack.scarlet.chaos_bolt.player": "%1$s was unmade by chaos magic while fighting %2$s",
+  "death.attack.scarlet.chaos_bolt.item": "%1$s was unmade by %2$s's chaos magic"
+}
