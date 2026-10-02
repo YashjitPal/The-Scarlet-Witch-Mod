@@ -1,0 +1,34 @@
+# gradle
+build
+.gradle
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea/*
+!.idea/scopes
+
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# vscode
+.vscode
+
+# game run directories
+run
+runs
+
+# asset tool environments
+tools/.venv
+__pycache__
+
+# os
+Thumbs.db
+.DS_Store

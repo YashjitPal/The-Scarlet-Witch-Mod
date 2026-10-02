@@ -1,0 +1,13 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "scarlet:item/witch_tiara_worn"
+  },
+  "display": {
+    "head": { "rotation": [0, 180, 0], "translation": [0, 2.88, -6.704], "scale": [1, 1, 0.512] },
+    "thirdperson_righthand": { "rotation": [0, 0, 0], "translation": [0, 2, 1], "scale": [0.6, 0.6, 0.6] },
+    "thirdperson_lefthand": { "rotation": [0, 0, 0], "translation": [0, 2, 1], "scale": [0.6, 0.6, 0.6] },
+    "firstperson_righthand": { "rotation": [0, -90, 25], "translation": [1.13, 3.2, 1.13], "scale": [0.75, 0.75, 0.75] },
+    "firstperson_lefthand": { "rotation": [0, 90, -25], "translation": [1.13, 3.2, 1.13], "scale": [0.75, 0.75, 0.75] }
+  }
+}
