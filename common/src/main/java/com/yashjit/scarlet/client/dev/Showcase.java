@@ -392,6 +392,42 @@ public final class Showcase {
                     .shot("hex_warning_a", 20).shot("hex_warning_b", 30)
                     .shot("hex_collapse_a", 55).shot("hex_collapse_b", 15).shot("hex_collapse_c", 15).shot("hex_gone", 30)
                     .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]");
+            case "town" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=minecraft:pig]")
+                    .command("kill @e[type=minecraft:mannequin]")
+                    .command("execute as @a run scarlet hex build town")
+                    .command("time set noon")
+                    // open grassland, with a player's hut standing in one of the lots for the town to leave alone
+                    .command("execute at @a run fill ~-24 ~ ~-24 ~24 ~12 ~24 minecraft:air")
+                    .command("execute at @a run fill ~-64 ~-1 ~-64 ~64 ~-1 ~64 minecraft:grass_block")
+                    .command("execute at @a run fill ~-14 ~ ~3 ~-10 ~3 ~7 minecraft:cobblestone hollow")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX)
+                    .look(17, 180, 24, 2.0)
+                    .tap().shot("town_found_a", 12).shot("town_found_b", 22).shot("town_found_c", 24).shot("town_found_d", 24)
+                    .shot("town_found_e", 24).shot("town_burst", 16)
+                    .look(80, 180, 55, 0.0).shot("town_spread_a", 16).shot("town_spread_b", 30).shot("town_spread_c", 60)
+                    .look(9, 200, 12, 1.6).shot("town_home", 40)
+                    .hold(true).then(minecraft -> {
+                    }, 50)
+                    .hold(false)
+                    .look(115, 180, 58, 0.0).shot("town_grown_a", 60).shot("town_grown_b", 90)
+                    .look(22, 120, 16, 1.5).shot("town_street", 4)
+                    .command("execute as @a at @s run scarlet hex era 1970s").shot("town_70s_sweep", 14).shot("town_70s_street", 50)
+                    .look(115, 180, 58, 0.0).shot("town_70s", 4)
+                    .look(22, 120, 16, 1.5)
+                    .command("execute as @a at @s run scarlet hex era 1980s").shot("town_80s_street", 60)
+                    .command("execute as @a at @s run scarlet hex era present").shot("town_present_street", 60)
+                    .command("execute as @a at @s run scarlet hex era 1950s").shot("town_50s_street", 60)
+                    .look(115, 180, 58, 0.0)
+                    .sneak(true).hold(true).then(minecraft -> {
+                    }, 40)
+                    .hold(false).sneak(false).shot("town_shrunk", 60)
+                    .command("execute as @a at @s run scarlet hex dispel").shot("town_collapse_a", 18).shot("town_collapse_b", 16)
+                    .shot("town_gone", 50);
             case "play" -> s
                     .command("item replace entity @a armor.head with scarlet:witch_tiara")
                     .command("give @a scarlet:warlock_crown");
@@ -540,9 +576,6 @@ public final class Showcase {
         }
 
         /**
-         * Stops creative flight left over from an earlier run, so the player stands on the ground.
-         */
-        /**
          * Takes down any Hex an earlier run left standing in the world.
          */
         Scene dispelHexes() {
@@ -554,6 +587,9 @@ public final class Showcase {
             }, 4);
         }
 
+        /**
+         * Stops creative flight left over from an earlier run, so the player stands on the ground.
+         */
         Scene land() {
             return then(minecraft -> {
                 if (minecraft.player != null && minecraft.player.getAbilities().flying) {

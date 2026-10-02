@@ -8,7 +8,7 @@ public final class ScarletNetwork {
     /**
      * Bump whenever a payload's format changes, so mismatched clients and servers refuse to connect.
      */
-    public static final String VERSION = "4";
+    public static final String VERSION = "5";
 
     private ScarletNetwork() {
     }
@@ -20,5 +20,6 @@ public final class ScarletNetwork {
         registry.clientbound(ChaosImpactPayload.TYPE, ChaosImpactPayload.STREAM_CODEC);
         registry.clientbound(MagicEventPayload.TYPE, MagicEventPayload.STREAM_CODEC);
         registry.clientbound(HexSyncPayload.TYPE, HexSyncPayload.STREAM_CODEC);
+        registry.clientbound(TownBuildPayload.TYPE, TownBuildPayload.STREAM_CODEC);
     }
 }

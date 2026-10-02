@@ -2,10 +2,13 @@ package com.yashjit.scarlet.hex;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.yashjit.scarlet.hex.town.HexTown;
+import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.phys.Vec3;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One caster's Hex: a hexagonal dome of rewritten reality around the point it was cast from, shaped as
@@ -25,8 +28,15 @@ public final class Hex {
             Codec.STRING.optionalFieldOf("name", DEFAULT_NAME).forGetter(hex -> hex.name),
             Phase.CODEC.optionalFieldOf("phase", Phase.STANDING).forGetter(hex -> hex.phase),
             Codec.LONG.optionalFieldOf("phase_since", 0L).forGetter(hex -> hex.phaseSince),
-            Codec.FLOAT.optionalFieldOf("phase_radius", 0.0F).forGetter(hex -> hex.phaseRadius)
-    ).apply(i, Hex::new));
+            Codec.FLOAT.optionalFieldOf("phase_radius", 0.0F).forGetter(hex -> hex.phaseRadius),
+            Codec.LONG.optionalFieldOf("era_since", 0L).forGetter(hex -> hex.eraSince),
+            HexTown.CODEC.optionalFieldOf("town").forGetter(hex -> Optional.ofNullable(hex.town))
+    ).apply(i, (caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius, eraSince, town) -> {
+        Hex hex = new Hex(caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius);
+        hex.eraSince = eraSince;
+        hex.town = town.orElse(null);
+        return hex;
+    }));
 
     final UUID caster;
     String casterName;
@@ -38,6 +48,9 @@ public final class Hex {
     long phaseSince;
     /** The radius when the current phase began, which the collapse shrinks from. */
     float phaseRadius;
+    /** When the era last changed, for the channel-change flicker. */
+    long eraSince;
+    @Nullable HexTown town;
 
     Hex(UUID caster, String casterName, Vec3 center, float radius, Era era, String name, Phase phase, long phaseSince, float phaseRadius) {
         this.caster = caster;
@@ -75,6 +88,10 @@ public final class Hex {
         return phase;
     }
 
+    public @Nullable HexTown town() {
+        return town;
+    }
+
     public boolean contains(Vec3 point) {
         return HexShape.contains(center, radius, point);
     }
@@ -86,10 +103,12 @@ public final class Hex {
     }
 
     HexSnapshot snapshot() {
-        return new HexSnapshot(caster, casterName, center, radius, era.ordinal(), name, phase.ordinal(), phaseSince, phaseRadius);
+        return new HexSnapshot(caster, casterName, center, radius, era.ordinal(), name, phase.ordinal(), phaseSince, phaseRadius, eraSince);
     }
 
     public enum Phase implements StringRepresentable {
+        /** The caster's home building itself, before the Hex bursts out of it. */
+        FOUNDING("founding"),
         /** Rushing out from where it was cast. */
         SPREADING("spreading"),
         STANDING("standing"),

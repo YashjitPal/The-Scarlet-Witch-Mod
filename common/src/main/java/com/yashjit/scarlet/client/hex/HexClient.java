@@ -27,6 +27,8 @@ public final class HexClient {
 
     /** How long the caster's arms stay thrown wide after casting, in ticks. */
     public static final float BURST_TICKS = 30.0F;
+    /** How long the static of an era change lasts, in ticks. */
+    private static final float CHANNEL_TICKS = 16.0F;
 
     private static final Map<UUID, Wall> WALLS = new HashMap<>();
     private static final Map<UUID, Double> BURSTS = new HashMap<>();
@@ -51,7 +53,9 @@ public final class HexClient {
         double now = minecraft.level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         for (HexSnapshot hex : payload.hexes()) {
             HexSnapshot old = before.get(hex.caster());
-            if (old == null && hex.phaseValue() == Hex.Phase.SPREADING && now - hex.phaseSince() < 10) {
+            boolean entered = old == null || old.phase() != hex.phase();
+            boolean bursting = hex.phaseValue() == Hex.Phase.FOUNDING || hex.phaseValue() == Hex.Phase.SPREADING;
+            if (entered && bursting && now - hex.phaseSince() < 10) {
                 BURSTS.put(hex.caster(), (double) hex.phaseSince());
             }
         }
@@ -114,7 +118,10 @@ public final class HexClient {
             }
             float flare = flare(hex, now, Math.abs(wall.radius - before) / Math.max(seconds, 1.0E-3F));
             float warning = hex.phaseValue() == Hex.Phase.WARNING ? Ease.clamp01((float) (now - hex.phaseSince()) / Hexes.WARNING_TICKS) : 0.0F;
-            shown.add(new Shown(hex.center(), radius, hex.eraValue(), flare, warning, distance));
+            float sinceEra = (float) (now - hex.eraSince());
+            float channel = hex.eraSince() > 0 && sinceEra >= 0.0F && sinceEra < CHANNEL_TICKS
+                    ? (float) Math.pow(1.0F - sinceEra / CHANNEL_TICKS, 1.5) : 0.0F;
+            shown.add(new Shown(hex.center(), radius, hex.eraValue(), flare, warning, channel, distance));
         }
         WALLS.keySet().removeIf(id -> Hexes.clientHexes().stream().noneMatch(hex -> hex.caster().equals(id)));
         shown.sort(Comparator.comparingDouble(Shown::distance));
@@ -124,6 +131,7 @@ public final class HexClient {
     private static float radius(HexSnapshot hex, Wall wall, double now, float seconds) {
         float t = (float) (now - hex.phaseSince());
         switch (hex.phaseValue()) {
+            case FOUNDING -> wall.radius = 0.0F;
             case SPREADING -> wall.radius = hex.radius() * Ease.outCubic(Ease.clamp01(t / Hexes.SPREAD_TICKS));
             case COLLAPSING -> wall.radius = hex.phaseRadius() * (1.0F - Ease.inCubic(Ease.clamp01(t / Hexes.COLLAPSE_TICKS)));
             default -> wall.radius = Ease.damp(wall.radius, hex.radius(), 6.0F, seconds);
@@ -139,6 +147,7 @@ public final class HexClient {
     private static float flare(HexSnapshot hex, double now, float speed) {
         float t = (float) (now - hex.phaseSince());
         return switch (hex.phaseValue()) {
+            case FOUNDING -> 0.0F;
             case SPREADING -> 1.0F - Ease.clamp01(t / Hexes.SPREAD_TICKS) * 0.8F;
             case COLLAPSING -> 0.6F + 0.4F * Ease.clamp01(t / Hexes.COLLAPSE_TICKS);
             default -> Math.min(0.6F, speed / 12.0F);
@@ -147,9 +156,10 @@ public final class HexClient {
 
     /**
      * @param center   world position
+     * @param channel  the static of an era change, 1 the moment it changes and fading to 0
      * @param distance from the camera to the center
      */
-    public record Shown(Vec3 center, float radius, Era era, float flare, float warning, double distance) {
+    public record Shown(Vec3 center, float radius, Era era, float flare, float warning, float channel, double distance) {
     }
 
     private static final class Wall {
