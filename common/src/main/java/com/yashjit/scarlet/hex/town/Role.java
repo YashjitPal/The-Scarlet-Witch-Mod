@@ -80,7 +80,18 @@ public enum Role {
     /** A barn's red boards. */
     BARN_WALL,
     /** A bed upstairs, both halves of it. */
-    BED;
+    BED,
+    // the era decorations a home is furnished with, which change model with the era rather than block
+    TELEVISION,
+    RADIO,
+    TELEPHONE,
+    STOVE,
+    TOASTER,
+    ARMCHAIR,
+    TABLE_LAMP,
+    CLOCK,
+    PICTURE,
+    POSTER;
 
     private static final Role[] VALUES = values();
 

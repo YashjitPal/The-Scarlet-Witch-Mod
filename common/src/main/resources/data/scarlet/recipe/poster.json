@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "P": "minecraft:paper",
+    "R": "minecraft:red_dye"
+  },
+  "pattern": [
+    "PR",
+    "PP"
+  ],
+  "result": {
+    "count": 2,
+    "id": "scarlet:poster"
+  }
+}

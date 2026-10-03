@@ -1,0 +1,61 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/bakelite_brown",
+    "t0": "scarlet:block/decor/bakelite_brown",
+    "t1": "scarlet:block/decor/radio/1950s_front",
+    "t2": "scarlet:block/decor/radio/1950s_dial_on"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, 3.188, 0], "scale": [0.85, 0.85, 0.85] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.4, 0.4, 0.4] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.68, 0.68, 0.68] }
+},
+  "elements": [
+    {
+      "from": [3, 0, 6],
+      "to": [13, 7, 11],
+      "faces": {
+        "down": { "uv": [3, 5, 13, 10], "texture": "#t0", "cullface": "down" },
+        "up": { "uv": [3, 6, 13, 11], "texture": "#t0" },
+        "north": { "uv": [0, 0, 10, 7], "texture": "#t1" },
+        "south": { "uv": [3, 9, 13, 16], "texture": "#t0" },
+        "west": { "uv": [6, 9, 11, 16], "texture": "#t0" },
+        "east": { "uv": [5, 9, 10, 16], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [4, 7, 6],
+      "to": [12, 8, 11],
+      "faces": {
+        "down": { "uv": [4, 5, 12, 10], "texture": "#t0" },
+        "up": { "uv": [4, 6, 12, 11], "texture": "#t0" },
+        "north": { "uv": [4, 8, 12, 9], "texture": "#t0" },
+        "south": { "uv": [4, 8, 12, 9], "texture": "#t0" },
+        "west": { "uv": [6, 8, 11, 9], "texture": "#t0" },
+        "east": { "uv": [5, 8, 10, 9], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [5.5, 8, 6],
+      "to": [10.5, 8.5, 11],
+      "faces": {
+        "down": { "uv": [5.5, 5, 10.5, 10], "texture": "#t0" },
+        "up": { "uv": [5.5, 6, 10.5, 11], "texture": "#t0" },
+        "north": { "uv": [5.5, 7.5, 10.5, 8], "texture": "#t0" },
+        "south": { "uv": [5.5, 7.5, 10.5, 8], "texture": "#t0" },
+        "west": { "uv": [6, 7.5, 11, 8], "texture": "#t0" },
+        "east": { "uv": [5, 7.5, 10, 8], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [4, 4, 5.8],
+      "to": [7, 6, 6],
+      "light_emission": 10,
+      "shade_direction_override": "up",
+      "faces": {
+        "north": { "uv": [0, 0, 3, 2], "texture": "#t2" }
+      }
+    }
+  ]
+}

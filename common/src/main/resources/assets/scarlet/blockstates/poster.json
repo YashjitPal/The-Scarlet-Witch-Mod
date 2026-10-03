@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "era=1950s,facing=north": { "model": "scarlet:block/poster/1950s" },
+    "era=1950s,facing=east": { "model": "scarlet:block/poster/1950s", "y": 90 },
+    "era=1950s,facing=south": { "model": "scarlet:block/poster/1950s", "y": 180 },
+    "era=1950s,facing=west": { "model": "scarlet:block/poster/1950s", "y": 270 },
+    "era=1960s,facing=north": { "model": "scarlet:block/poster/1960s" },
+    "era=1960s,facing=east": { "model": "scarlet:block/poster/1960s", "y": 90 },
+    "era=1960s,facing=south": { "model": "scarlet:block/poster/1960s", "y": 180 },
+    "era=1960s,facing=west": { "model": "scarlet:block/poster/1960s", "y": 270 },
+    "era=1970s,facing=north": { "model": "scarlet:block/poster/1970s" },
+    "era=1970s,facing=east": { "model": "scarlet:block/poster/1970s", "y": 90 },
+    "era=1970s,facing=south": { "model": "scarlet:block/poster/1970s", "y": 180 },
+    "era=1970s,facing=west": { "model": "scarlet:block/poster/1970s", "y": 270 },
+    "era=1980s,facing=north": { "model": "scarlet:block/poster/1980s" },
+    "era=1980s,facing=east": { "model": "scarlet:block/poster/1980s", "y": 90 },
+    "era=1980s,facing=south": { "model": "scarlet:block/poster/1980s", "y": 180 },
+    "era=1980s,facing=west": { "model": "scarlet:block/poster/1980s", "y": 270 },
+    "era=2000s,facing=north": { "model": "scarlet:block/poster/2000s" },
+    "era=2000s,facing=east": { "model": "scarlet:block/poster/2000s", "y": 90 },
+    "era=2000s,facing=south": { "model": "scarlet:block/poster/2000s", "y": 180 },
+    "era=2000s,facing=west": { "model": "scarlet:block/poster/2000s", "y": 270 },
+    "era=present,facing=north": { "model": "scarlet:block/poster/present" },
+    "era=present,facing=east": { "model": "scarlet:block/poster/present", "y": 90 },
+    "era=present,facing=south": { "model": "scarlet:block/poster/present", "y": 180 },
+    "era=present,facing=west": { "model": "scarlet:block/poster/present", "y": 270 }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "conditions": [ { "condition": "minecraft:survives_explosion" } ],
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "scarlet:refrigerator",
+          "conditions": [
+            {
+              "condition": "minecraft:block_state_property",
+              "block": "scarlet:refrigerator",
+              "properties": { "half": "lower" }
+            }
+          ]
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "scarlet:blocks/refrigerator"
+}

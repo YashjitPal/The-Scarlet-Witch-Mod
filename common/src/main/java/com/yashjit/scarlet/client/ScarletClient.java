@@ -69,7 +69,11 @@ import com.yashjit.scarlet.network.TownUnformPayload;
 import com.yashjit.scarlet.network.TownGlitchPayload;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.registry.ScarletEntities;
+import com.yashjit.scarlet.client.hex.RadioMusic;
+import com.yashjit.scarlet.client.entity.ParkedCarRenderer;
+import com.yashjit.scarlet.decor.RadioSounds;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.NoopRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;
 import org.jspecify.annotations.Nullable;
 
@@ -91,6 +95,9 @@ public final class ScarletClient {
         platform.registerAvatarLayer(CostumeLayer::new);
         platform.registerAvatarLayer(MagicLayer::new);
         platform.registerEntityRenderer(ScarletEntities.CHAOS_BOLT, ChaosBoltRenderer::new);
+        platform.registerEntityRenderer(ScarletEntities.SEAT, NoopRenderer::new);
+        platform.registerEntityRenderer(ScarletEntities.PARKED_CAR, ParkedCarRenderer::new);
+        RadioSounds.listen(RadioMusic::heard);
         platform.registerClientbound(ChaosImpactPayload.TYPE, BoltFx::impact);
         platform.registerClientbound(MagicEventPayload.TYPE, payload -> {
             ShieldFx.onEvent(payload);
@@ -167,6 +174,7 @@ public final class ScarletClient {
         Outfits.tick(minecraft);
         TitleCard.tick(minecraft);
         LaughTrack.tick(minecraft);
+        RadioMusic.tick(minecraft);
         SpellWheel.tick(minecraft);
         CastInput.tick(minecraft);
         ScarletFx.tick(minecraft);

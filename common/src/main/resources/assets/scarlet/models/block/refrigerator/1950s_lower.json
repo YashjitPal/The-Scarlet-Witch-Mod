@@ -1,0 +1,51 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/chrome",
+    "t0": "scarlet:block/decor/chrome",
+    "t1": "scarlet:block/decor/enamel_mint",
+    "t2": "scarlet:block/decor/refrigerator/1950s_lower"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.625, 0.625, 0.625] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.25, 0.25, 0.25] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.5, 0.5, 0.5] }
+},
+  "elements": [
+    {
+      "from": [1.5, 0, 4],
+      "to": [14.5, 1, 14],
+      "faces": {
+        "down": { "uv": [1.5, 2, 14.5, 12], "texture": "#t0", "cullface": "down" },
+        "up": { "uv": [1.5, 4, 14.5, 14], "texture": "#t0" },
+        "north": { "uv": [1.5, 15, 14.5, 16], "texture": "#t0" },
+        "south": { "uv": [1.5, 15, 14.5, 16], "texture": "#t0" },
+        "west": { "uv": [4, 15, 14, 16], "texture": "#t0" },
+        "east": { "uv": [2, 15, 12, 16], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [1, 1, 3],
+      "to": [15, 16, 15],
+      "faces": {
+        "down": { "uv": [1, 1, 15, 13], "texture": "#t1" },
+        "up": { "uv": [1, 3, 15, 15], "texture": "#t1", "cullface": "up" },
+        "north": { "uv": [0, 0, 14, 15], "texture": "#t2" },
+        "south": { "uv": [1, 0, 15, 15], "texture": "#t1" },
+        "west": { "uv": [3, 0, 15, 15], "texture": "#t1" },
+        "east": { "uv": [1, 0, 13, 15], "texture": "#t1" }
+      }
+    },
+    {
+      "from": [11, 14, 2.2],
+      "to": [12.5, 16, 3],
+      "faces": {
+        "down": { "uv": [11, 13, 12.5, 13.8], "texture": "#t0" },
+        "north": { "uv": [3.5, 0, 5, 2], "texture": "#t0" },
+        "south": { "uv": [11, 0, 12.5, 2], "texture": "#t0" },
+        "west": { "uv": [2.2, 0, 3, 2], "texture": "#t0" },
+        "east": { "uv": [13, 0, 13.8, 2], "texture": "#t0" }
+      }
+    }
+  ]
+}

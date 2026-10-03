@@ -205,6 +205,33 @@ public final class Showcase {
                 WorldPresets::createTestWorldDimensions, new TitleScreen());
     }
 
+    /**
+     * Every era decoration in one era, set down in a row six blocks in front of the player and facing them: the
+     * kitchen to the left, the living room in the middle, the wall hangings to the right against the wall behind.
+     */
+    private static List<String> decorRow(String era) {
+        String e = "era=" + era + ",facing=north";
+        List<String> c = new ArrayList<>();
+        c.add("execute at @a run setblock ~-12 ~ ~6 scarlet:refrigerator[" + e + ",half=lower]");
+        c.add("execute at @a run setblock ~-12 ~1 ~6 scarlet:refrigerator[" + e + ",half=upper]");
+        c.add("execute at @a run setblock ~-10 ~ ~6 scarlet:stove[" + e + ",lit=true]");
+        c.add("execute at @a run setblock ~-8 ~ ~6 minecraft:smooth_quartz");
+        c.add("execute at @a run setblock ~-8 ~1 ~6 scarlet:toaster[" + e + "]");
+        c.add("execute at @a run setblock ~-6 ~ ~6 scarlet:television[" + e + ",lit=true]");
+        c.add("execute at @a run setblock ~-4 ~ ~6 scarlet:couch[" + e + ",part=left]");
+        c.add("execute at @a run setblock ~-3 ~ ~6 scarlet:couch[" + e + ",part=middle]");
+        c.add("execute at @a run setblock ~-2 ~ ~6 scarlet:couch[" + e + ",part=right]");
+        c.add("execute at @a run setblock ~0 ~ ~6 scarlet:armchair[" + e + "]");
+        c.add("execute at @a run setblock ~2 ~ ~6 scarlet:lamp[" + e + ",lit=true]");
+        c.add("execute at @a run setblock ~4 ~ ~6 scarlet:radio[" + e + ",lit=true]");
+        c.add("execute at @a run setblock ~6 ~ ~6 minecraft:oak_slab[type=top]");
+        c.add("execute at @a run setblock ~6 ~1 ~6 scarlet:telephone[" + e + "]");
+        c.add("execute at @a run setblock ~8 ~1 ~6 scarlet:wall_clock[" + e + "]");
+        c.add("execute at @a run setblock ~10 ~1 ~6 scarlet:picture_frame[" + e + "]");
+        c.add("execute at @a run setblock ~12 ~1 ~6 scarlet:poster[" + e + "]");
+        return c;
+    }
+
     private static List<Step> scene(String name) {
         Scene s = new Scene();
         s.command("time set noon").command("weather clear").camera(CameraType.THIRD_PERSON_FRONT).hideHud(true);
@@ -658,6 +685,86 @@ public final class Showcase {
                             }, 150)
                             .view(-12, 8, -19, 0, 6, 1).shot("homes_" + cast, 6)
                             .dispelHexes();
+                }
+                s.playerCamera();
+            }
+            // every era decoration in a row against a wall, era by era: the kitchen, the living room, what hangs on the wall
+            case "decor" -> {
+                s.land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-16 ~ ~-10 ~16 ~8 ~10 minecraft:air")
+                        .command("execute at @a run fill ~-14 ~-1 ~-4 ~14 ~-1 ~8 minecraft:oak_planks")
+                        .command("execute at @a run fill ~-14 ~ ~7 ~14 ~4 ~7 minecraft:smooth_quartz")
+                        .anchor();
+                for (String era : new String[] {"1950s", "1960s", "1970s", "1980s", "2000s", "present"}) {
+                    for (String command : decorRow(era)) {
+                        s.command(command);
+                    }
+                    s.view(0, 5, -8, 0, 1, 6).shot("decor_" + era, 20)
+                            .view(-8.5, 2.6, 1.8, -8.5, 1, 6).shot("decor_" + era + "_kitchen", 6)
+                            .view(-1.5, 2.4, 1.8, -1.5, 0.8, 6).shot("decor_" + era + "_living", 6)
+                            .view(8, 2.6, 1.8, 8, 1.2, 6).shot("decor_" + era + "_wall", 6);
+                }
+                s.command("time set midnight").view(-2, 3, -2, -2, 1, 6).shot("decor_night", 30).command("time set noon").playerCamera();
+            }
+            // cars parked inside a Hex that builds nothing, the Hex taken through every era: a new car each time
+            case "cars" -> {
+                s.land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex build nothing")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("item replace entity @a weapon.offhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-16 ~ ~-6 ~16 ~6 ~16 minecraft:air")
+                        .command("execute at @a run fill ~-16 ~-1 ~-6 ~16 ~-1 ~16 minecraft:smooth_stone")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().anchor()
+                        .tap().then(minecraft -> {
+                        }, 120)
+                        .command("execute at @a run summon scarlet:parked_car ~-7 ~ ~9 {Rotation:[90f,0f],paint:0}")
+                        .command("execute at @a run summon scarlet:parked_car ~0 ~ ~9 {Rotation:[90f,0f],paint:1}")
+                        .command("execute at @a run summon scarlet:parked_car ~7 ~ ~9 {Rotation:[90f,0f],paint:2}");
+                for (String era : new String[] {"1950s", "1960s", "1970s", "1980s", "2000s", "present"}) {
+                    s.command("execute as @a run scarlet hex era " + era).then(minecraft -> {
+                            }, 140)
+                            .view(0, 4, 0, 0, 0.8, 9).shot("cars_" + era, 4)
+                            .view(-5, 2.2, 4.5, 0, 0.8, 9).shot("cars_" + era + "_near", 4);
+                }
+                s.view(4, 2.5, 13.5, 0, 0.8, 9).shot("cars_back", 4).playerCamera().inventory().shot("cars_inventory", 15);
+            }
+            // a home raised on open ground and looked round inside, in three eras: the living room, the kitchen, upstairs
+            case "furnished" -> {
+                s.land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex build home")
+                        .command("execute as @a run scarlet hex forget")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("item replace entity @a weapon.offhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-30 ~ ~-30 ~30 ~16 ~30 minecraft:air")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().anchor()
+                        .tap().then(minecraft -> {
+                        }, 430);
+                for (String era : new String[] {"1950s", "1970s", "present"}) {
+                    s.command("execute as @a run scarlet hex era " + era).then(minecraft -> {
+                            }, 160)
+                            .view(0, 2.3, -2.6, 0, 1.2, 3.5).shot("furnished_" + era + "_couch", 6)
+                            .view(0.5, 2.0, 2.4, -1.5, 0.9, -2.4).shot("furnished_" + era + "_tv", 4)
+                            .view(2.5, 2.0, 2.4, -1.5, 0.9, -2.4).shot("furnished_" + era + "_tv_b", 4)
+                            .view(0, 2.4, -1, -4.5, 1.2, 2.5).shot("furnished_" + era + "_kitchen_a", 4)
+                            .view(0, 2.4, -1, 4.5, 1.2, 2.5).shot("furnished_" + era + "_kitchen_b", 4)
+                            .view(0, 7.3, -1.5, 0, 6.3, 3.5).shot("furnished_" + era + "_upstairs", 4);
                 }
                 s.playerCamera();
             }

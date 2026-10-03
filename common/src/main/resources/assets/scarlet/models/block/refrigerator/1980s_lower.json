@@ -1,0 +1,63 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/enamel_almond",
+    "t0": "scarlet:block/decor/enamel_almond",
+    "t1": "scarlet:block/decor/refrigerator/1980s_lower",
+    "t2": "scarlet:block/decor/plastic_black",
+    "t3": "scarlet:block/decor/plastic_almond"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.625, 0.625, 0.625] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.25, 0.25, 0.25] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.5, 0.5, 0.5] }
+},
+  "elements": [
+    {
+      "from": [0.5, 0.5, 3],
+      "to": [15.5, 16, 15],
+      "faces": {
+        "down": { "uv": [0.5, 1, 15.5, 13], "texture": "#t0" },
+        "up": { "uv": [0.5, 3, 15.5, 15], "texture": "#t0", "cullface": "up" },
+        "north": { "uv": [0, 0, 15, 15.5], "texture": "#t1" },
+        "south": { "uv": [0.5, 0, 15.5, 15.5], "texture": "#t0" },
+        "west": { "uv": [3, 0, 15, 15.5], "texture": "#t0" },
+        "east": { "uv": [1, 0, 13, 15.5], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [1, 0, 4],
+      "to": [15, 0.5, 14],
+      "faces": {
+        "down": { "uv": [1, 2, 15, 12], "texture": "#t2", "cullface": "down" },
+        "up": { "uv": [1, 4, 15, 14], "texture": "#t2" },
+        "north": { "uv": [1, 15.5, 15, 16], "texture": "#t2" },
+        "south": { "uv": [1, 15.5, 15, 16], "texture": "#t2" },
+        "west": { "uv": [4, 15.5, 14, 16], "texture": "#t2" },
+        "east": { "uv": [2, 15.5, 12, 16], "texture": "#t2" }
+      }
+    },
+    {
+      "from": [6.25, 6, 2.2],
+      "to": [7, 16, 3],
+      "faces": {
+        "down": { "uv": [6.25, 13, 7, 13.8], "texture": "#t3" },
+        "north": { "uv": [9, 0, 9.75, 10], "texture": "#t3" },
+        "south": { "uv": [6.25, 0, 7, 10], "texture": "#t3" },
+        "west": { "uv": [2.2, 0, 3, 10], "texture": "#t3" },
+        "east": { "uv": [13, 0, 13.8, 10], "texture": "#t3" }
+      }
+    },
+    {
+      "from": [9, 6, 2.2],
+      "to": [9.75, 16, 3],
+      "faces": {
+        "down": { "uv": [9, 13, 9.75, 13.8], "texture": "#t3" },
+        "north": { "uv": [6.25, 0, 7, 10], "texture": "#t3" },
+        "south": { "uv": [9, 0, 9.75, 10], "texture": "#t3" },
+        "west": { "uv": [2.2, 0, 3, 10], "texture": "#t3" },
+        "east": { "uv": [13, 0, 13.8, 10], "texture": "#t3" }
+      }
+    }
+  ]
+}

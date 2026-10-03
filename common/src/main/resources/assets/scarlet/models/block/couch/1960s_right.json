@@ -1,0 +1,99 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/teak",
+    "t0": "scarlet:block/decor/teak",
+    "t1": "scarlet:block/decor/fabric_teal"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, 1.25, 0], "scale": [0.625, 0.625, 0.625] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.25, 0.25, 0.25] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.5, 0.5, 0.5] }
+},
+  "elements": [
+    {
+      "from": [0, 3, 1],
+      "to": [14.5, 4.5, 15],
+      "faces": {
+        "down": { "uv": [0, 1, 14.5, 15], "texture": "#t0" },
+        "up": { "uv": [0, 1, 14.5, 15], "texture": "#t0" },
+        "north": { "uv": [1.5, 11.5, 16, 13], "texture": "#t0" },
+        "south": { "uv": [0, 11.5, 14.5, 13], "texture": "#t0" },
+        "west": { "uv": [1, 11.5, 15, 13], "texture": "#t0", "cullface": "west" },
+        "east": { "uv": [1, 11.5, 15, 13], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [0, 4.5, 1.5],
+      "to": [14.5, 6.5, 12.5],
+      "faces": {
+        "down": { "uv": [0, 3.5, 14.5, 14.5], "texture": "#t1" },
+        "up": { "uv": [0, 1.5, 14.5, 12.5], "texture": "#t1" },
+        "north": { "uv": [1.5, 9.5, 16, 11.5], "texture": "#t1" },
+        "south": { "uv": [0, 9.5, 14.5, 11.5], "texture": "#t1" },
+        "west": { "uv": [1.5, 9.5, 12.5, 11.5], "texture": "#t1", "cullface": "west" },
+        "east": { "uv": [3.5, 9.5, 14.5, 11.5], "texture": "#t1" }
+      }
+    },
+    {
+      "from": [0, 4.5, 12.5],
+      "to": [14.5, 12, 15.5],
+      "faces": {
+        "down": { "uv": [0, 0.5, 14.5, 3.5], "texture": "#t1" },
+        "up": { "uv": [0, 12.5, 14.5, 15.5], "texture": "#t1" },
+        "north": { "uv": [1.5, 4, 16, 11.5], "texture": "#t1" },
+        "south": { "uv": [0, 4, 14.5, 11.5], "texture": "#t0" },
+        "west": { "uv": [12.5, 4, 15.5, 11.5], "texture": "#t1", "cullface": "west" },
+        "east": { "uv": [0.5, 4, 3.5, 11.5], "texture": "#t1" }
+      }
+    },
+    {
+      "from": [0, 6.5, 11.5],
+      "to": [14.5, 11.5, 12.5],
+      "faces": {
+        "down": { "uv": [0, 3.5, 14.5, 4.5], "texture": "#t1" },
+        "up": { "uv": [0, 11.5, 14.5, 12.5], "texture": "#t1" },
+        "north": { "uv": [1.5, 4.5, 16, 9.5], "texture": "#t1" },
+        "south": { "uv": [0, 4.5, 14.5, 9.5], "texture": "#t1" },
+        "west": { "uv": [11.5, 4.5, 12.5, 9.5], "texture": "#t1", "cullface": "west" },
+        "east": { "uv": [3.5, 4.5, 4.5, 9.5], "texture": "#t1" }
+      }
+    },
+    {
+      "from": [14.5, 4.5, 2],
+      "to": [16, 8.5, 14.5],
+      "faces": {
+        "down": { "uv": [14.5, 1.5, 16, 14], "texture": "#t0" },
+        "up": { "uv": [14.5, 2, 16, 14.5], "texture": "#t0" },
+        "north": { "uv": [0, 7.5, 1.5, 11.5], "texture": "#t0" },
+        "south": { "uv": [14.5, 7.5, 16, 11.5], "texture": "#t0" },
+        "west": { "uv": [2, 7.5, 14.5, 11.5], "texture": "#t0" },
+        "east": { "uv": [1.5, 7.5, 14, 11.5], "texture": "#t0", "cullface": "east" }
+      }
+    },
+    {
+      "from": [14, 0, 2],
+      "to": [15, 3, 3],
+      "faces": {
+        "down": { "uv": [14, 13, 15, 14], "texture": "#t0", "cullface": "down" },
+        "up": { "uv": [14, 2, 15, 3], "texture": "#t0" },
+        "north": { "uv": [1, 13, 2, 16], "texture": "#t0" },
+        "south": { "uv": [14, 13, 15, 16], "texture": "#t0" },
+        "west": { "uv": [2, 13, 3, 16], "texture": "#t0" },
+        "east": { "uv": [13, 13, 14, 16], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [14, 0, 12.5],
+      "to": [15, 3, 13.5],
+      "faces": {
+        "down": { "uv": [14, 2.5, 15, 3.5], "texture": "#t0", "cullface": "down" },
+        "up": { "uv": [14, 12.5, 15, 13.5], "texture": "#t0" },
+        "north": { "uv": [1, 13, 2, 16], "texture": "#t0" },
+        "south": { "uv": [14, 13, 15, 16], "texture": "#t0" },
+        "west": { "uv": [12.5, 13, 13.5, 16], "texture": "#t0" },
+        "east": { "uv": [2.5, 13, 3.5, 16], "texture": "#t0" }
+      }
+    }
+  ]
+}

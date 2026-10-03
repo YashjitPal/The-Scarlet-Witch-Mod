@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "R": "minecraft:redstone",
+    "C": "minecraft:copper_ingot",
+    "S": "minecraft:smooth_stone_slab"
+  },
+  "pattern": [
+    "RCR",
+    "SSS"
+  ],
+  "result": {
+    "count": 1,
+    "id": "scarlet:telephone"
+  }
+}

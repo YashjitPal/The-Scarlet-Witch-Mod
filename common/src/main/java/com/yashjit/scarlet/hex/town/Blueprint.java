@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Everything one part of the town is made of, in the order it builds itself: each piece belongs to a stage (the
@@ -19,18 +20,20 @@ public final class Blueprint {
 
     private final Frame frame;
     private final List<Piece> pieces;
+    private final List<Car> cars;
     private final int[] stageTicks;
 
     /**
      * @param stageTicks how long each stage takes to build
      */
     public Blueprint(Frame frame, int... stageTicks) {
-        this(frame, new ArrayList<>(), stageTicks);
+        this(frame, new ArrayList<>(), new ArrayList<>(), stageTicks);
     }
 
-    private Blueprint(Frame frame, List<Piece> pieces, int[] stageTicks) {
+    private Blueprint(Frame frame, List<Piece> pieces, List<Car> cars, int[] stageTicks) {
         this.frame = frame;
         this.pieces = pieces;
+        this.cars = cars;
         this.stageTicks = stageTicks;
     }
 
@@ -43,7 +46,22 @@ public final class Blueprint {
      * down in this one, shifted over.
      */
     public Blueprint shifted(int a, int b) {
-        return new Blueprint(new Frame(frame.at(a, b, 0), frame.front()), pieces, stageTicks);
+        return new Blueprint(new Frame(frame.at(a, b, 0), frame.front()), pieces, cars, stageTicks);
+    }
+
+    /**
+     * A car parked on the part once it stands, along a line of blocks from one to another back from the street, its
+     * nose the way given.
+     */
+    public void car(int a, int b0, int b1, int y, Direction facing, int paint) {
+        BlockPos from = frame.at(a, b0, y);
+        BlockPos to = frame.at(a, b1, y);
+        Vec3 middle = new Vec3((from.getX() + to.getX()) / 2.0 + 0.5, y, (from.getZ() + to.getZ()) / 2.0 + 0.5);
+        cars.add(new Car(middle, facing, paint));
+    }
+
+    public List<Car> cars() {
+        return cars;
     }
 
     public void set(int a, int b, int y, Role role, int paint, BlockState template, int stage) {
@@ -117,6 +135,12 @@ public final class Blueprint {
             total += ticks;
         }
         return total;
+    }
+
+    /**
+     * A car the town parks: where the middle of it stands, which way its nose points, and its paint.
+     */
+    public record Car(Vec3 at, Direction facing, int paint) {
     }
 
     /**

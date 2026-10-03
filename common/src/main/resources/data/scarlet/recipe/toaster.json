@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "N": "minecraft:iron_nugget",
+    "R": "minecraft:redstone"
+  },
+  "pattern": [
+    "NNN",
+    "NRN"
+  ],
+  "result": {
+    "count": 1,
+    "id": "scarlet:toaster"
+  }
+}

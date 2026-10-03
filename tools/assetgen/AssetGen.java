@@ -96,6 +96,7 @@ public final class AssetGen {
             writePng(strip(row), preview.resolve("people_" + name + ".png"));
         }
         System.out.println("Crown, costume and people assets written to " + assets.toAbsolutePath());
+        Decor.generate(assets.getParent().getParent());
     }
 
     // ---------------------------------------------------------------- crowns

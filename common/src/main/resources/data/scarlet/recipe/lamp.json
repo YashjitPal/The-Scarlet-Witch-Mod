@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "P": "minecraft:paper",
+    "T": "minecraft:torch",
+    "S": "minecraft:smooth_stone_slab"
+  },
+  "pattern": [
+    " P ",
+    "PTP",
+    " S "
+  ],
+  "result": {
+    "count": 1,
+    "id": "scarlet:lamp"
+  }
+}

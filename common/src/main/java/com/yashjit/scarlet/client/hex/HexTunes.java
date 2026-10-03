@@ -5,10 +5,14 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.core.Holder;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The theme each era's title card plays, scored for note blocks: a dreamy harp in the 1950s, a bouncing cartoon
@@ -47,6 +51,28 @@ public final class HexTunes {
             float pitch = (float) Math.pow(2.0, note.semitone / 12.0);
             sounds.playDelayed(SimpleSoundInstance.forUI(note.instrument.value(), pitch, note.volume), note.tick);
         }
+    }
+
+    /**
+     * The same theme played out of something in the world, a radio or a record player, heard from where it stands.
+     */
+    public static void playAt(Era era, Vec3 at, float volume) {
+        SoundManager sounds = Minecraft.getInstance().getSoundManager();
+        RandomSource random = SoundInstance.createUnseededRandom();
+        for (Note note : score(era)) {
+            float pitch = (float) Math.pow(2.0, note.semitone / 12.0);
+            sounds.playDelayed(new SimpleSoundInstance(note.instrument.value(), SoundSource.RECORDS, note.volume * volume, pitch, random, at.x, at.y, at.z),
+                    note.tick);
+        }
+    }
+
+    /** How many ticks an era's theme lasts, to its last note. */
+    public static int length(Era era) {
+        int last = 0;
+        for (Note note : score(era)) {
+            last = Math.max(last, note.tick);
+        }
+        return last + 1;
     }
 
     private static List<Note> score(Era era) {

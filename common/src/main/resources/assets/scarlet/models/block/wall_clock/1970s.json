@@ -1,0 +1,39 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/veneer",
+    "t0": "scarlet:block/decor/veneer",
+    "t1": "scarlet:block/decor/wall_clock/1970s_front"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, -0.172, 0], "scale": [0.69, 0.69, 0.69] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.276, 0.276, 0.276] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.552, 0.552, 0.552] }
+},
+  "elements": [
+    {
+      "from": [4, 1, 14],
+      "to": [12, 15, 16],
+      "faces": {
+        "down": { "uv": [4, 0, 12, 2], "texture": "#t0" },
+        "up": { "uv": [4, 14, 12, 16], "texture": "#t0" },
+        "north": { "uv": [0, 0, 8, 14], "texture": "#t1" },
+        "south": { "uv": [4, 1, 12, 15], "texture": "#t0", "cullface": "south" },
+        "west": { "uv": [14, 1, 16, 15], "texture": "#t0" },
+        "east": { "uv": [0, 1, 2, 15], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [3.5, 14.5, 13.5],
+      "to": [12.5, 15.5, 16],
+      "faces": {
+        "down": { "uv": [3.5, 0, 12.5, 2.5], "texture": "#t0" },
+        "up": { "uv": [3.5, 13.5, 12.5, 16], "texture": "#t0" },
+        "north": { "uv": [3.5, 0.5, 12.5, 1.5], "texture": "#t0" },
+        "south": { "uv": [3.5, 0.5, 12.5, 1.5], "texture": "#t0", "cullface": "south" },
+        "west": { "uv": [13.5, 0.5, 16, 1.5], "texture": "#t0" },
+        "east": { "uv": [0, 0.5, 2.5, 1.5], "texture": "#t0" }
+      }
+    }
+  ]
+}

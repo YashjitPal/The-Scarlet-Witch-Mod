@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "W": "#minecraft:wool",
+    "P": "#minecraft:planks"
+  },
+  "pattern": [
+    "WWW",
+    "PPP"
+  ],
+  "result": {
+    "count": 3,
+    "id": "scarlet:couch"
+  }
+}

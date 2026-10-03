@@ -1,6 +1,9 @@
 package com.yashjit.scarlet.hex.town;
 
+import com.yashjit.scarlet.decor.EraDecor;
 import com.yashjit.scarlet.hex.Era;
+import com.yashjit.scarlet.registry.ScarletBlocks;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Map;
 import net.minecraft.world.item.DyeColor;
@@ -23,6 +26,7 @@ public final class EraStyle {
     public static final int FLOWERS = 6;
 
     private static final Map<Role, Block[]> BY_ERA = new EnumMap<>(Role.class);
+    private static final Map<Role, Block[]> LEGACY = new EnumMap<>(Role.class);
     private static final Block[][] SIDING = {
             {Blocks.PALE_OAK_PLANKS, Blocks.BIRCH_PLANKS, Blocks.CHERRY_PLANKS, terracotta(DyeColor.LIGHT_BLUE)},
             {Blocks.SMOOTH_QUARTZ, terracotta(DyeColor.CYAN), terracotta(DyeColor.LIME), terracotta(DyeColor.WHITE)},
@@ -99,13 +103,24 @@ public final class EraStyle {
                 Blocks.OAK_LEAVES);
         era(Role.RUG, carpet(DyeColor.LIGHT_GRAY), carpet(DyeColor.CYAN), carpet(DyeColor.ORANGE), carpet(DyeColor.PINK), carpet(DyeColor.BROWN),
                 carpet(DyeColor.GRAY));
-        era(Role.COUCH, Blocks.CHERRY_STAIRS, Blocks.WARPED_STAIRS, Blocks.ACACIA_STAIRS, Blocks.PURPUR_STAIRS,
+        everyEra(Role.COUCH, ScarletBlocks.COUCH.get());
+        legacy(Role.COUCH, Blocks.CHERRY_STAIRS, Blocks.WARPED_STAIRS, Blocks.ACACIA_STAIRS, Blocks.PURPUR_STAIRS,
                 Blocks.SMOOTH_SANDSTONE_STAIRS, Blocks.POLISHED_DEEPSLATE_STAIRS);
         era(Role.TABLE, Blocks.DARK_OAK_SLAB, Blocks.BIRCH_SLAB, Blocks.SPRUCE_SLAB, Blocks.QUARTZ_SLAB, Blocks.OAK_SLAB,
                 Blocks.POLISHED_BLACKSTONE_SLAB);
         era(Role.SHELF, Blocks.BOOKSHELF, Blocks.BOOKSHELF, Blocks.BOOKSHELF, Blocks.BOOKSHELF, Blocks.BOOKSHELF, Blocks.BOOKSHELF);
-        era(Role.FRIDGE, Blocks.QUARTZ_PILLAR, Blocks.QUARTZ_PILLAR, Blocks.QUARTZ_PILLAR, Blocks.QUARTZ_PILLAR, Blocks.QUARTZ_PILLAR,
-                Blocks.POLISHED_BASALT);
+        everyEra(Role.FRIDGE, ScarletBlocks.REFRIGERATOR.get());
+        legacy(Role.FRIDGE, Blocks.QUARTZ_PILLAR, Blocks.POLISHED_BASALT);
+        everyEra(Role.TELEVISION, ScarletBlocks.TELEVISION.get());
+        everyEra(Role.RADIO, ScarletBlocks.RADIO.get());
+        everyEra(Role.TELEPHONE, ScarletBlocks.TELEPHONE.get());
+        everyEra(Role.STOVE, ScarletBlocks.STOVE.get());
+        everyEra(Role.TOASTER, ScarletBlocks.TOASTER.get());
+        everyEra(Role.ARMCHAIR, ScarletBlocks.ARMCHAIR.get());
+        everyEra(Role.TABLE_LAMP, ScarletBlocks.LAMP.get());
+        everyEra(Role.CLOCK, ScarletBlocks.WALL_CLOCK.get());
+        everyEra(Role.PICTURE, ScarletBlocks.PICTURE_FRAME.get());
+        everyEra(Role.POSTER, ScarletBlocks.POSTER.get());
         era(Role.COUNTER, Blocks.SMOOTH_QUARTZ, Blocks.SMOOTH_QUARTZ, Blocks.SPRUCE_PLANKS, concrete(DyeColor.WHITE), Blocks.POLISHED_GRANITE,
                 Blocks.POLISHED_DEEPSLATE);
         era(Role.SINK, Blocks.CAULDRON, Blocks.CAULDRON, Blocks.CAULDRON, Blocks.CAULDRON, Blocks.CAULDRON, Blocks.CAULDRON);
@@ -161,6 +176,18 @@ public final class EraStyle {
         BY_ERA.put(role, blocks);
     }
 
+    /** A role built in every era from the same block, an era decoration that changes its own look. */
+    private static void everyEra(Role role, Block block) {
+        Block[] blocks = new Block[Era.values().length];
+        Arrays.fill(blocks, block);
+        BY_ERA.put(role, blocks);
+    }
+
+    /** What a role was built from before, still the town's own wherever a town built then stands. */
+    private static void legacy(Role role, Block... blocks) {
+        LEGACY.put(role, blocks);
+    }
+
     /**
      * The block an era builds a role from.
      *
@@ -184,7 +211,7 @@ public final class EraStyle {
         if (state.hasProperty(LeavesBlock.PERSISTENT)) {
             state = state.setValue(LeavesBlock.PERSISTENT, true);
         }
-        return state;
+        return EraDecor.inEra(state, era);
     }
 
     /**
@@ -201,6 +228,11 @@ public final class EraStyle {
         }
         for (Era era : Era.values()) {
             if (state.is(block(role, era, paint))) {
+                return true;
+            }
+        }
+        for (Block old : LEGACY.getOrDefault(role, new Block[0])) {
+            if (state.is(old)) {
                 return true;
             }
         }

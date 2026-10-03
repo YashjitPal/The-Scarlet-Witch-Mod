@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/ash",
+    "t0": "scarlet:block/decor/ash",
+    "t1": "scarlet:block/decor/picture_frame/present_picture"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.833, 0.833, 0.833] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.333, 0.333, 0.333] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.667, 0.667, 0.667] }
+},
+  "elements": [
+    {
+      "from": [2, 3, 15],
+      "to": [14, 13, 16],
+      "faces": {
+        "down": { "uv": [2, 0, 14, 1], "texture": "#t0" },
+        "up": { "uv": [2, 15, 14, 16], "texture": "#t0" },
+        "north": { "uv": [0, 0, 12, 10], "texture": "#t1" },
+        "west": { "uv": [15, 3, 16, 13], "texture": "#t0" },
+        "east": { "uv": [0, 3, 1, 13], "texture": "#t0" }
+      }
+    }
+  ]
+}

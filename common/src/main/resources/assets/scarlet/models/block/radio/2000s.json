@@ -1,0 +1,61 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/black_ash",
+    "t0": "scarlet:block/decor/black_ash",
+    "t1": "scarlet:block/decor/radio/2000s_speaker",
+    "t2": "scarlet:block/decor/plastic_silver",
+    "t3": "scarlet:block/decor/radio/2000s_front",
+    "t4": "scarlet:block/decor/radio/2000s_display"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, 2.333, 0], "scale": [0.667, 0.667, 0.667] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.267, 0.267, 0.267] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.533, 0.533, 0.533] }
+},
+  "elements": [
+    {
+      "from": [0.5, 0, 6],
+      "to": [4.5, 8, 11],
+      "faces": {
+        "down": { "uv": [0.5, 5, 4.5, 10], "texture": "#t0", "cullface": "down" },
+        "up": { "uv": [0.5, 6, 4.5, 11], "texture": "#t0" },
+        "north": { "uv": [0, 0, 4, 8], "texture": "#t1" },
+        "south": { "uv": [0.5, 8, 4.5, 16], "texture": "#t0" },
+        "west": { "uv": [6, 8, 11, 16], "texture": "#t0" },
+        "east": { "uv": [5, 8, 10, 16], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [11.5, 0, 6],
+      "to": [15.5, 8, 11],
+      "faces": {
+        "down": { "uv": [11.5, 5, 15.5, 10], "texture": "#t0", "cullface": "down" },
+        "up": { "uv": [11.5, 6, 15.5, 11], "texture": "#t0" },
+        "north": { "uv": [0, 0, 4, 8], "texture": "#t1" },
+        "south": { "uv": [11.5, 8, 15.5, 16], "texture": "#t0" },
+        "west": { "uv": [6, 8, 11, 16], "texture": "#t0" },
+        "east": { "uv": [5, 8, 10, 16], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [5, 0, 5],
+      "to": [11, 9, 12],
+      "faces": {
+        "down": { "uv": [5, 4, 11, 11], "texture": "#t2", "cullface": "down" },
+        "up": { "uv": [5, 5, 11, 12], "texture": "#t2" },
+        "north": { "uv": [0, 0, 6, 9], "texture": "#t3" },
+        "south": { "uv": [5, 7, 11, 16], "texture": "#t2" },
+        "west": { "uv": [5, 7, 12, 16], "texture": "#t2" },
+        "east": { "uv": [4, 7, 11, 16], "texture": "#t2" }
+      }
+    },
+    {
+      "from": [6, 5, 4.85],
+      "to": [10, 6, 5],
+      "faces": {
+        "north": { "uv": [0, 0, 4, 1], "texture": "#t4" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "era=1950s,part=front": { "model": "scarlet:block/car_body/1950s_front" },
+    "era=1950s,part=rear": { "model": "scarlet:block/car_body/1950s_rear" },
+    "era=1960s,part=front": { "model": "scarlet:block/car_body/1960s_front" },
+    "era=1960s,part=rear": { "model": "scarlet:block/car_body/1960s_rear" },
+    "era=1970s,part=front": { "model": "scarlet:block/car_body/1970s_front" },
+    "era=1970s,part=rear": { "model": "scarlet:block/car_body/1970s_rear" },
+    "era=1980s,part=front": { "model": "scarlet:block/car_body/1980s_front" },
+    "era=1980s,part=rear": { "model": "scarlet:block/car_body/1980s_rear" },
+    "era=2000s,part=front": { "model": "scarlet:block/car_body/2000s_front" },
+    "era=2000s,part=rear": { "model": "scarlet:block/car_body/2000s_rear" },
+    "era=present,part=front": { "model": "scarlet:block/car_body/present_front" },
+    "era=present,part=rear": { "model": "scarlet:block/car_body/present_rear" }
+  }
+}

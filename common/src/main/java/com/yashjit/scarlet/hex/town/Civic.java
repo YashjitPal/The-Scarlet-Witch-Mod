@@ -25,6 +25,7 @@ import static com.yashjit.scarlet.hex.town.TownPlan.LOT_DEPTH;
 import static com.yashjit.scarlet.hex.town.TownPlan.LOT_WIDTH;
 
 import com.yashjit.scarlet.hex.town.Blueprint.Frame;
+import com.yashjit.scarlet.registry.ScarletBlocks;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.BellBlock;
@@ -304,8 +305,9 @@ final class Civic {
         if (kind == Signs.DINER || kind == Signs.ICE_CREAM || kind == Signs.BAKERY) {
             for (int table : new int[] {3, 7}) {
                 blueprint.set(table, 5, g + 2, Role.TABLE, slab(SlabType.TOP), INTERIOR);
-                blueprint.set(table - 1, 5, g + 2, Role.COUCH, stairs(frame.left(), Half.BOTTOM), INTERIOR);
-                blueprint.set(table + 1, 5, g + 2, Role.COUCH, stairs(frame.right(), Half.BOTTOM), INTERIOR);
+                // a booth either side of each table, facing across it
+                blueprint.set(table - 1, 5, g + 2, Role.COUCH, Houses.decor(ScarletBlocks.COUCH, frame.right()), INTERIOR);
+                blueprint.set(table + 1, 5, g + 2, Role.COUCH, Houses.decor(ScarletBlocks.COUCH, frame.left()), INTERIOR);
             }
             blueprint.fill(2, 7, 8, 8, g + 2, g + 2, Role.COUNTER, FULL, INTERIOR);
         } else {

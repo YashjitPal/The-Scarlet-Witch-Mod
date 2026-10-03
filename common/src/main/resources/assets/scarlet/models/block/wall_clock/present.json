@@ -1,0 +1,21 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/wall_clock/present_face",
+    "t0": "scarlet:block/decor/wall_clock/present_face"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.769, 0.769, 0.769] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.308, 0.308, 0.308] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.615, 0.615, 0.615] }
+},
+  "elements": [
+    {
+      "from": [1.5, 1.5, 15],
+      "to": [14.5, 14.5, 16],
+      "faces": {
+        "north": { "uv": [0, 0, 13, 13], "texture": "#t0" }
+      }
+    }
+  ]
+}

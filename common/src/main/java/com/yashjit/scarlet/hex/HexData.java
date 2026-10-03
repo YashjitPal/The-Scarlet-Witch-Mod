@@ -7,6 +7,7 @@ import com.yashjit.scarlet.hex.town.HexTown;
 import com.yashjit.scarlet.hex.town.HomeRemnant;
 import com.yashjit.scarlet.hex.town.TownMemory;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.LongStream;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.datafix.DataFixTypes;
@@ -34,12 +36,15 @@ public final class HexData extends SavedData {
             HexTown.BLOCKS_CODEC.optionalFieldOf("pending", new Long2ObjectOpenHashMap<>()).forGetter(HexData::pendingToSave),
             HexTown.Kept.CODEC.listOf().optionalFieldOf("pending_kept", List.of()).forGetter(HexData::pendingKeptToSave),
             TownMemory.CODEC.listOf().optionalFieldOf("towns", List.of()).forGetter(data -> List.copyOf(data.towns)),
-            HexPaint.BLOCKS_CODEC.optionalFieldOf("pending_paint", new Long2ObjectOpenHashMap<>()).forGetter(data -> data.pendingPaint)
+            HexPaint.BLOCKS_CODEC.optionalFieldOf("pending_paint", new Long2ObjectOpenHashMap<>()).forGetter(data -> data.pendingPaint),
+            Codec.LONG_STREAM.xmap(LongStream::toArray, LongStream::of).optionalFieldOf("decor", new long[0])
+                    .forGetter(data -> data.decor.toLongArray())
     ).apply(i, HexData::new));
 
     // saves from before towns held only the list of Hexes
     private static final Codec<HexData> CODEC = Codec.withAlternative(CURRENT,
-            Hex.CODEC.listOf().xmap(hexes -> new HexData(hexes, new Long2ObjectOpenHashMap<>(), List.of(), List.of(), new Long2ObjectOpenHashMap<>()),
+            Hex.CODEC.listOf().xmap(hexes -> new HexData(hexes, new Long2ObjectOpenHashMap<>(), List.of(), List.of(), new Long2ObjectOpenHashMap<>(),
+                            new long[0]),
                     data -> List.copyOf(data.hexes.values())));
 
     /** Most towns remembered for each caster and build; past that, the oldest are forgotten. */
@@ -60,6 +65,8 @@ public final class HexData extends SavedData {
     private final List<TownMemory> towns;
     /** Painted blocks waiting for their chunk to load to change back. */
     private final Long2ObjectOpenHashMap<HexPaint.Painted> pendingPaint;
+    /** Era decorations people have put down inside Hexes here, which follow their Hex's era: see {@link HexDecor}. */
+    private final LongOpenHashSet decor;
     /** The homes fallen Hexes have left standing for a while, saved only as what is waiting to be put back. */
     private final List<HomeRemnant> remnants = new ArrayList<>();
     private final long instance = INSTANCES.incrementAndGet();
@@ -70,10 +77,11 @@ public final class HexData extends SavedData {
         this.pendingKept = new ArrayList<>();
         this.towns = new ArrayList<>();
         this.pendingPaint = new Long2ObjectOpenHashMap<>();
+        this.decor = new LongOpenHashSet();
     }
 
     private HexData(List<Hex> loaded, Long2ObjectOpenHashMap<HexTown.Built> pending, List<HexTown.Kept> pendingKept, List<TownMemory> towns,
-                    Long2ObjectOpenHashMap<HexPaint.Painted> pendingPaint) {
+                    Long2ObjectOpenHashMap<HexPaint.Painted> pendingPaint, long[] decor) {
         for (Hex hex : loaded) {
             hexes.put(hex.caster, hex);
         }
@@ -81,6 +89,7 @@ public final class HexData extends SavedData {
         this.pendingKept = new ArrayList<>(pendingKept);
         this.towns = new ArrayList<>(towns);
         this.pendingPaint = new Long2ObjectOpenHashMap<>(pendingPaint);
+        this.decor = new LongOpenHashSet(decor);
     }
 
     public static HexData of(ServerLevel level) {
@@ -163,6 +172,10 @@ public final class HexData extends SavedData {
 
     Long2ObjectOpenHashMap<HexPaint.Painted> pendingPaint() {
         return pendingPaint;
+    }
+
+    LongOpenHashSet decor() {
+        return decor;
     }
 
     /**

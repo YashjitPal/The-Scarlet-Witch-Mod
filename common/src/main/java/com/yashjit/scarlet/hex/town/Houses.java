@@ -1,13 +1,17 @@
 package com.yashjit.scarlet.hex.town;
 
 import com.yashjit.scarlet.hex.town.Blueprint.Frame;
+import com.yashjit.scarlet.registry.ScarletBlocks;
+import java.util.function.Supplier;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FenceGateBlock;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.LanternBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
@@ -16,6 +20,7 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Half;
@@ -557,6 +562,8 @@ public final class Houses {
         for (int b = 0; b < front; b++) {
             blueprint.fill(doorFrom, doorFrom + 2, b, b, g, g, Role.SIDEWALK, FULL, YARD);
         }
+        // the family car, parked nose in on the driveway
+        blueprint.car(doorFrom + 1, 1, front - 2, g + 1, frame.back(), Math.floorMod(Long.hashCode(frame.origin().asLong()), 5));
         return new int[] {doorFrom, doorFrom + 2};
     }
 
@@ -612,9 +619,11 @@ public final class Houses {
     // ---------------------------------------------------------------- rooms
 
     /**
-     * Downstairs, a couch against the back wall facing a coffee table on a rug, end tables either side, shelves by the
-     * door, the kitchen along the right wall with a table and chairs, and a light hanging over it all; upstairs, a bed
-     * between two nightstands, a rug, a dresser and a light.
+     * Downstairs, the living room of a sitcom: a couch against the back wall facing the television over a coffee table
+     * on a rug, a telephone and a lamp on the end tables either side, a clock and pictures on the wall over it, an
+     * armchair, shelves by the door with the radio on them; the kitchen along the right wall, refrigerator, range,
+     * sink and a toaster on the counter, with a table and chairs; and a light hanging over it all. Upstairs, a bed
+     * between two nightstands, a lamp, a rug, a dresser, a poster and a light.
      */
     private static void rooms(Blueprint blueprint, Box box) {
         Frame frame = blueprint.frame();
@@ -628,21 +637,31 @@ public final class Houses {
         boolean stairs = box.stories() > 1;
         blueprint.fill(c - 2, c + 2, front + 2, back - 1, y, y, Role.RUG, CARPET, INTERIOR);
         for (int a = c - 1; a <= c + 1; a++) {
-            blueprint.set(a, back, y, Role.COUCH, stairs(frame.back(), Half.BOTTOM), INTERIOR);
+            blueprint.set(a, back, y, Role.COUCH, decor(ScarletBlocks.COUCH, frame.front()), INTERIOR);
         }
         blueprint.set(c, back - 2, y, Role.TABLE, slab(SlabType.TOP), INTERIOR);
         blueprint.set(c - 2, back, y, Role.TABLE, slab(SlabType.TOP), INTERIOR);
-        blueprint.set(c - 2, back, y + 1, Role.PLANT, POT, INTERIOR);
+        blueprint.set(c - 2, back, y + 1, Role.TELEPHONE, decor(ScarletBlocks.TELEPHONE, frame.front()), INTERIOR);
         blueprint.set(c + 2, back, y, Role.TABLE, slab(SlabType.TOP), INTERIOR);
-        blueprint.set(c + 2, back, y + 1, Role.LAMP, lantern(false), INTERIOR);
+        blueprint.set(c + 2, back, y + 1, Role.TABLE_LAMP, lit(decor(ScarletBlocks.LAMP, frame.front())), INTERIOR);
+        blueprint.set(c, back, y + 3, Role.CLOCK, decor(ScarletBlocks.WALL_CLOCK, frame.front()), INTERIOR);
+        blueprint.set(c - 1, back, y + 2, Role.PICTURE, decor(ScarletBlocks.PICTURE_FRAME, frame.front()), INTERIOR);
+        blueprint.set(c + 1, back, y + 2, Role.PICTURE, decor(ScarletBlocks.PICTURE_FRAME, frame.front()), INTERIOR);
+        // the television by the front wall, turned to the couch, and an armchair drawn up beside the rug
+        blueprint.set(c - 2, front + 1, y, Role.TELEVISION, lit(decor(ScarletBlocks.TELEVISION, frame.back())), INTERIOR);
+        blueprint.set(c - 3, back - 1, y, Role.ARMCHAIR, decor(ScarletBlocks.ARMCHAIR, frame.front()), INTERIOR);
         blueprint.fill(left, left, front, front + 1, y, y + 1, Role.SHELF, FULL, INTERIOR);
+        blueprint.set(left, front + 1, y + 2, Role.RADIO, decor(ScarletBlocks.RADIO, frame.right()), INTERIOR);
+        blueprint.set(left + 1, front + 2, y, Role.PLANT, POT, INTERIOR);
         if (!stairs) {
             blueprint.set(left, back, y, Role.PORCH_POST, FENCE, INTERIOR);
             blueprint.set(left, back, y + 1, Role.LAMP, lantern(false), INTERIOR);
         }
-        blueprint.fill(right, right, back, back, y, y + 1, Role.FRIDGE, pillar(Direction.Axis.Y), INTERIOR);
+        fridge(blueprint, right, back, y, frame.left(), INTERIOR);
         blueprint.fill(right, right, back - 3, back - 1, y, y, Role.COUNTER, FULL, INTERIOR);
+        blueprint.set(right, back - 1, y, Role.STOVE, decor(ScarletBlocks.STOVE, frame.left()), INTERIOR);
         blueprint.set(right, back - 2, y, Role.SINK, CAULDRON, INTERIOR);
+        blueprint.set(right, back - 3, y + 1, Role.TOASTER, decor(ScarletBlocks.TOASTER, frame.left()), INTERIOR);
         blueprint.set(right - 2, front + 1, y, Role.TABLE, slab(SlabType.TOP), INTERIOR);
         blueprint.set(right - 3, front + 1, y, Role.BENCH, stairs(frame.left(), Half.BOTTOM), INTERIOR);
         blueprint.set(right - 1, front + 1, y, Role.BENCH, stairs(frame.right(), Half.BOTTOM), INTERIOR);
@@ -657,9 +676,27 @@ public final class Houses {
         blueprint.set(c - 1, back, up, Role.TABLE, slab(SlabType.TOP), INTERIOR);
         blueprint.set(c - 1, back, up + 1, Role.PLANT, POT, INTERIOR);
         blueprint.set(c + 2, back, up, Role.TABLE, slab(SlabType.TOP), INTERIOR);
-        blueprint.set(c + 2, back, up + 1, Role.LAMP, lantern(false), INTERIOR);
+        blueprint.set(c + 2, back, up + 1, Role.TABLE_LAMP, lit(decor(ScarletBlocks.LAMP, frame.front())), INTERIOR);
+        blueprint.set(c - 1, front, up + 1, Role.POSTER, decor(ScarletBlocks.POSTER, frame.back()), INTERIOR);
         blueprint.fill(right, right, front, front + 1, up, up + 1, Role.SHELF, FULL, INTERIOR);
         blueprint.set(c, (front + back) / 2, box.top() - 1, Role.LAMP, lantern(true), INTERIOR);
+    }
+
+    /** An era decoration, facing the way given, in the present day until the town's era is put on it. */
+    static BlockState decor(Supplier<Block> block, Direction facing) {
+        return block.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, facing);
+    }
+
+    /** The same, switched on: a lamp lit, a television showing its program. */
+    static BlockState lit(BlockState state) {
+        return state.hasProperty(BlockStateProperties.LIT) ? state.setValue(BlockStateProperties.LIT, true) : state;
+    }
+
+    /** A refrigerator against a wall, both its halves, facing out into the room. */
+    static void fridge(Blueprint blueprint, int a, int b, int y, Direction facing, int stage) {
+        BlockState fridge = decor(ScarletBlocks.REFRIGERATOR, facing);
+        blueprint.set(a, b, y, Role.FRIDGE, fridge.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER), stage);
+        blueprint.set(a, b, y + 1, Role.FRIDGE, fridge.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER), stage);
     }
 
     // ---------------------------------------------------------------- a home made of what stands
@@ -819,7 +856,11 @@ public final class Houses {
         if (right - left >= 4 && inside > TownPlan.LIVING_ROOM) {
             blueprint.fill(door - 1, door + 1, front + 2, inside - 1, y, y, Role.RUG, CARPET, INTERIOR);
             for (int a = door - 1; a <= door + 1; a++) {
-                blueprint.set(a, inside, y, Role.COUCH, stairs(frame.back(), Half.BOTTOM), INTERIOR);
+                blueprint.set(a, inside, y, Role.COUCH, decor(ScarletBlocks.COUCH, frame.front()), INTERIOR);
+            }
+            if (door - 2 > left) {
+                // the television by the front wall, turned to the couch
+                blueprint.set(door - 2, front + 1, y, Role.TELEVISION, lit(decor(ScarletBlocks.TELEVISION, frame.back())), INTERIOR);
             }
             if (inside - 2 > TownPlan.LIVING_ROOM) {
                 blueprint.set(door, inside - 2, y, Role.TABLE, slab(SlabType.TOP), INTERIOR);
@@ -1056,7 +1097,8 @@ public final class Houses {
             case PORCH_POST, CHIMNEY, SHUTTER, AWNING, SIGN, LAMP_POST -> EXTERIOR;
             case WALKWAY, PICKET, GATE, HEDGE, FLOWER, MAILBOX, MAILBOX_POST, TREE_LOG, TREE_LEAVES, ORCHARD_LEAVES, ORCHARD_BLOSSOM,
                  SIDEWALK, ROAD, ROAD_LINE, PLAZA, GAZEBO_POST, BENCH, HAY, PLAY_FRAME, SLIDE, CHAIN, BELL, PRESERVE -> YARD;
-            case RUG, COUCH, TABLE, SHELF, FRIDGE, COUNTER, SINK, PLANT, LAMP, BED -> INTERIOR;
+            case RUG, COUCH, TABLE, SHELF, FRIDGE, COUNTER, SINK, PLANT, LAMP, BED, TELEVISION, RADIO, TELEPHONE, STOVE, TOASTER, ARMCHAIR,
+                 TABLE_LAMP, CLOCK, PICTURE, POSTER -> INTERIOR;
         };
     }
 

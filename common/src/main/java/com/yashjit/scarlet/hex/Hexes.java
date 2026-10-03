@@ -618,6 +618,7 @@ public final class Hexes {
         }
         Residents.tick(level, data, now);
         tickRemnants(level, data, now);
+        HexDecor.tick(level, data, now);
         if (data.all().isEmpty()) {
             return;
         }

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "P": "#minecraft:planks",
+    "G": "minecraft:glass_pane",
+    "R": "minecraft:redstone"
+  },
+  "pattern": [
+    "PPP",
+    "PGP",
+    "PRP"
+  ],
+  "result": {
+    "count": 1,
+    "id": "scarlet:television"
+  }
+}

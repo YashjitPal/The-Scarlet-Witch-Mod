@@ -7,6 +7,23 @@
   "item.scarlet.crown.mastery.max": "Fully mastered",
 
   "entity.scarlet.chaos_bolt": "Chaos Bolt",
+  "entity.scarlet.seat": "Seat",
+  "entity.scarlet.parked_car": "Parked Car",
+  "item.scarlet.parked_car": "Parked Car",
+  "block.scarlet.car_body": "Car",
+
+  "block.scarlet.television": "Television",
+  "block.scarlet.radio": "Radio",
+  "block.scarlet.telephone": "Telephone",
+  "block.scarlet.couch": "Couch",
+  "block.scarlet.armchair": "Armchair",
+  "block.scarlet.lamp": "Table Lamp",
+  "block.scarlet.refrigerator": "Refrigerator",
+  "block.scarlet.stove": "Stove",
+  "block.scarlet.toaster": "Toaster",
+  "block.scarlet.wall_clock": "Wall Clock",
+  "block.scarlet.picture_frame": "Picture Frame",
+  "block.scarlet.poster": "Poster",
 
   "itemGroup.scarlet": "Scarlet Witch",
 

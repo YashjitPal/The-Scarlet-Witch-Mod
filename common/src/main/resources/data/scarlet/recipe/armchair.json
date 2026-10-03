@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "W": "#minecraft:wool",
+    "P": "#minecraft:planks"
+  },
+  "pattern": [
+    "W W",
+    "WWW",
+    "P P"
+  ],
+  "result": {
+    "count": 1,
+    "id": "scarlet:armchair"
+  }
+}

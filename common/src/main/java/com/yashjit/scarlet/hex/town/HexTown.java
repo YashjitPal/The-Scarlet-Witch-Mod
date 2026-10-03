@@ -9,6 +9,7 @@ import com.yashjit.scarlet.hex.HexPaint;
 import com.yashjit.scarlet.hex.HexShape;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.town.Blueprint.Frame;
+import com.yashjit.scarlet.entity.ParkedCar;
 import com.yashjit.scarlet.hex.town.Blueprint.Piece;
 import com.yashjit.scarlet.hex.town.TownPlan.Kind;
 import com.yashjit.scarlet.hex.town.TownPlan.Part;
@@ -942,6 +943,7 @@ public final class HexTown {
         timed.sort((x, y) -> Integer.compare(x.tick(), y.tick()));
         keep(level, part, survey, hexCenter, clip, top, occupied);
         Build build = new Build(part, survey.ground(), timed, now, duration);
+        build.cars.addAll(blueprint.cars());
         if (adopted) {
             this.adopted.add(part.id());
         }
@@ -1023,7 +1025,9 @@ public final class HexTown {
             Blueprint blueprint = blueprint(part, leveled, clip != WHOLE, new boolean[leveled.columns().length]);
             List<Piece> pieces = blueprint.schedule();
             pieces.removeIf(piece -> leveled.isBlocked(part, piece.pos()) || !within(hexCenter, clip, piece.pos()));
-            builds.put(id, new Build(part, ground, pieces, started.get(id), blueprint.duration()));
+            Build build = new Build(part, ground, pieces, started.get(id), blueprint.duration());
+            build.cars.addAll(blueprint.cars());
+            builds.put(id, build);
         }
     }
 
@@ -1062,6 +1066,7 @@ public final class HexTown {
                 if (!build.restyled.isEmpty()) {
                     reshape(level, build.restyled);
                 }
+                park(level, build.cars);
                 changed = true;
                 TownEvents.finished(level, build.part);
             }
@@ -1093,6 +1098,18 @@ public final class HexTown {
             blocks.add((int) Math.max(0L, piece.tick() - elapsed));
         }
         TownEvents.forming(level, build.part, build.ground, blocks.toIntArray());
+    }
+
+    /**
+     * Parks a part's cars once it stands, unless one is parked there already, as when the town comes back.
+     */
+    private static void park(ServerLevel level, List<Blueprint.Car> cars) {
+        for (Blueprint.Car car : cars) {
+            AABB spot = new AABB(car.at().x - 1.5, car.at().y - 0.5, car.at().z - 1.5, car.at().x + 1.5, car.at().y + 2.0, car.at().z + 1.5);
+            if (level.hasChunkAt(BlockPos.containing(car.at())) && level.getEntitiesOfClass(ParkedCar.class, spot).isEmpty()) {
+                ParkedCar.park(level, car.at(), car.facing().toYRot(), car.paint(), true);
+            }
+        }
     }
 
     // ---------------------------------------------------------------- putting blocks down
@@ -2326,6 +2343,8 @@ public final class HexTown {
         final int duration;
         /** Blocks of a building that stays, made over so far. */
         final LongArrayList restyled = new LongArrayList();
+        /** The cars parked on it once it stands. */
+        final List<Blueprint.Car> cars = new ArrayList<>();
         int next;
         /** How many of the pieces players have been told are coming. */
         int announced;

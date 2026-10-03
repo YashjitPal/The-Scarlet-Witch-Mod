@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "scarlet:block/decor/wall_clock/1950s_rays",
+    "t0": "scarlet:block/decor/wall_clock/1950s_rays",
+    "t1": "scarlet:block/decor/brass",
+    "t2": "scarlet:block/decor/wall_clock/1950s_face"
+  },
+"display": {
+  "gui": { "rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.625, 0.625, 0.625] },
+  "ground": { "rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.25, 0.25, 0.25] },
+  "fixed": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.5, 0.5, 0.5] }
+},
+  "elements": [
+    {
+      "from": [0, 0, 15.4],
+      "to": [16, 16, 15.6],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 16], "texture": "#t0" }
+      }
+    },
+    {
+      "from": [5, 5, 14.75],
+      "to": [11, 11, 15.75],
+      "faces": {
+        "down": { "uv": [5, 0.25, 11, 1.25], "texture": "#t1" },
+        "up": { "uv": [5, 14.75, 11, 15.75], "texture": "#t1" },
+        "north": { "uv": [0, 0, 6, 6], "texture": "#t2" },
+        "south": { "uv": [5, 5, 11, 11], "texture": "#t1" },
+        "west": { "uv": [14.75, 5, 15.75, 11], "texture": "#t1" },
+        "east": { "uv": [0.25, 5, 1.25, 11], "texture": "#t1" }
+      }
+    }
+  ]
+}
