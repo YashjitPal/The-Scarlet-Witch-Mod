@@ -44,6 +44,20 @@ public final class PixelSprite {
      * A grid pinned with a pixel corner at x, y, z, its pixels {@code size} blocks across where it is pinned.
      */
     public PixelSprite(PoseStack.Pose pose, float x, float y, float z, float size) {
+        this(pose, x, y, z, size, 0.0F);
+    }
+
+    /**
+     * A grid of standard pixels pinned at x, y, z.
+     */
+    public PixelSprite(PoseStack.Pose pose, float x, float y, float z) {
+        this(pose, x, y, z, Pixels.SIZE);
+    }
+
+    /**
+     * @param nearest nearer the eyes than this, it is pinned this far off instead, along the same line of sight
+     */
+    private PixelSprite(PoseStack.Pose pose, float x, float y, float z, float size, float nearest) {
         this.pose = pose;
         Glow.Billboard axes = Glow.billboard(pose);
         this.right = axes.right();
@@ -54,16 +68,30 @@ public final class PixelSprite {
         this.size = size;
         this.rightLength2 = right.lengthSquared();
         this.upLength2 = up.lengthSquared();
+        if (nearest > 0.0F) {
+            // the camera's right and up cross to point back at whoever is looking
+            Vector3f forward = new Vector3f(normal).negate().normalize();
+            float ahead = new Vector3f(anchor).sub(eye).dot(forward);
+            if (ahead < nearest) {
+                if (ahead > 1.0E-3F) {
+                    anchor.sub(eye).mul(nearest / ahead).add(eye);
+                } else {
+                    anchor.set(forward).mul(nearest).add(eye);
+                }
+            }
+        }
         float depth = new Vector3f(anchor).sub(eye).dot(normal);
         this.anchorDepth = Math.abs(depth) < 1.0E-5F ? 1.0E-5F : depth;
         index.defaultReturnValue(-1);
     }
 
     /**
-     * A grid of standard pixels pinned at x, y, z.
+     * A grid of standard pixels for magic out in the world, pinned at x, y, z as seen. Nearer the eyes than a few
+     * blocks it is pinned further off along the same line of sight, so what is drawn on it stays where it is on screen
+     * but its pixels stay small, rather than swelling into blocks across the view.
      */
-    public PixelSprite(PoseStack.Pose pose, float x, float y, float z) {
-        this(pose, x, y, z, Pixels.SIZE);
+    public static PixelSprite inWorld(PoseStack.Pose pose, float x, float y, float z) {
+        return new PixelSprite(pose, x, y, z, Pixels.SIZE, 3.0F);
     }
 
     /**
@@ -124,6 +152,19 @@ public final class PixelSprite {
                 put(i0 + di, j0 + dj, at[2], argb, priority);
             }
         }
+    }
+
+    /**
+     * Plots a point as if it were {@code lift} blocks nearer the eyes along its own line of sight: on the same pixel as
+     * seen, but in front of a surface it lies on or just behind, as eyes on a face are.
+     */
+    public void plotInFront(float x, float y, float z, float lift, int argb, int priority, int thickness) {
+        float dx = eye.x - x;
+        float dy = eye.y - y;
+        float dz = eye.z - z;
+        float distance = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        float k = distance < 1.0E-4F ? 0.0F : Math.min(lift, distance * 0.5F) / distance;
+        plot(x + dx * k, y + dy * k, z + dz * k, argb, priority, thickness);
     }
 
     /**

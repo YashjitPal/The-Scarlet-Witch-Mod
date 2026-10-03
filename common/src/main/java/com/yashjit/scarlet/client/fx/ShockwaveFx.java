@@ -5,8 +5,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
+import com.yashjit.scarlet.client.render.FlatPixels;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.magic.Spell;
 import com.yashjit.scarlet.magic.SpellCasts;
 import com.yashjit.scarlet.network.MagicEventPayload;
@@ -28,9 +31,10 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
 /**
- * The Shockwave as everyone sees it. Energy gathers into a burning knot between the caster's hands, then bursts out of
- * them as a ring racing across the ground: a bright leading edge with a wall of light standing on it, echoes behind it,
- * a flash at the heart, sparks flung outward, and the dirt it passes over kicked up into the air.
+ * The Shockwave as everyone sees it, as pixel art. Energy gathers into a churning knot between the caster's hands, then
+ * bursts out of them as a ring racing across the ground on its own grid of texels: a white-hot leading edge with a wall
+ * of it licking up off it like flame, a wake thinning out behind, echoes after it, a flash at the heart, sparks flung
+ * outward, and the dirt it passes over kicked up into the air.
  */
 public final class ShockwaveFx {
 
@@ -38,8 +42,6 @@ public final class ShockwaveFx {
     private static final float FLING_TICKS = 24.0F;
     private static final float RADIUS = (float) SpellCasts.SHOCKWAVE_RADIUS;
     private static final float TAU = (float) (Math.PI * 2);
-    private static final Vector3f FLAT_U = new Vector3f(1, 0, 0);
-    private static final Vector3f FLAT_V = new Vector3f(0, 0, 1);
 
     private static final Int2DoubleMap GATHERS = new Int2DoubleOpenHashMap();
     private static final Int2DoubleMap FLINGS = new Int2DoubleOpenHashMap();
@@ -231,46 +233,21 @@ public final class ShockwaveFx {
                 }
             }
         }
-        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
-            float before = Glow.darkness();
-            for (Wave wave : waves) {
-                Glow.darken(wave.darkness());
-                tintWave(buffer, pose, wave, now, camera);
-            }
-            Glow.darken(before);
-        });
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             float before = Glow.darkness();
             for (Knot knot : knots) {
                 Glow.darken(knot.darkness());
-                drawKnot(buffer, pose, axes, knot, now);
+                drawKnot(buffer, pose, knot, now);
             }
             for (Wave wave : waves) {
                 Glow.darken(wave.darkness());
-                drawWave(buffer, pose, axes, wave, now, camera);
+                drawWave(buffer, pose, wave, now, camera);
             }
             Glow.darken(before);
         });
     }
 
-    /**
-     * The red glass of the wave, a band just inside its edge.
-     */
-    private static void tintWave(VertexConsumer buffer, PoseStack.Pose pose, Wave wave, double now, Vec3 camera) {
-        float t = (float) (now - wave.start());
-        if (t < 0.0F || t > WAVE_TICKS) {
-            return;
-        }
-        float k = t / WAVE_TICKS;
-        float radius = RADIUS * Ease.outCubic(k);
-        float fade = (float) Math.pow(1.0F - k, 1.4) * 0.5F;
-        Vector3f c = wave.center().subtract(camera).toVector3f().add(0.0F, 0.06F, 0.0F);
-        Glow.annulus(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, radius * 0.7F, radius, GlowPass.tint(ScarletPalette.GLASS, 0.0F),
-                GlowPass.tint(ScarletPalette.GLASS, fade), 72);
-    }
-
-    private static void drawWave(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Wave wave, double now, Vec3 camera) {
+    private static void drawWave(VertexConsumer buffer, PoseStack.Pose pose, Wave wave, double now, Vec3 camera) {
         float t = (float) (now - wave.start());
         if (t < 0.0F || t > WAVE_TICKS + 4.0F) {
             return;
@@ -278,58 +255,77 @@ public final class ShockwaveFx {
         float k = Ease.clamp01(t / WAVE_TICKS);
         float fade = (float) Math.pow(1.0F - k, 1.2);
         float radius = RADIUS * Ease.outCubic(k);
-        Vector3f c = wave.center().subtract(camera).toVector3f().add(0.0F, 0.08F, 0.0F);
-
-        Glow.annulus(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, radius * 0.55F, radius, Glow.withAlpha(ScarletPalette.SCARLET, 0.0F),
-                Glow.withAlpha(ScarletPalette.SCARLET, 0.2F * fade), 72);
-        Glow.ring(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, radius, 0.5F * (1.0F - k) + 0.15F, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.85F * fade), 72);
-        Glow.ring(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, radius, 0.1F, Glow.withAlpha(ScarletPalette.CORE, 0.6F * fade), 72);
-        for (int i = 1; i <= 2; i++) {
-            float echo = Ease.clamp01((t - i * 2.5F) / WAVE_TICKS);
+        int frame = (int) Math.floor(now);
+        Vec3 ground = wave.center().add(0.0, 0.06, 0.0);
+        float depth = 0.5F * (1.0F - k) + 0.15F;
+        float wake = Math.max(0.01F, radius * 0.45F - depth);
+        // the edge racing out across the ground, white-hot at its front, and the wake it leaves thinning out behind it
+        FlatPixels.ring(buffer, pose, camera, ground.x, ground.y, ground.z, radius * 0.55F, radius, (i, kk, r, theta) -> {
+            float into = (radius - r) / depth;
+            if (into < 1.0F) {
+                return Pixels.shows(fade * (1.15F - into), i, kk)
+                        ? Pixels.opaque(into < 0.18F ? Pixels.HOT : into < 0.4F ? Pixels.PINK : into < 0.7F ? Pixels.BRIGHT : Pixels.SCARLET) : 0;
+            }
+            float behind = (r - radius * 0.55F) / wake;
+            return Pixels.shows(fade * 0.35F * behind, i + frame, kk) ? Pixels.ramp(Pixels.CRIMSON, 0.75F) : 0;
+        });
+        for (int e = 1; e <= 2; e++) {
+            float echo = Ease.clamp01((t - e * 2.5F) / WAVE_TICKS);
             if (echo <= 0.0F) {
                 continue;
             }
-            Glow.ring(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, RADIUS * Ease.outCubic(echo) * (1.0F - 0.12F * i), 0.2F,
-                    Glow.withAlpha(ScarletPalette.SCARLET, 0.45F * (float) Math.pow(1.0F - echo, 1.5)), 64);
+            float at = RADIUS * Ease.outCubic(echo) * (1.0F - 0.12F * e);
+            float shown = 0.7F * (float) Math.pow(1.0F - echo, 1.5);
+            FlatPixels.ring(buffer, pose, camera, ground.x, ground.y, ground.z, Math.max(0.0F, at - 0.16F), at,
+                    (i, kk, r, theta) -> Pixels.shows(shown, i, kk) ? Pixels.opaque(r > at - 0.07F ? Pixels.BRIGHT : Pixels.SCARLET) : 0);
         }
-
-        // a wall of light standing on the edge, lower as it spreads
+        Vector3f c = ground.subtract(camera).toVector3f();
+        PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y + 1.0F, c.z);
+        // a wall of it standing on the edge, licking up like flame, lower as it spreads
         float height = 1.7F * (1.0F - k) * Ease.clamp01(t / 2.0F);
         if (height > 0.05F) {
-            int count = 49;
-            Vector3f[] points = new Vector3f[count];
-            float[] widths = new float[count];
-            int[] colors = new int[count];
-            for (int i = 0; i < count; i++) {
-                float angle = i * TAU / (count - 1);
-                points[i] = new Vector3f(c.x + Mth.cos(angle) * radius, c.y + height * 0.5F, c.z + Mth.sin(angle) * radius);
-                widths[i] = height;
-                colors[i] = Glow.withAlpha(ScarletPalette.SCARLET, 0.32F * fade);
+            int columns = Math.clamp(Math.round(radius * TAU * 12.0F), 24, 480);
+            for (int n = 0; n < columns; n++) {
+                if (!Pixels.shows(fade, n, frame)) {
+                    continue;
+                }
+                float angle = n * TAU / columns;
+                float lick = height * (0.45F + 0.55F * Pixels.noise(angle * 6.0F, frame * 0.35F, 71));
+                Vector3f base = new Vector3f(c.x + Mth.cos(angle) * radius, c.y, c.z + Mth.sin(angle) * radius);
+                Vector3f mid = new Vector3f(base).add(0.0F, lick * 0.4F, 0.0F);
+                Vector3f top = new Vector3f(base).add(0.0F, lick, 0.0F);
+                sprite.line(base, mid, Pixels.opaque(Pixels.PINK), 1, 1);
+                sprite.line(mid, top, Pixels.opaque(Pixels.SCARLET), 0, 1);
             }
-            Glow.ribbon(buffer, pose, axes, points, widths, colors);
         }
-
+        // the flash at its heart
         if (t < 5.0F) {
             float flash = 1.0F - t / 5.0F;
-            Glow.disc(buffer, pose, axes, c.x, c.y + 1.0F, c.z, 2.8F * (0.5F + 0.5F * flash), Glow.withAlpha(ScarletPalette.SCARLET, 0.4F * flash));
-            Glow.disc(buffer, pose, axes, c.x, c.y + 1.0F, c.z, 0.9F, Glow.withAlpha(ScarletPalette.CORE, 0.75F * flash));
+            Wisps.orb(sprite, 10.0F * flash, 3.0F * flash, frame, 73);
+            Wisps.burst(sprite, 0.6F + 2.0F * (1.0F - flash), 0.4F, flash, frame);
         }
+        sprite.draw(buffer);
     }
 
-    private static void drawKnot(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Knot knot, double now) {
+    /**
+     * The energy gathering between the hands: a ball of it churning there, growing as it gathers, rings of it turning
+     * about it on tilted axes.
+     */
+    private static void drawKnot(VertexConsumer buffer, PoseStack.Pose pose, Knot knot, double now) {
         float time = (float) (now % 24000.0);
         float g = knot.gather() * (knot.own() ? 0.6F : 1.0F);
         Vector3f c = knot.at();
-        float flicker = 0.85F + 0.15F * Mth.sin(time * 2.3F);
-        Glow.disc(buffer, pose, axes, c.x, c.y, c.z, 0.5F * g, Glow.withAlpha(ScarletPalette.SCARLET, 0.35F * g * flicker));
-        Glow.spark(buffer, pose, axes, c.x, c.y, c.z, 0.06F + 0.1F * g, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, g * flicker);
-        Vector3f[] plane = Glow.planeAxes(new Vector3f(axes.right()).cross(axes.up()));
+        int frame = (int) Math.floor(time);
+        PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y, c.z);
+        Wisps.orb(sprite, 1.0F + 3.0F * g, 1.0F + 2.0F * g, frame, 74);
         for (int i = 0; i < 2; i++) {
             float spin = time * (0.6F + 0.3F * i) * (i == 0 ? 1.0F : -1.0F);
-            Vector3f u = new Vector3f(plane[0]).mul(Mth.cos(spin)).add(new Vector3f(plane[1]).mul(Mth.sin(spin)));
-            Vector3f v = new Vector3f(axes.up()).mul(0.4F).add(new Vector3f(u).cross(axes.up()).mul(0.9F)).normalize();
-            Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, 0.18F + 0.12F * g, 0.05F, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.6F * g), 24);
+            float tilt = 0.4F + 0.5F * i;
+            Vector3f u = new Vector3f(Mth.cos(spin), 0.0F, Mth.sin(spin));
+            Vector3f v = new Vector3f(-Mth.sin(spin) * Mth.cos(tilt), Mth.sin(tilt), Mth.cos(spin) * Mth.cos(tilt));
+            Wisps.ring(sprite, c, u, v, 0.18F + 0.12F * g, spin, g, Pixels.opaque(Pixels.BRIGHT), 1, 1);
         }
+        sprite.draw(buffer);
     }
 
     /**

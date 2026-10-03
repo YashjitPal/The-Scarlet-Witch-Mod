@@ -9,6 +9,8 @@ import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.magic.TelekinesisClient;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.network.MagicEventPayload;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -32,16 +34,14 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
 /**
- * Telekinesis as everyone sees it. Scarlet tendrils stream from both of the caster's palms and wrap into what they
- * hold, writhing as it moves, with beads of light running along them into it. The held thing glows red through, turns
- * inside slow rings of light and sheds sparks. A block torn out of the ground bursts out in a ring of light, and
- * anything thrown that slams into the world goes off in a burst of sparks.
+ * Telekinesis as everyone sees it, as pixel art. Scarlet tendrils curl from both of the caster's palms into what they
+ * hold, writhing as it moves, with beads of light racing along them into it. The held thing reddens through, wisps of
+ * magic wind round it one way and the other, and it sheds sparks. A block torn out of the ground bursts out in sparks,
+ * and anything thrown that slams into the world goes off in a burst of them.
  */
 public final class TelekinesisFx {
 
     private static final int TENDRILS_PER_HAND = 3;
-    private static final int POINTS = 12;
-    private static final float TAU = (float) (Math.PI * 2);
 
     private static final Int2ObjectMap<Hum> HUMS = new Int2ObjectOpenHashMap<>();
 
@@ -155,99 +155,83 @@ public final class TelekinesisFx {
         if (draws.isEmpty()) {
             return;
         }
+        // what is held reddens through, in a blot of chunky pixels
         GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
             float before = Glow.darkness();
             for (Draw draw : draws) {
                 Glow.darken(draw.darkness());
-                Vector3f c = draw.center();
-                Glow.tintDisc(buffer, pose, axes, c.x, c.y, c.z, draw.size() * 0.95F, GlowPass.tint(ScarletPalette.GLASS, 0.5F * draw.presence()));
+                tint(buffer, pose, draw);
             }
             Glow.darken(before);
         });
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             float time = (float) (now % 24000.0);
             float before = Glow.darkness();
             for (Draw draw : draws) {
                 Glow.darken(draw.darkness());
-                aura(buffer, pose, axes, draw, time);
+                PixelSprite sprite = Wisps.farther(pose, draw.center(), new Vector3f(draw.rightPalm()).add(draw.leftPalm()).mul(0.5F));
+                wrap(sprite, draw, time);
                 for (int hand = 0; hand < 2; hand++) {
                     Vector3f palm = hand == 0 ? draw.rightPalm() : draw.leftPalm();
                     for (int i = 0; i < TENDRILS_PER_HAND; i++) {
-                        tendril(buffer, pose, axes, draw, palm, hand * TENDRILS_PER_HAND + i, time);
+                        tendril(sprite, draw, palm, hand * TENDRILS_PER_HAND + i, time);
                     }
                 }
+                sprite.draw(buffer);
             }
             Glow.darken(before);
         });
     }
 
     /**
-     * The glow it is held in: a red halo and two rings of light turning slowly around it on tilted axes.
+     * The red that what is held shows through: a blot over it, its edge broken up in a dither.
      */
-    private static void aura(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Draw draw, float time) {
+    private static void tint(VertexConsumer buffer, PoseStack.Pose pose, Draw draw) {
         Vector3f c = draw.center();
-        float fade = draw.presence();
-        float pulse = 0.85F + 0.15F * Mth.sin(time * 0.4F + draw.seed());
-        Glow.disc(buffer, pose, axes, c.x, c.y, c.z, draw.size() * 1.1F, Glow.withAlpha(ScarletPalette.SCARLET, 0.18F * fade * pulse));
-        float radius = draw.size() * 0.72F + 0.15F;
-        for (int i = 0; i < 2; i++) {
-            float spin = time * (0.05F + 0.03F * i) * (i == 0 ? 1.0F : -1.0F) + draw.seed();
-            float tilt = 0.5F + 0.6F * i;
-            Vector3f u = new Vector3f(Mth.cos(spin), 0.0F, Mth.sin(spin));
-            Vector3f v = new Vector3f(-Mth.sin(spin) * Mth.cos(tilt), Mth.sin(tilt), Mth.cos(spin) * Mth.cos(tilt));
-            Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, radius, 0.09F, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.55F * fade * pulse), 40);
-            Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, radius, 0.025F, Glow.withAlpha(ScarletPalette.CORE, 0.35F * fade), 40);
-            float bead = time * 0.2F * (i == 0 ? 1.0F : -1.0F) + i * 2.0F;
-            float bx = Mth.cos(bead) * radius;
-            float by = Mth.sin(bead) * radius;
-            Glow.spark(buffer, pose, axes, c.x + u.x * bx + v.x * by, c.y + u.y * bx + v.y * by, c.z + u.z * bx + v.z * by, 0.04F,
-                    ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, fade);
+        PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y, c.z);
+        float rx = (draw.width() * 0.5F + 0.25F) / Pixels.SIZE;
+        float ry = (draw.height() * 0.5F + 0.25F) / Pixels.SIZE;
+        int color = GlowPass.tint(ScarletPalette.GLASS, 0.5F * draw.presence());
+        int reachX = (int) Math.ceil(rx);
+        int reachY = (int) Math.ceil(ry);
+        for (int i = -reachX; i < reachX; i++) {
+            for (int j = -reachY; j < reachY; j++) {
+                float x = (i + 0.5F) / rx;
+                float y = (j + 0.5F) / ry;
+                float d = x * x + y * y;
+                if (d > 1.0F || d > 0.6F && !Pixels.shows((1.0F - d) / 0.4F, i, j)) {
+                    continue;
+                }
+                sprite.cell(i, j, color, 0);
+            }
         }
+        sprite.draw(buffer);
     }
 
     /**
-     * One tendril from a palm into the held thing: it leaves the hand thick and bright, curls along the way, and
-     * thins as it sinks into its own spot on the target.
+     * Wisps of it wound round what is held, turning about it one way and the other, light running up them.
      */
-    private static void tendril(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Draw draw, Vector3f palm, int index, float time) {
+    private static void wrap(PixelSprite sprite, Draw draw, float time) {
+        Vector3f c = draw.center();
+        float radius = draw.width() * 0.5F + 0.22F;
+        float half = draw.height() * 0.5F + 0.12F;
+        Wisps.helix(sprite, c, radius, radius, -half, half, 2, 1.4F, 0.11F, time, draw.presence(), draw.seed(), 0);
+        Wisps.helix(sprite, c, radius * 1.12F, radius * 0.9F, -half * 0.8F, half * 0.9F, 1, 1.1F, -0.08F, time, draw.presence() * 0.8F,
+                draw.seed() + 1.7F, 5);
+    }
+
+    /**
+     * One tendril from a palm into the held thing: it leaves the hand thick and hot, curls along the way, and thins as
+     * it sinks into its own spot on the target.
+     */
+    private static void tendril(PixelSprite sprite, Draw draw, Vector3f palm, int index, float time) {
         float seed = draw.seed() + index * 1.913F;
         Vector3f c = draw.center();
         // where on the target it takes hold
         Vector3f grip = new Vector3f(c).add(Mth.sin(seed * 3.1F) * draw.width() * 0.4F, Mth.sin(seed * 1.7F) * draw.height() * 0.35F,
                 Mth.cos(seed * 2.3F) * draw.width() * 0.4F);
-        Vector3f path = new Vector3f(grip).sub(palm);
-        float length = path.length();
-        if (length < 0.05F) {
-            return;
-        }
-        Vector3f[] side = Glow.planeAxes(new Vector3f(path).normalize());
-        float fade = draw.presence() * (draw.own() ? 0.75F : 1.0F);
-        Vector3f[] points = new Vector3f[POINTS];
-        float[] widths = new float[POINTS];
-        float[] cores = new float[POINTS];
-        int[] colors = new int[POINTS];
-        int[] coreColors = new int[POINTS];
-        float curl = Math.min(0.6F, length * 0.08F);
-        for (int i = 0; i < POINTS; i++) {
-            float s = i / (float) (POINTS - 1);
-            float envelope = Mth.sin(s * (float) Math.PI);
-            float a = time * 0.35F + s * 7.0F + seed;
-            float wobbleU = (Mth.sin(a) * curl + Mth.sin(seed * 5.0F) * curl * 0.8F) * envelope;
-            float wobbleV = (Mth.cos(a * 0.8F + seed) * curl + Mth.cos(seed * 4.0F) * curl * 0.8F) * envelope;
-            points[i] = new Vector3f(palm).add(new Vector3f(path).mul(s)).add(new Vector3f(side[0]).mul(wobbleU)).add(new Vector3f(side[1]).mul(wobbleV));
-            widths[i] = 0.09F - 0.05F * s;
-            cores[i] = widths[i] * 0.3F;
-            colors[i] = Glow.withAlpha(ScarletPalette.SCARLET, fade * (0.4F - 0.15F * s));
-            coreColors[i] = Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, fade * (0.75F - 0.3F * s));
-        }
-        Glow.ribbon(buffer, pose, axes, points, widths, colors);
-        Glow.ribbon(buffer, pose, axes, points, cores, coreColors);
-        float bead = (time * 0.09F + index * 0.37F) % 1.0F;
-        int at = Math.min(POINTS - 1, Math.round(bead * (POINTS - 1)));
-        Vector3f p = points[at];
-        Glow.spark(buffer, pose, axes, p.x, p.y, p.z, 0.035F, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, fade * Mth.sin(bead * (float) Math.PI));
+        float curl = Math.min(0.6F, grip.distance(palm) * 0.08F);
+        Wisps.tendril(sprite, palm, grip, 1.0F, curl, seed, time, draw.presence() * (draw.own() ? 0.75F : 1.0F), 0.09F, index + 11);
     }
 
     private static int count(RandomSource random, float expected) {

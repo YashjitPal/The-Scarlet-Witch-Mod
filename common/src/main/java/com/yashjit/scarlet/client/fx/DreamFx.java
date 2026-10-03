@@ -1,7 +1,6 @@
 package com.yashjit.scarlet.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.anim.Meditation;
@@ -9,8 +8,11 @@ import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.magic.MindControlClient;
+import com.yashjit.scarlet.client.render.FlatPixels;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.entity.DreamBody;
 import com.yashjit.scarlet.network.MagicEventPayload;
@@ -58,6 +60,8 @@ public final class DreamFx {
     private static final double OPEN_TICKS = 18.0;
     private static final double WAKE_TICKS = 14.0;
     private static final float CHEST = 0.95F;
+    private static final Vector3f FLAT_U = new Vector3f(1.0F, 0.0F, 0.0F);
+    private static final Vector3f FLAT_V = new Vector3f(0.0F, 0.0F, 1.0F);
 
     private static final List<Burst> BURSTS = new ArrayList<>();
 
@@ -219,83 +223,75 @@ public final class DreamFx {
         if (sitters.isEmpty() && gazes.isEmpty() && bursts.isEmpty()) {
             return;
         }
-        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             float before = Glow.darkness();
-            for (Sitter sitter : sitters) {
-                Glow.darken(sitter.darkness());
-                for (int w = 0; w < WISPS; w++) {
-                    Wisp wisp = sitter.ownEyes() ? null : wisp(sitter, w, time);
-                    if (wisp == null) {
-                        continue;
-                    }
-                    float[] widths = new float[WISP_POINTS];
-                    int[] tints = new int[WISP_POINTS];
-                    for (int i = 0; i < WISP_POINTS; i++) {
-                        widths[i] = wisp.widths()[i] * 2.6F;
-                        tints[i] = GlowPass.tint(ScarletPalette.GLASS, wisp.alphas()[i] * 0.65F);
-                    }
-                    Glow.tintRibbon(buffer, pose, axes, wisp.points(), widths, tints);
-                }
-            }
-            for (Burst burst : bursts) {
-                Glow.darken(burst.darkness());
-                float k = (float) ((now - burst.at()) / BURST_TICKS);
-                Vector3f chest = burst.feet().subtract(camera).toVector3f().add(0.0F, CHEST, 0.0F);
-                float size = burst.departing() ? 0.4F + 1.6F * Ease.outCubic(k) : 1.8F - 1.4F * Ease.outCubic(k);
-                Glow.tintDisc(buffer, pose, axes, chest.x, chest.y, chest.z, size, GlowPass.tint(ScarletPalette.GLASS, 0.5F * (1.0F - k)));
-            }
-            Glow.darken(before);
-        });
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
-            float before = Glow.darkness();
+            int frame = (int) Math.floor(now);
             for (Sitter sitter : sitters) {
                 Glow.darken(sitter.darkness());
                 Vector3f feet = sitter.feet();
-                float pulse = 0.8F + 0.2F * Mth.sin(time * 0.09F + sitter.seed());
-                for (int w = 0; w < WISPS; w++) {
-                    // not through your own eyes, where they would rise straight through the view
-                    Wisp wisp = sitter.ownEyes() ? null : wisp(sitter, w, time);
-                    if (wisp == null) {
-                        continue;
-                    }
-                    int[] colors = new int[WISP_POINTS];
-                    for (int i = 0; i < WISP_POINTS; i++) {
-                        colors[i] = Glow.withAlpha(i % 5 == 2 ? ScarletPalette.BRIGHT_SCARLET : ScarletPalette.SCARLET, wisp.alphas()[i]);
-                    }
-                    Glow.ribbon(buffer, pose, axes, wisp.points(), wisp.widths(), colors);
-                }
-                // a faint ring of light on the ground beneath, turning with the swirl
-                Vector3f u = new Vector3f(Mth.cos(time * 0.02F), 0.0F, Mth.sin(time * 0.02F));
-                Vector3f v = new Vector3f(-u.z, 0.0F, u.x);
-                Glow.ring(buffer, pose, feet.x, feet.y + 0.04F, feet.z, u, v, 0.72F, 0.1F,
-                        Glow.withAlpha(ScarletPalette.SCARLET, 0.42F * sitter.sit() * pulse), 48);
-                Glow.ring(buffer, pose, feet.x, feet.y + 0.04F, feet.z, u, v, 0.5F, 0.04F,
-                        Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.3F * sitter.sit() * pulse), 40);
+                // not through your own eyes, where they would rise straight through the view
                 if (!sitter.ownEyes()) {
-                    Glow.disc(buffer, pose, axes, feet.x, feet.y + CHEST * 0.8F + sitter.lift() * 0.3F, feet.z, 0.75F,
-                            Glow.withAlpha(ScarletPalette.SCARLET, 0.07F * sitter.sit()));
+                    PixelSprite sprite = PixelSprite.inWorld(pose, feet.x, feet.y + CHEST, feet.z);
+                    for (int w = 0; w < WISPS; w++) {
+                        Wisp wisp = wisp(sitter, w, time);
+                        if (wisp != null) {
+                            drawWisp(sprite, wisp, w, frame);
+                        }
+                    }
+                    sprite.draw(buffer);
                 }
+                // a faint ring on the ground beneath, its marks turning with the swirl
+                float shown = sitter.sit() * (0.8F + 0.2F * Mth.sin(time * 0.09F + sitter.seed()));
+                float turn = time * 0.02F + sitter.seed();
+                FlatPixels.ring(buffer, pose, camera, feet.x + camera.x, feet.y + camera.y + 0.03, feet.z + camera.z, 0.44F, 0.76F,
+                        (i, k, r, theta) -> {
+                            if (!Pixels.shows(shown * (r < 0.5F ? 0.6F : 0.9F), i, k) || r >= 0.5F && r < 0.63F) {
+                                return 0;
+                            }
+                            if (r < 0.5F) {
+                                return Pixels.opaque(Pixels.CRIMSON);
+                            }
+                            int mark = Mth.floor((theta - turn) / (Mth.TWO_PI / 24.0F));
+                            return Pixels.opaque(Math.floorMod(mark, 3) == 0 ? Pixels.BRIGHT : Pixels.SCARLET);
+                        });
             }
             for (Gaze gaze : gazes) {
                 Glow.darken(gaze.darkness());
-                MindControlFx.eyes(buffer, pose, axes, gaze.head(), gaze.size(), gaze.out(), gaze.yaw(), 1.0F, time);
+                Vector3f head = gaze.head();
+                PixelSprite sprite = PixelSprite.inWorld(pose, head.x, head.y, head.z);
+                Wisps.eyes(sprite, head, gaze.size(), gaze.out(), gaze.yaw(), 1.0F, time);
+                sprite.draw(buffer);
             }
             for (Burst burst : bursts) {
+                // a ring bursting out of the chest as the spirit leaves, or closing in on it as it comes back, round a flash
                 Glow.darken(burst.darkness());
                 float k = (float) ((now - burst.at()) / BURST_TICKS);
                 Vector3f chest = burst.feet().subtract(camera).toVector3f().add(0.0F, CHEST, 0.0F);
                 float fade = 1.0F - Ease.outCubic(k);
                 float size = burst.departing() ? 0.3F + 1.5F * Ease.outCubic(k) : 1.6F - 1.3F * Ease.outCubic(k);
-                Glow.disc(buffer, pose, axes, chest.x, chest.y, chest.z, size, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.45F * fade));
-                Glow.disc(buffer, pose, axes, chest.x, chest.y, chest.z, size * 0.3F, Glow.withAlpha(ScarletPalette.CORE, 0.7F * fade * fade));
-                Vector3f u = new Vector3f(1.0F, 0.0F, 0.0F);
-                Vector3f v = new Vector3f(0.0F, 0.0F, 1.0F);
-                Glow.ring(buffer, pose, chest.x, chest.y, chest.z, u, v, size * 0.9F, 0.12F, Glow.withAlpha(ScarletPalette.SCARLET, 0.6F * fade), 48);
+                PixelSprite sprite = PixelSprite.inWorld(pose, chest.x, chest.y, chest.z);
+                Wisps.burst(sprite, size, 0.25F, fade, frame);
+                Wisps.ring(sprite, chest, FLAT_U, FLAT_V, size * 0.9F, 0.0F, 1.0F, Pixels.opaque(fade > 0.5F ? Pixels.BRIGHT : Pixels.SCARLET), 0, 1);
+                if (fade > 0.4F) {
+                    Wisps.orb(sprite, 4.0F * fade, 1.5F, frame, 37);
+                }
+                sprite.draw(buffer);
             }
             Glow.darken(before);
         });
+    }
+
+    /**
+     * One wisp of the swirl as a line of pixels, whole along its middle and thinning out at its ends and as it fades, a
+     * brighter fleck here and there along it.
+     */
+    private static void drawWisp(PixelSprite sprite, Wisp wisp, int index, int frame) {
+        Vector3f[] points = wisp.points();
+        for (int i = 1; i < points.length; i++) {
+            if (Pixels.shows(wisp.alphas()[i] / 0.65F * 1.8F, i + frame, index + 50)) {
+                sprite.line(points[i - 1], points[i], Pixels.opaque(i % 5 == 2 ? Pixels.BRIGHT : Pixels.SCARLET), 1, wisp.widths()[i] > 0.08F ? 2 : 1);
+            }
+        }
     }
 
     /**

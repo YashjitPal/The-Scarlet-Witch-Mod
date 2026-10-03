@@ -7,8 +7,11 @@ import com.yashjit.scarlet.client.anim.CastPoses;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.anim.PoseBlends;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
+import com.yashjit.scarlet.client.render.FlatPixels;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.network.MagicEventPayload;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,11 +25,12 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
 /**
- * Levitation as everyone sees it.
+ * Levitation as everyone sees it, as pixel art.
  *
  * <ul>
- *     <li>A pad of light under the feet, ringed with slowly turning marks.</li>
- *     <li>Threads of energy spiraling up around the legs, and sparks circling the feet and falling away.</li>
+ *     <li>A pad of magic churning under the feet, ringed with slowly turning marks, lying on the world's own grid of
+ *     texels.</li>
+ *     <li>Strands of it winding up around the legs, and sparks circling the feet and falling away.</li>
  *     <li>A shock ring across the ground at lift-off, and a softer one at touch-down.</li>
  * </ul>
  */
@@ -35,8 +39,6 @@ public final class LevitationFx {
     private static final float LIFT_OFF_TICKS = 13.0F;
     private static final float TOUCH_DOWN_TICKS = 10.0F;
     private static final float TAU = (float) (Math.PI * 2);
-    private static final Vector3f FLAT_U = new Vector3f(1, 0, 0);
-    private static final Vector3f FLAT_V = new Vector3f(0, 0, 1);
 
     private static final List<Burst> BURSTS = new ArrayList<>();
 
@@ -148,36 +150,11 @@ public final class LevitationFx {
         if (hovers.isEmpty() && bursts.isEmpty()) {
             return;
         }
-        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             float before = Glow.darkness();
             for (Hover hover : hovers) {
                 Glow.darken(hover.darkness());
-                Vector3f c = new Vector3f(hover.feet()).add(0, -0.1F, 0);
-                float fade = Ease.outCubic(Ease.clamp01(hover.levitate()));
-                Glow.planeDisc(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, 0.62F, GlowPass.tint(ScarletPalette.GLASS, 0.5F * fade),
-                        GlowPass.tint(ScarletPalette.GLASS, 0.0F), 28);
-            }
-            for (Burst burst : bursts) {
-                float duration = burst.liftOff() ? LIFT_OFF_TICKS : TOUCH_DOWN_TICKS;
-                float t = (float) (now - burst.start());
-                if (t < 0.0F || t > duration) {
-                    continue;
-                }
-                Glow.darken(burst.darkness());
-                float k = t / duration;
-                Vector3f c = burst.position().subtract(camera).toVector3f().add(0, 0.04F, 0);
-                float reach = 0.25F + ((burst.liftOff() ? 2.4F : 1.5F) - 0.25F) * Ease.outCubic(k);
-                Glow.planeDisc(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, reach, GlowPass.tint(ScarletPalette.GLASS, 0.0F),
-                        GlowPass.tint(ScarletPalette.GLASS, 0.55F * (float) Math.pow(1.0F - k, 1.5)), 32);
-            }
-            Glow.darken(before);
-        });
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
-            float before = Glow.darkness();
-            for (Hover hover : hovers) {
-                Glow.darken(hover.darkness());
-                drawHover(buffer, pose, axes, hover);
+                drawHover(buffer, pose, hover, camera);
             }
             for (Burst burst : bursts) {
                 Glow.darken(burst.darkness());
@@ -187,45 +164,44 @@ public final class LevitationFx {
         });
     }
 
-    private static void drawHover(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Hover hover) {
+    /**
+     * A pad of magic churning under the feet on the world's own grid of texels, white-hot at its heart and licking out
+     * at its rim, six marks turning slowly round it, and strands of it winding up round the legs.
+     */
+    private static void drawHover(VertexConsumer buffer, PoseStack.Pose pose, Hover hover, Vec3 camera) {
         float fade = Ease.outCubic(Ease.clamp01(hover.levitate()));
         float time = hover.age();
+        int frame = (int) Math.floor(time);
         Vector3f c = new Vector3f(hover.feet()).add(0, -0.1F, 0);
-        float breathe = Mth.sin(time * 0.2F);
-        Glow.planeDisc(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, 0.55F, Glow.withAlpha(ScarletPalette.SCARLET, 0.12F * fade),
-                Glow.withAlpha(ScarletPalette.SCARLET, 0.0F), 28);
-        Glow.ring(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, 0.48F + 0.04F * breathe, 0.12F, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.45F * fade), 32);
-        Glow.ring(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, 0.28F, 0.05F, Glow.withAlpha(ScarletPalette.CORE, 0.16F * fade), 24);
-        // six marks turning slowly around the pad
-        int mark = Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.38F * fade);
-        for (int i = 0; i < 6; i++) {
-            float start = time * 0.05F + i * TAU / 6.0F + hover.seed();
-            for (int j = 0; j < 3; j++) {
-                float a0 = start + j * 0.16F;
-                float a1 = a0 + 0.16F;
-                Glow.planeLine(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, Mth.cos(a0) * 0.64F, Mth.sin(a0) * 0.64F,
-                        Mth.cos(a1) * 0.64F, Mth.sin(a1) * 0.64F, 0.045F, mark);
+        float rim = 0.46F + 0.04F * Mth.sin(time * 0.2F);
+        float turn = time * 0.05F + hover.seed();
+        FlatPixels.ring(buffer, pose, camera, c.x + camera.x, c.y + camera.y, c.z + camera.z, 0.0F, 0.7F, (i, k, r, theta) -> {
+            if (r > 0.57F) {
+                // the marks, short arcs of six turning round it
+                float sector = (theta - turn) / (TAU / 6.0F);
+                return r < 0.66F && sector - Mth.floor(sector) < 0.3F && Pixels.shows(fade, i, k) ? Pixels.opaque(Pixels.BRIGHT) : 0;
             }
-        }
-        // threads of energy winding up around the legs
-        int count = 9;
-        for (int i = 0; i < 3; i++) {
-            Vector3f[] points = new Vector3f[count];
-            float[] widths = new float[count];
-            int[] colors = new int[count];
-            for (int j = 0; j < count; j++) {
-                float s = j / (float) (count - 1);
-                float angle = time * 0.2F + i * TAU / 3.0F + s * 2.5F + hover.seed();
-                float radius = 0.36F - 0.12F * s;
-                points[j] = new Vector3f(c.x + Mth.cos(angle) * radius, c.y + 0.05F + s * 0.6F, c.z + Mth.sin(angle) * radius);
-                float envelope = Mth.sin(s * (float) Math.PI);
-                widths[j] = 0.015F + 0.045F * envelope;
-                colors[j] = Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.3F * fade * envelope);
+            float lick = 0.09F * Pixels.noise(Mth.cos(theta) * 2.0F + frame * 0.4F, Mth.sin(theta) * 2.0F - frame * 0.3F, 62);
+            if (r > rim + lick) {
+                return 0;
             }
-            Glow.ribbon(buffer, pose, axes, points, widths, colors);
-        }
+            float churn = Pixels.churn(i * 0.22F + frame * 0.18F, k * 0.22F - frame * 0.13F, 61);
+            float heat = (1.0F - r / rim) * 0.75F + churn * 0.45F;
+            if (!Pixels.shows(fade * (0.45F + heat), i, k)) {
+                return 0;
+            }
+            int step = heat > 0.95F ? Pixels.HOT : heat > 0.75F ? Pixels.PINK : heat > 0.55F ? Pixels.BRIGHT : heat > 0.3F ? Pixels.SCARLET : Pixels.CRIMSON;
+            return step >= Pixels.SCARLET ? Pixels.ramp(step, 0.75F) : Pixels.opaque(step);
+        });
+        PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y + 0.35F, c.z);
+        Wisps.helix(sprite, c, 0.36F, 0.24F, 0.05F, 0.65F, 3, 0.4F, 0.2F, time, fade, hover.seed(), 0);
+        sprite.draw(buffer);
     }
 
+    /**
+     * A shock ring racing out across the ground at lift-off, a softer one at touch-down: white-hot at its leading edge
+     * and cooling behind it, on the world's own grid of texels, breaking up as it fades.
+     */
     private static void drawBurst(VertexConsumer buffer, PoseStack.Pose pose, Burst burst, double now, Vec3 camera) {
         float duration = burst.liftOff() ? LIFT_OFF_TICKS : TOUCH_DOWN_TICKS;
         float t = (float) (now - burst.start());
@@ -233,20 +209,25 @@ public final class LevitationFx {
             return;
         }
         float k = t / duration;
-        float fade = (float) Math.pow(1.0F - k, 1.5);
-        Vector3f c = burst.position().subtract(camera).toVector3f().add(0, 0.05F, 0);
+        Vec3 at = burst.position().add(0.0, 0.03, 0.0);
         float reach = burst.liftOff() ? 2.4F : 1.5F;
-        Glow.planeDisc(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, 1.1F * (1.0F - k * 0.5F), Glow.withAlpha(ScarletPalette.SCARLET, 0.28F * fade),
-                Glow.withAlpha(ScarletPalette.SCARLET, 0.0F), 28);
-        Glow.ring(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, 0.25F + (reach - 0.25F) * Ease.outCubic(k), 0.32F * (1.0F - k) + 0.05F,
-                Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.75F * fade), 40);
+        shock(buffer, pose, camera, at, 0.25F + (reach - 0.25F) * Ease.outCubic(k), 0.32F * (1.0F - k) + 0.08F, (float) Math.pow(1.0F - k, 1.5));
         if (burst.liftOff()) {
             float late = Ease.clamp01((t - 2.0F) / (duration - 2.0F));
             if (t > 2.0F && late < 1.0F) {
-                Glow.ring(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, 0.2F + 1.2F * Ease.outCubic(late), 0.18F * (1.0F - late) + 0.03F,
-                        Glow.withAlpha(ScarletPalette.SCARLET, 0.6F * (float) Math.pow(1.0F - late, 1.5)), 32);
+                shock(buffer, pose, camera, at, 0.2F + 1.2F * Ease.outCubic(late), 0.18F * (1.0F - late) + 0.06F, 0.7F * (float) Math.pow(1.0F - late, 1.5));
             }
         }
+    }
+
+    private static void shock(VertexConsumer buffer, PoseStack.Pose pose, Vec3 camera, Vec3 at, float front, float depth, float fade) {
+        FlatPixels.ring(buffer, pose, camera, at.x, at.y, at.z, Math.max(0.0F, front - depth), front, (i, k, r, theta) -> {
+            float into = (front - r) / depth;
+            if (!Pixels.shows(fade * (1.1F - into), i, k)) {
+                return 0;
+            }
+            return Pixels.opaque(into < 0.2F ? Pixels.HOT : into < 0.45F ? Pixels.PINK : into < 0.7F ? Pixels.BRIGHT : Pixels.SCARLET);
+        });
     }
 
     /**

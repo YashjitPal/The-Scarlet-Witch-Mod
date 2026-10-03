@@ -85,22 +85,6 @@ public final class ArmMagic {
      * The ball of magic churning in the palm.
      */
     private static void palm(PixelSprite sprite, float time, float intensity) {
-        int frame = (int) Math.floor(time);
-        float radius = (1.5F + 0.5F * Mth.sin(time * 0.5F)) * intensity + 0.5F;
-        int reach = (int) Math.ceil(radius + 2.0F);
-        for (int i = -reach; i < reach; i++) {
-            for (int j = -reach; j < reach; j++) {
-                float x = i + 0.5F;
-                float y = j + 0.5F;
-                float r = (float) Math.sqrt(x * x + y * y);
-                float theta = (float) Math.atan2(y, x);
-                float flame = 1.5F * intensity * Pixels.noise(Mth.cos(theta) * 2.0F + frame * 0.5F, Mth.sin(theta) * 2.0F - frame * 0.35F, 23);
-                if (r >= radius + flame) {
-                    continue;
-                }
-                int step = r < radius * 0.45F ? Pixels.HOT : r < radius ? Pixels.PINK : r < radius + flame * 0.5F ? Pixels.BRIGHT : Pixels.SCARLET;
-                sprite.cell(i, j, Pixels.opaque(step), 2);
-            }
-        }
+        Wisps.orb(sprite, (1.5F + 0.5F * Mth.sin(time * 0.5F)) * intensity + 0.5F, 1.5F * intensity, (int) Math.floor(time), 23);
     }
 }

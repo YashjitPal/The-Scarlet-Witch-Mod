@@ -12,6 +12,7 @@ import com.yashjit.scarlet.network.CastPayload;
 import com.yashjit.scarlet.network.DreamPayload;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.player.ScarletPlayerData;
+import java.util.Arrays;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -37,7 +38,15 @@ public final class CastInput {
     private static final int DOUBLE_TAP_TICKS = 7;
 
     private static int predictedCount = Integer.MIN_VALUE;
-    private static long localReadyAt = Long.MIN_VALUE;
+    /**
+     * When each spell can next be cast, as this side reckons it until the server's word arrives: each spell's own, so a
+     * long cooldown on one never holds back another.
+     */
+    private static final long[] LOCAL_READY_AT = new long[Spell.values().length];
+
+    static {
+        Arrays.fill(LOCAL_READY_AT, Long.MIN_VALUE);
+    }
     private static long lastRefusalAt = ScarletPlayerData.NEVER;
     private static @Nullable Spell holding;
     private static boolean pressHandled;
@@ -85,7 +94,7 @@ public final class CastInput {
             }
             return true;
         }
-        Magic.Refusal refusal = now < localReadyAt ? Magic.Refusal.COOLDOWN : Magic.check(player, spell, now);
+        Magic.Refusal refusal = now < LOCAL_READY_AT[spell.ordinal()] ? Magic.Refusal.COOLDOWN : Magic.check(player, spell, now);
         switch (refusal) {
             case NONE -> {
                 if (spell.input() == Spell.Input.CHANNEL) {
@@ -93,7 +102,7 @@ public final class CastInput {
                 } else {
                     int castNumber = Math.max(state.castCount(), predictedCount + 1);
                     predictedCount = castNumber;
-                    localReadyAt = now + spell.cooldown();
+                    LOCAL_READY_AT[spell.ordinal()] = now + spell.cooldown();
                     float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
                     CastGestures.predict(player, Magic.castArm(player, castNumber), now + partialTick);
                 }

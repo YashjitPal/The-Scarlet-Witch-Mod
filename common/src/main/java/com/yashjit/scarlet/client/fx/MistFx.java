@@ -1,11 +1,14 @@
 package com.yashjit.scarlet.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.magic.Spell;
 import com.yashjit.scarlet.network.MagicEventPayload;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -27,14 +30,18 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Red Mist as everyone sees it. The caster comes apart into a crimson fog that spirals up around them, streams to where
- * they are going in a long smear of red, and pulls back together into them there. The fog reddens and darkens what is
- * behind it like real mist, with embers burning through it. Arriving, your own view clears out of a red blink.
+ * they are going in a long smear of red, and pulls back together into them there. The fog is pixel art, dithered puffs
+ * of crimson and wine that redden and darken what is behind them like real mist, with embers burning through them.
+ * Arriving, your own view clears out of a red blink.
  */
 public final class MistFx {
 
     private static final int BLINK_TICKS = 9;
     private static final float TAU = (float) (Math.PI * 2);
     private static final int MAX_PUFFS = 900;
+    /** Fog nearer the eyes than this is not drawn, and it thins in over the next {@link #NEAR_FADE}. */
+    private static final float NEAR = 0.9F;
+    private static final float NEAR_FADE = 1.4F;
 
     private static final Int2ObjectMap<Track> TRACKS = new Int2ObjectOpenHashMap<>();
     private static final List<Puff> PUFFS = new ArrayList<>();
@@ -213,27 +220,54 @@ public final class MistFx {
             values[i * 7 + 5] = puff.shade;
             values[i * 7 + 6] = puff.darkness;
         }
-        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             float before = Glow.darkness();
             for (int i = 0; i < count; i++) {
+                float x = values[i * 7];
+                float y = values[i * 7 + 1];
+                float z = values[i * 7 + 2];
+                // thinning out right round the eyes, where it would only be a few great squares across the view
+                float alpha = values[i * 7 + 4] * Ease.clamp01(((float) Math.sqrt(x * x + y * y + z * z) - NEAR) / NEAR_FADE);
+                if (alpha < 0.02F) {
+                    continue;
+                }
                 Glow.darken(values[i * 7 + 6]);
-                Glow.tintDisc(buffer, pose, axes, values[i * 7], values[i * 7 + 1], values[i * 7 + 2], values[i * 7 + 3],
-                        GlowPass.tint(ScarletPalette.GLASS, 0.55F * values[i * 7 + 4]));
+                fog(buffer, pose, x, y, z, values[i * 7 + 3], alpha, values[i * 7 + 5], i);
             }
             Glow.darken(before);
         });
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
-            float before = Glow.darkness();
-            for (int i = 0; i < count; i++) {
-                Glow.darken(values[i * 7 + 6]);
-                int color = Glow.mix(ScarletPalette.WINE, ScarletPalette.CRIMSON, values[i * 7 + 5]);
-                Glow.disc(buffer, pose, axes, values[i * 7], values[i * 7 + 1], values[i * 7 + 2], values[i * 7 + 3],
-                        Glow.withAlpha(color, 0.28F * values[i * 7 + 4]));
+    }
+
+    /**
+     * A puff of the fog: a round, dithered patch of crimson and wine pixels, thickest in the middle, reddening and
+     * darkening what lies behind it, an ember burning through here and there.
+     *
+     * @param shade how far toward crimson it is from wine, 0 to 1
+     */
+    private static void fog(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, float radius, float alpha, float shade, int seed) {
+        int reach = Math.max(1, Math.round(radius / Pixels.SIZE));
+        PixelSprite sprite = PixelSprite.inWorld(pose, x, y, z);
+        for (int i = -reach; i < reach; i++) {
+            for (int j = -reach; j < reach; j++) {
+                float r = (float) Math.sqrt((i + 0.5F) * (i + 0.5F) + (j + 0.5F) * (j + 0.5F)) / reach;
+                float level = alpha * (1.0F - r * r) * 1.8F;
+                if (r >= 1.0F || !Pixels.shows(level, i + seed, j + seed * 3)) {
+                    continue;
+                }
+                int color;
+                if (level > 0.85F && Pixels.hash(i, j, seed, 9) < 0.08F) {
+                    color = Pixels.opaque(Pixels.BRIGHT);
+                } else if (level > 0.85F) {
+                    color = Pixels.ramp(Pixels.SCARLET, 0.75F);
+                } else if (level > 0.55F) {
+                    color = Pixels.ramp(Pixels.CRIMSON, 0.75F);
+                } else {
+                    color = Pixels.ramp(shade > 0.5F ? Pixels.CRIMSON : Pixels.WINE, 0.5F);
+                }
+                sprite.cell(i, j, color, 0);
             }
-            Glow.darken(before);
-        });
+        }
+        sprite.draw(buffer);
     }
 
     /**

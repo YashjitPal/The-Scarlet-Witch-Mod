@@ -1,7 +1,6 @@
 package com.yashjit.scarlet.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
@@ -10,6 +9,8 @@ import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.magic.MindControlClient;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.magic.MindControl;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
@@ -56,13 +57,13 @@ import org.jspecify.annotations.Nullable;
  *     <li>Held yourself: the picture is tinged red and closes in, beating fast, with how hard you are fighting it.</li>
  * </ul>
  *
- * <p>Everything in the world is drawn over a scarlet tint, so it keeps its red against a bright sky.
+ * <p>Everything in the world is pixel art, stepped down the ramp of the mod's magic, so it keeps its red against a
+ * bright sky.
  */
 public final class MindControlFx {
 
     private static final Identifier GLOW = Scarlet.id("hud/glow");
     private static final int TENDRILS_PER_HAND = 2;
-    private static final int POINTS = 14;
     private static final double SNAP_TICKS = 12.0;
     private static final double DIVE_TICKS = 14.0;
     private static final double RETURN_TICKS = 10.0;
@@ -202,73 +203,41 @@ public final class MindControlFx {
         if (draws.isEmpty() && embers.isEmpty() && snaps.isEmpty()) {
             return;
         }
-        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             float before = Glow.darkness();
             for (Draw draw : draws) {
                 Glow.darken(draw.darkness());
-                for (Path tendril : tendrils(draw)) {
-                    float[] widths = new float[tendril.count()];
-                    int[] tints = new int[tendril.count()];
-                    for (int i = 0; i < tendril.count(); i++) {
-                        widths[i] = tendril.widths()[i] * 2.6F;
-                        tints[i] = GlowPass.tint(ScarletPalette.GLASS, tendril.alpha() * (0.5F - 0.2F * tendril.along()[i]));
-                    }
-                    Glow.tintRibbon(buffer, pose, axes, tendril.points(), widths, tints);
-                }
-                Path thread = thread(draw);
-                if (thread != null) {
-                    float[] widths = new float[thread.count()];
-                    int[] tints = new int[thread.count()];
-                    for (int i = 0; i < thread.count(); i++) {
-                        widths[i] = thread.widths()[i] * 2.8F;
-                        tints[i] = GlowPass.tint(ScarletPalette.GLASS, thread.alpha() * thread.fades()[i] * 0.55F);
-                    }
-                    Glow.tintRibbon(buffer, pose, axes, thread.points(), widths, tints);
-                }
+                Vector3f head = draw.head();
+                PixelSprite sprite = Wisps.farther(pose, head, draw.inside() > 0.5F ? draw.brow()
+                        : new Vector3f(draw.rightPalm()).add(draw.leftPalm()).mul(0.5F));
+                tendrils(sprite, draw);
+                thread(sprite, draw);
                 if (!draw.viewedFromInside()) {
-                    Vector3f c = crownCenter(draw.head(), draw.size());
-                    Glow.tintDisc(buffer, pose, axes, c.x, c.y, c.z, 0.6F * draw.size(), GlowPass.tint(ScarletPalette.GLASS, 0.42F * draw.reach()));
-                }
-            }
-            Glow.darken(before);
-            for (Snap snap : snaps) {
-                float k = (float) ((now - snap.at()) / SNAP_TICKS);
-                Vector3f at = snap.head().subtract(camera).toVector3f();
-                Glow.tintDisc(buffer, pose, axes, at.x, at.y, at.z, snap.size() * (0.5F + 1.4F * Ease.outCubic(k)),
-                        GlowPass.tint(ScarletPalette.GLASS, 0.5F * (1.0F - k)));
-            }
-        });
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
-            float before = Glow.darkness();
-            for (Draw draw : draws) {
-                Glow.darken(draw.darkness());
-                for (Path tendril : tendrils(draw)) {
-                    drawTendril(buffer, pose, axes, tendril, draw.time());
-                }
-                Path thread = thread(draw);
-                if (thread != null) {
-                    drawThread(buffer, pose, axes, thread, draw);
-                }
-                if (!draw.viewedFromInside()) {
-                    crown(buffer, pose, axes, draw.head(), draw.size(), draw.reach(), draw.seed(), draw.time());
+                    crown(sprite, head, draw.size(), draw.reach(), draw.seed(), draw.time());
                     if (draw.lightEyes()) {
-                        eyes(buffer, pose, axes, draw.head(), draw.size(), draw.out(), draw.yaw(), draw.reach(), draw.time() + draw.seed());
+                        Wisps.eyes(sprite, head, draw.size(), draw.out(), draw.yaw(), draw.reach(), draw.time() + draw.seed());
                     }
                 }
+                sprite.draw(buffer);
             }
             Glow.darken(before);
             for (Ember ember : embers) {
-                eyes(buffer, pose, axes, ember.head(), ember.size(), ember.out(), ember.yaw(), 0.45F * ember.loyalty(), time);
+                Vector3f head = ember.head();
+                PixelSprite sprite = PixelSprite.inWorld(pose, head.x, head.y, head.z);
+                Wisps.eyes(sprite, head, ember.size(), ember.out(), ember.yaw(), 0.45F * ember.loyalty(), time);
+                sprite.draw(buffer);
             }
             for (Snap snap : snaps) {
+                // the thread snapping back: a ring of it bursting out of the head round a white-hot flash
                 float k = (float) ((now - snap.at()) / SNAP_TICKS);
                 Vector3f at = snap.head().subtract(camera).toVector3f();
-                float fade = 1.0F - Ease.outCubic(k);
-                Glow.disc(buffer, pose, axes, at.x, at.y, at.z, snap.size() * (0.4F + 1.4F * Ease.outCubic(k)),
-                        Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.5F * fade));
-                Glow.disc(buffer, pose, axes, at.x, at.y, at.z, snap.size() * 0.35F, Glow.withAlpha(ScarletPalette.CORE, 0.7F * fade * fade));
+                PixelSprite sprite = PixelSprite.inWorld(pose, at.x, at.y, at.z);
+                int frame = (int) Math.floor(now);
+                Wisps.burst(sprite, snap.size() * (0.2F + 0.9F * Ease.outCubic(k)), 0.1F + 0.2F * (1.0F - k), 1.0F - Ease.outCubic(k), frame);
+                if (k < 0.4F) {
+                    Wisps.orb(sprite, 3.5F * (1.0F - k / 0.4F) * snap.size(), 1.5F, frame, 31);
+                }
+                sprite.draw(buffer);
             }
         });
     }
@@ -278,133 +247,61 @@ public final class MindControlFx {
      * is inside. None are drawn into the view of whoever is inside it, nor more than one from each hand seen from the
      * caster's own eyes.
      */
-    private static List<Path> tendrils(Draw draw) {
+    private static void tendrils(PixelSprite sprite, Draw draw) {
         float alpha = draw.reach() * (1.0F - draw.inside());
         if (alpha < 0.01F || draw.viewedFromInside()) {
-            return List.of();
+            return;
         }
         int perHand = draw.ownFirstPerson() ? 1 : TENDRILS_PER_HAND;
-        List<Path> paths = new ArrayList<>(perHand * 2);
+        float reach = Math.clamp(draw.reach(), 0.0F, 1.0F);
         for (int hand = 0; hand < 2; hand++) {
             Vector3f palm = hand == 0 ? draw.rightPalm() : draw.leftPalm();
             for (int i = 0; i < perHand; i++) {
-                Path path = tendril(palm, draw, hand * TENDRILS_PER_HAND + i, draw.ownFirstPerson() ? alpha * 0.8F : alpha);
-                if (path != null) {
-                    paths.add(path);
-                }
+                int index = hand * TENDRILS_PER_HAND + i;
+                float seed = draw.seed() + index * 1.913F;
+                Vector3f grip = new Vector3f(draw.head()).add(Mth.sin(seed * 3.1F) * draw.size() * 0.18F,
+                        Mth.sin(seed * 1.7F) * draw.size() * 0.12F + 0.05F, Mth.cos(seed * 2.3F) * draw.size() * 0.18F);
+                float curl = Math.min(0.75F, grip.distance(palm) * 0.1F);
+                // the bead races faster while it is still reaching in
+                Wisps.tendril(sprite, palm, grip, reach, curl, seed, draw.time(), draw.ownFirstPerson() ? alpha * 0.8F : alpha,
+                        reach < 0.999F ? 0.16F : 0.08F, index + 21);
             }
         }
-        return paths;
-    }
-
-    /**
-     * One tendril from a palm into the head, grown as far as the hold has reached along its way: thick leaving the hand,
-     * curling as it goes, thinning as it sinks in.
-     */
-    private static @Nullable Path tendril(Vector3f palm, Draw draw, int index, float alpha) {
-        float seed = draw.seed() + index * 1.913F;
-        Vector3f grip = new Vector3f(draw.head()).add(Mth.sin(seed * 3.1F) * draw.size() * 0.18F,
-                Mth.sin(seed * 1.7F) * draw.size() * 0.12F + 0.05F, Mth.cos(seed * 2.3F) * draw.size() * 0.18F);
-        Vector3f path = new Vector3f(grip).sub(palm);
-        float length = path.length();
-        if (length < 0.05F) {
-            return null;
-        }
-        Vector3f[] side = Glow.planeAxes(new Vector3f(path).normalize());
-        float reach = Math.clamp(draw.reach(), 0.0F, 1.0F);
-        int count = Math.max(2, Math.round(POINTS * reach));
-        Vector3f[] points = new Vector3f[count];
-        float[] widths = new float[count];
-        float[] along = new float[count];
-        float curl = Math.min(0.75F, length * 0.1F);
-        for (int i = 0; i < count; i++) {
-            float s = reach * i / (count - 1);
-            float envelope = Mth.sin(Math.min(1.0F, s) * (float) Math.PI);
-            float a = draw.time() * 0.42F + s * 8.0F + seed;
-            float u = (Mth.sin(a) * curl + Mth.sin(seed * 5.0F) * curl * 0.9F) * envelope;
-            float v = (Mth.cos(a * 0.8F + seed) * curl + Mth.cos(seed * 4.0F) * curl * 0.9F) * envelope;
-            points[i] = new Vector3f(palm).add(new Vector3f(path).mul(s)).add(new Vector3f(side[0]).mul(u)).add(new Vector3f(side[1]).mul(v));
-            widths[i] = 0.1F - 0.06F * s;
-            along[i] = s;
-        }
-        return new Path(points, widths, along, null, alpha, index);
-    }
-
-    private static void drawTendril(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Path tendril, float time) {
-        int count = tendril.count();
-        float[] cores = new float[count];
-        int[] colors = new int[count];
-        int[] coreColors = new int[count];
-        for (int i = 0; i < count; i++) {
-            float s = tendril.along()[i];
-            cores[i] = tendril.widths()[i] * 0.3F;
-            colors[i] = Glow.withAlpha(ScarletPalette.SCARLET, tendril.alpha() * (0.5F - 0.15F * s));
-            coreColors[i] = Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, tendril.alpha() * (0.85F - 0.25F * s));
-        }
-        Glow.ribbon(buffer, pose, axes, tendril.points(), tendril.widths(), colors);
-        Glow.ribbon(buffer, pose, axes, tendril.points(), cores, coreColors);
-        Vector3f tip = tendril.points()[count - 1];
-        Glow.spark(buffer, pose, axes, tip.x, tip.y, tip.z, 0.04F, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, tendril.alpha() * 0.7F);
-        // a bead of light racing along it into the head, faster while it is still reaching in
-        boolean reaching = tendril.along()[count - 1] < 0.999F;
-        float bead = (time * (reaching ? 0.16F : 0.08F) + tendril.index() * 0.41F) % 1.0F;
-        Vector3f p = tendril.points()[Math.min(count - 1, Math.round(bead * (count - 1)))];
-        Glow.spark(buffer, pose, axes, p.x, p.y, p.z, 0.035F, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET,
-                tendril.alpha() * Mth.sin(bead * (float) Math.PI));
     }
 
     /**
      * Once the view is inside: one trembling thread from the caster's brow to the head of what they hold, sagging a
-     * little, pulsing like a heartbeat. Seen from inside, it fades out before it reaches the view, coming up to you
-     * rather than through you.
+     * little, swelling and flaring with each beat of a heart, a bead of light running along it. Seen from inside, it
+     * thins out before it reaches the view, coming up to you rather than through you.
      */
-    private static @Nullable Path thread(Draw draw) {
+    private static void thread(PixelSprite sprite, Draw draw) {
         if (draw.inside() < 0.01F) {
-            return null;
+            return;
         }
         Vector3f from = new Vector3f(draw.brow()).add(0.0F, 0.1F, 0.0F);
         Vector3f path = new Vector3f(draw.head()).sub(from);
         float length = path.length();
         if (length < 0.1F) {
-            return null;
+            return;
         }
         Vector3f[] side = Glow.planeAxes(new Vector3f(path).normalize());
-        int count = Math.clamp(Math.round(length * 2.0F), 8, 40);
-        Vector3f[] points = new Vector3f[count];
-        float[] widths = new float[count];
-        float[] along = new float[count];
-        float[] fades = new float[count];
+        int count = Math.clamp(Math.round(length * 8.0F), 8, 96);
         float beat = heartbeat(draw.time());
-        for (int i = 0; i < count; i++) {
-            float s = i / (float) (count - 1);
-            float sag = Mth.sin(s * (float) Math.PI) * Math.min(0.6F, length * 0.06F);
-            float shiver = Mth.sin(draw.time() * 0.9F + s * 13.0F + draw.seed()) * 0.03F * Mth.sin(s * (float) Math.PI);
-            points[i] = new Vector3f(from).add(new Vector3f(path).mul(s)).add(0.0F, sag, 0.0F).add(new Vector3f(side[0]).mul(shiver));
-            fades[i] = draw.viewedFromInside() ? 1.0F - Ease.clamp01((s - 0.55F) / 0.45F) : 1.0F;
-            widths[i] = (0.06F + 0.03F * beat) * fades[i];
-            along[i] = s;
-        }
-        return new Path(points, widths, along, fades, draw.inside(), 0);
-    }
-
-    private static void drawThread(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Path thread, Draw draw) {
-        int count = thread.count();
-        float beat = heartbeat(draw.time());
-        int[] colors = new int[count];
-        float[] cores = new float[count];
-        int[] coreColors = new int[count];
-        for (int i = 0; i < count; i++) {
-            float fade = thread.fades()[i];
-            colors[i] = Glow.withAlpha(ScarletPalette.SCARLET, thread.alpha() * (0.5F + 0.3F * beat) * fade);
-            cores[i] = thread.widths()[i] * 0.35F;
-            coreColors[i] = Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, thread.alpha() * (0.75F + 0.25F * beat) * fade);
-        }
-        Glow.ribbon(buffer, pose, axes, thread.points(), thread.widths(), colors);
-        Glow.ribbon(buffer, pose, axes, thread.points(), cores, coreColors);
         float run = (draw.time() * 0.05F + draw.seed()) % 1.0F;
-        int at = Math.min(count - 1, Math.round(run * (count - 1)));
-        Vector3f p = thread.points()[at];
-        Glow.spark(buffer, pose, axes, p.x, p.y, p.z, 0.05F, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, thread.alpha() * thread.fades()[at]);
+        int frame = (int) Math.floor(draw.time());
+        Vector3f previous = null;
+        for (int i = 0; i <= count; i++) {
+            float s = i / (float) count;
+            float sag = Mth.sin(s * Mth.PI) * Math.min(0.6F, length * 0.06F);
+            float shiver = Mth.sin(draw.time() * 0.9F + s * 13.0F + draw.seed()) * 0.03F * Mth.sin(s * Mth.PI);
+            Vector3f at = new Vector3f(path).mul(s).add(from).add(side[0].x * shiver, sag + side[0].y * shiver, side[0].z * shiver);
+            float fade = draw.viewedFromInside() ? 1.0F - Ease.clamp01((s - 0.55F) / 0.45F) : 1.0F;
+            if (previous != null && Pixels.shows(draw.inside() * fade, i + frame, 7)) {
+                int step = Math.abs(s - run) < 0.025F ? Pixels.HOT : beat > 0.5F ? Pixels.PINK : Pixels.BRIGHT;
+                sprite.line(previous, at, Pixels.opaque(step), 1, beat > 0.5F && fade > 0.5F ? 2 : 1);
+            }
+            previous = at;
+        }
     }
 
     private static Vector3f crownCenter(Vector3f head, float size) {
@@ -412,74 +309,48 @@ public final class MindControlFx {
     }
 
     /**
-     * A crown of light gathering around a held head: a soft red halo, two rings turning on tilted axes, beads circling
-     * on them, and wisps curling up off it.
+     * A crown of light gathering round a held head: two rings turning on tilted axes, closing round it as the hold
+     * takes and flaring with each beat of a heart, a bead of light circling on each, and wisps curling up off it.
      */
-    private static void crown(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Vector3f head, float size, float reach, float seed,
-                              float time) {
+    private static void crown(PixelSprite sprite, Vector3f head, float size, float reach, float seed, float time) {
         float grow = Ease.outCubic(reach);
         if (grow < 0.01F) {
             return;
         }
-        float pulse = 0.85F + 0.15F * heartbeat(time + seed);
+        boolean beat = heartbeat(time + seed) > 0.5F;
         Vector3f c = crownCenter(head, size);
-        Glow.disc(buffer, pose, axes, c.x, c.y, c.z, 0.55F * size * grow, Glow.withAlpha(ScarletPalette.SCARLET, 0.22F * grow * pulse));
         float radius = (0.32F + 0.08F * (1.0F - grow)) * size;
+        int frame = (int) Math.floor(time);
+        int beadSize = size > 1.5F ? 2 : 1;
         for (int i = 0; i < 2; i++) {
             float spin = time * (0.07F + 0.04F * i) * (i == 0 ? 1.0F : -1.0F) + seed;
             float tilt = 0.25F + 0.35F * i;
             Vector3f u = new Vector3f(Mth.cos(spin), 0.0F, Mth.sin(spin));
             Vector3f v = new Vector3f(-Mth.sin(spin) * Mth.cos(tilt), Mth.sin(tilt), Mth.cos(spin) * Mth.cos(tilt));
-            Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, radius, 0.08F * size, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.6F * grow * pulse), 36);
-            Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, radius, 0.022F * size, Glow.withAlpha(ScarletPalette.CORE, 0.45F * grow), 36);
+            int color = Pixels.opaque(beat ? Pixels.PINK : i == 0 ? Pixels.BRIGHT : Pixels.SCARLET);
+            Wisps.ring(sprite, c, u, v, radius, spin, grow, color, 1, 1);
             float bead = time * 0.25F * (i == 0 ? 1.0F : -1.0F) + i * 2.5F;
             float bx = Mth.cos(bead) * radius;
             float by = Mth.sin(bead) * radius;
-            Glow.spark(buffer, pose, axes, c.x + u.x * bx + v.x * by, c.y + u.y * bx + v.y * by, c.z + u.z * bx + v.z * by, 0.035F * size,
-                    ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, grow);
+            sprite.plot(c.x + u.x * bx + v.x * by, c.y + u.y * bx + v.y * by, c.z + u.z * bx + v.z * by, Pixels.opaque(Pixels.HOT), 2, beadSize);
         }
         // wisps curling up off the head
         for (int w = 0; w < 3; w++) {
             float phase = (time * 0.03F + w / 3.0F + seed) % 1.0F;
-            Vector3f[] points = new Vector3f[7];
-            float[] widths = new float[7];
-            int[] colors = new int[7];
             float angle = w * 2.094F + time * 0.02F + seed;
-            float life = Mth.sin(phase * (float) Math.PI);
-            for (int i = 0; i < 7; i++) {
-                float s = i / 6.0F;
+            float life = Mth.sin(phase * Mth.PI) * grow;
+            Vector3f previous = null;
+            for (int i = 0; i < 8; i++) {
+                float s = i / 7.0F;
                 float rise = (phase + s * 0.35F) * 0.9F * size;
                 float swirl = angle + s * 2.2F;
                 float r = radius * (0.9F - 0.5F * s);
-                points[i] = new Vector3f(c.x + Mth.cos(swirl) * r, c.y + rise, c.z + Mth.sin(swirl) * r);
-                widths[i] = 0.06F * size * (1.0F - s * 0.7F);
-                colors[i] = Glow.withAlpha(ScarletPalette.SCARLET, 0.38F * grow * life * (1.0F - s));
+                Vector3f at = new Vector3f(c.x + Mth.cos(swirl) * r, c.y + rise, c.z + Mth.sin(swirl) * r);
+                if (previous != null && Pixels.shows(life * (1.0F - 0.8F * s), i + frame, w + 40)) {
+                    sprite.line(previous, at, Pixels.opaque(s < 0.4F ? Pixels.SCARLET : Pixels.CRIMSON), 0, 1);
+                }
+                previous = at;
             }
-            Glow.ribbon(buffer, pose, axes, points, widths, colors);
-        }
-    }
-
-    /**
-     * Two red points of light where a creature's eyes are, a little out from its face.
-     *
-     * @param out how far in front of where it looks from its face is; see {@link #faceOut}
-     */
-    static void eyes(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Vector3f head, float size, float out, float yaw, float strength,
-                     float time) {
-        if (strength < 0.01F) {
-            return;
-        }
-        float rad = yaw * Mth.DEG_TO_RAD;
-        float fx = -Mth.sin(rad);
-        float fz = Mth.cos(rad);
-        float apart = 0.11F * size;
-        float flicker = 0.85F + 0.15F * Mth.sin(time * 1.3F);
-        for (int side = -1; side <= 1; side += 2) {
-            float x = head.x + fx * out + fz * apart * side;
-            float y = head.y + 0.06F * size;
-            float z = head.z + fz * out - fx * apart * side;
-            Glow.disc(buffer, pose, axes, x, y, z, 0.09F * size, Glow.withAlpha(ScarletPalette.SCARLET, 0.4F * strength * flicker));
-            Glow.disc(buffer, pose, axes, x, y, z, 0.032F * size, Glow.withAlpha(ScarletPalette.CORE, 0.95F * strength));
         }
     }
 
@@ -688,17 +559,6 @@ public final class MindControlFx {
      */
     private record Draw(Vector3f head, float size, float out, boolean lightEyes, float yaw, Vector3f rightPalm, Vector3f leftPalm, Vector3f brow, float reach,
                         float inside, boolean viewedFromInside, boolean ownFirstPerson, float seed, float time, float darkness) {
-    }
-
-    /**
-     * A tendril or the thread as laid out this frame: its points, how wide it is and how far along it each point is,
-     * how much of it shows at each point when it fades toward the view, and how strongly it shows overall.
-     */
-    private record Path(Vector3f[] points, float[] widths, float[] along, float @Nullable [] fades, float alpha, int index) {
-
-        int count() {
-            return points.length;
-        }
     }
 
     private record Ember(Vector3f head, float size, float out, float yaw, float loyalty) {

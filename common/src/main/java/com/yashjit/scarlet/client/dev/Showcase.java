@@ -1767,6 +1767,9 @@ public final class Showcase {
                     .land()
                     .dispelHexes()
                     .command("kill @e[type=!minecraft:player]")
+                    // out on open ground, clear of whatever other scenes have built near spawn
+                    .command("spreadplayers 640 640 0 1 false @a").then(minecraft -> {
+                    }, 40)
                     .command("time set noon")
                     .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
                     .command("item replace entity @a weapon.mainhand with minecraft:air")
@@ -1787,14 +1790,20 @@ public final class Showcase {
                     }, 90)
                     .playerCamera().face(0, 25).hideHud(false).tap().shot("shockwave_first_person_gather", 3).shot("shockwave_first_person", 6)
                     .hideHud(true)
-                    // Red Mist, seen from the side as the caster crosses twelve blocks
+                    // Red Mist, seen from the side as the caster crosses twelve blocks; the pigs thrown by the Shockwave die
+                    // of their fall, and the caster can't cast with what they dropped in hand
                     .command("kill @e[type=minecraft:pig]")
+                    .command("kill @e[type=minecraft:item]")
+                    .command("clear @a minecraft:porkchop")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
                     .face(90, 0).select(Spell.RED_MIST).look(13.0, -90, 14, 1.0)
                     .tap().shot("mist_out_a", 1).shot("mist_out_b", 2).shot("mist_in_a", 3).shot("mist_in_b", 3).shot("mist_after", 10)
                     .playerCamera().hideHud(false).face(90, 0).then(minecraft -> {
                     }, 60)
                     .tap().shot("mist_first_person_a", 6).shot("mist_first_person_b", 3).hideHud(true)
                     // Telekinesis: a pig lifted, raised and thrown; then a block torn out of the ground
+                    .command("kill @e[type=minecraft:item]")
+                    .command("clear @a minecraft:porkchop")
                     .command("execute as @a at @s run tp @s ~ ~ ~ 0 10")
                     .command("execute at @a run summon minecraft:pig ^ ^ ^5")
                     .face(0, 10).select(Spell.TELEKINESIS).look(6.5, 60, 12, 1.3)

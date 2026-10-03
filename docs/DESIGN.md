@@ -141,11 +141,12 @@ G = gold ingot   R = redstone dust   A = amethyst shard
 - **Cost:** a slow drain while held, plus energy for every blow, more for harder hits. Melee attackers are thrown back.
 - **Shatter:** when a blow costs more than you have, the shield still stops it but bursts into shards, and the spell rests for 3 seconds.
 - **Held still:** you move at 60% speed while shielding. Using an item or taking off the crown drops the shield.
-- **Look:**
-  - A faint membrane that brightens toward a burning rim, with motes circling it.
-  - A honeycomb lattice shimmering in slow waves, with a ripple from every hit.
-  - Wisps spiraling across the face, and ribbons of energy feeding it from both palms.
-  - It flares open when raised, and a low hum swells and fades with it.
+- **Look:** a disc of churning red energy drawn pixel by pixel on its own plane.
+  - Three arms of energy swirl in toward the middle through a thin red haze, and you see through it between them.
+  - Its rim burns, light running around it, with tongues of it licking outward like fire.
+  - Every blow sends a ring of light out across it from a white-hot sparkle where it landed.
+  - Strands of energy feed it from both palms, beads of light running along them.
+  - It whirls in fast as it is raised and dithers away as it is lowered, and a low hum swells and fades with it. When it breaks it bursts into tumbling chunks of itself that burn out as they fly.
 - **Pose:** the arms tremble with the strain and are knocked back by each blow.
 - **First person:** your own shield sits further out and fainter, so it frames the view instead of covering it.
 
@@ -154,20 +155,20 @@ G = gold ingot   R = redstone dust   A = amethyst shard
 - **Turn on and off** by casting it from the wheel, or by **double-tapping jump** (as in creative flight). Fly with the creative flight controls.
 - **Cost:** a gentle drain while airborne. Landing ends it. Switching it off in mid-air, or running out of energy, lowers you gently with slow falling.
 - **Look:**
-  - A pad of light under the feet, ringed with slowly turning marks.
-  - Threads of energy winding up the legs, with sparks circling the feet and dust falling away.
-  - A shock ring across the ground at lift-off, and a softer one at touch-down.
+  - A pad of magic churning under the feet, white-hot at its heart and licking out at its rim, ringed with six slowly turning marks.
+  - Strands of it winding up the legs, with sparks circling the feet and dust falling away.
+  - A shock ring racing across the ground at lift-off, white-hot at its leading edge, and a softer one at touch-down. The pad and the rings lie on the ground's own grid of texels.
 - **Pose:** the arms float out from the sides and the legs hang loose, with a gentle hover bob. The body leans into the flight and the arms sweep back as you pick up speed.
 
 ### Magic on the arms
 
-Whenever powers are in use, scarlet wisps spiral around the hands and forearms and sparkles drift off the fingers, flaring brighter at the moment of casting. Visible in first person on your own hands. Drawn by our effects engine, not vanilla particles.
+Whenever powers are in use, scarlet wisps spiral around the hands and forearms, light running down them, and a ball of magic churns in each palm, its rim licking out like flame, flaring brighter at the moment of casting. Visible in first person on your own hands, where its pixels match the arm's own texels. Drawn by our effects engine, not vanilla particles.
 
 They burn steadily while the shield is held and smolder while levitating.
 
 ### Mind control
 
-- Look at a creature within range and hold the cast: scarlet tendrils stream from your hands into its head, and its eyes glow red.
+- Look at a creature within range and hold the cast: scarlet tendrils curl from your hands into its head, a crown of two turning rings gathers round it, and its eyes burn red. Once you are inside, a single thread runs from your brow to its head, swelling with each beat of a heart.
 - **Mobs and animals:** your view moves into the creature and you control it directly: move, jump, attack. Your own body stands channeling and is vulnerable. Release to return.
 - After release, the mob stays loyal to you for a while.
 - **Players (short and fair):** a few seconds of control. Their screen tints red and they can struggle free by mashing keys. Long cooldown. Servers can turn it off.
@@ -367,23 +368,25 @@ Darkhold corruption pulls the palette toward `#3A0010` and `#0B0004`, with sickl
 
 ### Effects
 
+The powers are pixel art, drawn the way Minecraft draws everything: in square pixels a sixteenth of a block across, the size of a texel on a block or a skin, each a flat color from a seven-step ramp running from white-hot through scarlet and crimson down to shadow. Nothing soft, and nothing finer. They fade by stepping down the ramp and thinning out in an ordered dither, as pixel art does, rather than by blurring. Their patterns change a tick at a time, like an animated block texture, while the magic itself moves smoothly.
+
 Every power is built from layers, timed together:
 
-1. **Core:** the bright hot center.
-2. **Glow:** soft falloff around it.
-3. **Wisps:** flowing noise-driven tendrils.
-4. **Sparks and embers.**
-5. **Trails and ribbons** that follow hand movements.
-6. **Distortion:** heat-haze style refraction.
-7. **Light:** glow on nearby surfaces.
-8. **Screen:** vignette pulses, a touch of chromatic aberration on big moments.
-9. **Sound:** layered, with variations so nothing repeats.
+1. **Core:** white-hot pixels at its heart.
+2. **Body:** the churn of it, smoke or flame in scarlet and crimson.
+3. **Wisps:** tendrils and strands curling as lines of pixels, light running along them.
+4. **Sparks and embers:** single pixels flung off it, stepping down the ramp as they die.
+5. **Trails** that follow hand movements.
+6. **Screen:** vignette pulses on big moments.
+7. **Sound:** layered, with variations so nothing repeats.
 
-Nothing is drawn over a player's eyes. A skin's eyes can be anywhere on its face, or not there at all, so there is no knowing where to put a glow. Creatures' eyes, which are always in the same place, can burn red.
+- **Facing the camera:** wisps, tendrils, bursts and fog are plotted onto a grid that faces the camera, the way a particle's sprite does, so they land on whole pixels and a curling wisp reads as a line of them rather than a smear. The grid is pinned at the far end of what it draws, so its pixels are the size of a texel there and come out finer toward the camera, never coarser. Nearer than three blocks it is pinned further off along the same line of sight, so pixels never swell into blocks across the view, and fog thins out right round your own eyes.
+- **Lying flat:** the Rune Trap's sigil, the hover pad and shock rings lie on the world's own grid of sixteenths, so their pixels line up with the texels of the ground under them.
+- **Blended, not added:** pixels are blended over the world rather than added to it like light, so they can be as dark as crimson over snow and keep their scarlet in daylight. They test depth but never write it, so the world and the caster still hide whatever passes behind them. Magic laid out in a plane is drawn from both sides.
 
-Glows are pure added light: they must never hide or smear what is behind them. They test depth but never write it. Without improved transparency, world glows are drawn last, after water, clouds and weather. With it, they only report their closest depth to the transparency system, never its depth range or opacity.
+Nothing is drawn over a player's eyes. A skin's eyes can be anywhere on its face, or not there at all, so there is no knowing where to put them. Creatures' eyes, which are always in the same place, can burn red: a white-hot pixel each with a red glint round it, drawn a little in front of the face so the face never hides them.
 
-Added light alone washes out to pink against a bright sky. So magic that must keep its scarlet in daylight (the shield, the hover pad, later the Hex) has a **tint** under its glow. Without improved transparency, the tint filters what is behind it the way red glass does. With it, the tint is blended, darker and thinner, since blending is the closest the transparency system allows. Tints follow the same depth rules as glows. Magic laid out in a plane is drawn from both sides.
+The Hex's glitches (section 7) are light on a grid of eighths of a block rather than pixels. Glows are pure added light: they must never hide or smear what is behind them. They test depth but never write it. Without improved transparency, world glows are drawn last, after water, clouds and weather. With it, they only report their closest depth to the transparency system, never its depth range or opacity. Where a glow must keep its scarlet in daylight, or something held by Telekinesis reddens through, a **tint** filters what is behind it the way red glass does. With improved transparency, the tint is blended, darker and thinner, since blending is the closest the transparency system allows. Tints follow the same depth rules as glows.
 
 ### Performance and accessibility
 

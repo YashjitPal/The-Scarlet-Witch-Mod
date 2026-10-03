@@ -5,8 +5,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
+import com.yashjit.scarlet.client.render.FlatPixels;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.magic.RuneTraps;
 import com.yashjit.scarlet.network.MagicEventPayload;
 import com.yashjit.scarlet.network.RunePayload;
@@ -37,12 +40,11 @@ import org.jspecify.annotations.Nullable;
  *     <li>Wiped away: the sigil sinks into the ground and its runes scatter as sparks.</li>
  * </ul>
  *
- * <p>Everything lies over a scarlet tint, so it keeps its red on sunlit ground.
+ * <p>All of it is pixel art: the sigil chalked on the ground in pixels on the world's own grid of texels, the light and
+ * the chains in pixels facing the camera, each a step of the mod's ramp, so it keeps its red on sunlit ground.
  */
 public final class RuneFx {
 
-    private static final Vector3f FLAT_U = new Vector3f(1.0F, 0.0F, 0.0F);
-    private static final Vector3f FLAT_V = new Vector3f(0.0F, 0.0F, 1.0F);
     private static final int GLYPHS = 18;
     private static final double FADE_TICKS = 12.0;
     /** A sigil not heard of for this long is let go, in case word of its end was missed. */
@@ -188,37 +190,19 @@ public final class RuneFx {
             return;
         }
         float time = (float) (now % 24000.0);
-        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             float before = Glow.darkness();
             for (Draw draw : draws) {
                 Glow.darken(draw.darkness());
-                Vector3f c = draw.center();
-                float density = (draw.sprung() > 0.0F ? 0.42F : 0.24F) * draw.written() * draw.fade();
-                float r = RuneTraps.RADIUS * radiusScale(draw);
-                Glow.planeDisc(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, r, GlowPass.tint(ScarletPalette.GLASS, density * 0.6F),
-                        GlowPass.tint(ScarletPalette.GLASS, density), 48);
-                Glow.annulus(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, r, r * 1.08F, GlowPass.tint(ScarletPalette.GLASS, density),
-                        GlowPass.tint(ScarletPalette.GLASS, 0.0F), 48);
+                sigil(buffer, pose, draw, time, camera);
                 if (draw.sprung() > 0.0F) {
-                    Glow.Billboard axes = Glow.billboard(pose);
+                    Vector3f c = draw.center();
+                    PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y + 1.0F, c.z);
+                    column(sprite, draw, time);
                     for (Held held : draw.held()) {
-                        chainTints(buffer, pose, axes, draw, held);
+                        chains(sprite, draw, held, time);
                     }
-                }
-            }
-            Glow.darken(before);
-        });
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
-            float before = Glow.darkness();
-            for (Draw draw : draws) {
-                Glow.darken(draw.darkness());
-                sigil(buffer, pose, draw, time);
-                if (draw.sprung() > 0.0F) {
-                    column(buffer, pose, axes, draw);
-                    for (Held held : draw.held()) {
-                        chains(buffer, pose, axes, draw, held, time);
-                    }
+                    sprite.draw(buffer);
                 }
             }
             Glow.darken(before);
@@ -234,122 +218,110 @@ public final class RuneFx {
     }
 
     /**
-     * The sigil itself, lying on the ground, written in as far as it has got.
+     * The sigil itself, chalked on the ground in pixels on the world's own grid of texels, written in as far as it has
+     * got. Its lines take a step of the ramp as bright as it burns: dim while it waits, white-hot as it springs.
      */
-    private static void sigil(VertexConsumer buffer, PoseStack.Pose pose, Draw draw, float time) {
+    private static void sigil(VertexConsumer buffer, PoseStack.Pose pose, Draw draw, float time, Vec3 camera) {
         Vector3f c = draw.center();
+        double cx = c.x + camera.x;
+        double cz = c.z + camera.z;
         float written = draw.written();
         float flare = draw.sprung() > 0.0F ? Math.max(0.0F, 1.0F - draw.sprung() / 10.0F) : 0.0F;
         float breathe = 0.85F + 0.15F * Mth.sin(time * 0.12F + draw.seed());
-        float bright = (draw.sprung() > 0.0F ? 0.95F : 0.6F * breathe) * draw.fade() + flare * 0.6F;
+        float bright = (draw.sprung() > 0.0F ? 0.95F : 0.6F * breathe) + flare * 0.6F;
+        int lit = bright > 1.2F ? Pixels.HOT : bright > 0.85F ? Pixels.PINK : bright > 0.55F ? Pixels.BRIGHT : Pixels.SCARLET;
+        int dim = lit + 1;
         float r = RuneTraps.RADIUS * radiusScale(draw);
         float spin = time * 0.012F + draw.seed();
-        // the rings trace around as the sigil is written
-        arc(buffer, pose, c, r, 0.07F, spin, written, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.9F * bright));
-        arc(buffer, pose, c, r, 0.025F, spin, written, Glow.withAlpha(ScarletPalette.CORE, 0.6F * bright));
+        FlatPixels.Sketch sketch = new FlatPixels.Sketch();
+        // the rings trace round as the sigil is written, the outer two pixels wide
+        sketch.arc(cx, cz, r, spin, written, Pixels.opaque(lit), 3);
+        sketch.arc(cx, cz, r - Pixels.SIZE, spin, written, Pixels.opaque(dim), 2);
         float inner = Ease.clamp01((written - 0.2F) / 0.8F);
-        arc(buffer, pose, c, r * 0.78F, 0.045F, -spin * 1.3F, inner, Glow.withAlpha(ScarletPalette.SCARLET, 0.85F * bright));
+        sketch.arc(cx, cz, r * 0.78F, -spin * 1.3F, inner, Pixels.opaque(dim), 2);
         // the runes between them light up one by one, in the order the ring passes them
         for (int g = 0; g < GLYPHS; g++) {
             float at = g / (float) GLYPHS;
-            float lit = Ease.clamp01((written - at) * 6.0F);
-            if (lit <= 0.0F) {
-                continue;
+            float glow = Ease.clamp01((written - at) * 6.0F);
+            if (glow > 0.0F) {
+                glyph(sketch, cx, cz, spin + at * TAU, r * 0.885F, r * 0.08F, draw.seed() * 31.0F + g, Pixels.opaque(glow > 0.6F ? lit : dim));
             }
-            float angle = spin + at * TAU;
-            glyph(buffer, pose, c, angle, r * 0.885F, r * 0.08F, draw.seed() * 31.0F + g, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.85F * bright * lit));
         }
-        // a hexagram in the middle, turning against the runes
+        // a hexagram in the middle, turning against the runes, round a white-hot heart
         float star = Ease.clamp01((written - 0.5F) / 0.5F);
-        if (star > 0.0F) {
+        if (star > 0.15F) {
             float points = r * 0.7F;
-            int color = Glow.withAlpha(ScarletPalette.SCARLET, 0.8F * bright * star);
             for (int t = 0; t < 2; t++) {
                 float base = -spin * 0.7F + t * (TAU / 6.0F);
                 for (int k = 0; k < 3; k++) {
                     float a0 = base + k * TAU / 3.0F;
                     float a1 = base + (k + 1) * TAU / 3.0F;
-                    Glow.planeLine(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, Mth.cos(a0) * points, Mth.sin(a0) * points, Mth.cos(a1) * points,
-                            Mth.sin(a1) * points, 0.05F, color);
+                    sketch.line(cx + Mth.cos(a0) * points, cz + Mth.sin(a0) * points, cx + Mth.cos(a1) * points, cz + Mth.sin(a1) * points,
+                            Pixels.opaque(dim), 1);
                 }
             }
-            Glow.ring(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, r * 0.18F, 0.04F, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.8F * bright * star), 24);
-            Glow.planeDisc(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, r * 0.08F, Glow.withAlpha(ScarletPalette.CORE, 0.8F * bright * star),
-                    Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.0F), 16);
+            sketch.arc(cx, cz, r * 0.18F, 0.0F, 1.0F, Pixels.opaque(lit), 2);
+            for (int d = 0; d < 4; d++) {
+                sketch.dot(cx + (d & 1) * Pixels.SIZE - Pixels.SIZE * 0.5, cz + (d >> 1) * Pixels.SIZE - Pixels.SIZE * 0.5, Pixels.opaque(Pixels.HOT), 4);
+            }
         }
-    }
-
-    /**
-     * A ring traced around as far as {@code reach}, from 0 none to 1 all the way, starting at {@code from} radians.
-     */
-    private static void arc(VertexConsumer buffer, PoseStack.Pose pose, Vector3f c, float radius, float width, float from, float reach, int color) {
-        if (reach <= 0.0F) {
-            return;
-        }
-        int segments = Math.max(1, Math.round(48 * reach));
-        float step = TAU * reach / segments;
-        for (int i = 0; i < segments; i++) {
-            float a0 = from + i * step;
-            float a1 = a0 + step;
-            Glow.planeLine(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, Mth.cos(a0) * radius, Mth.sin(a0) * radius, Mth.cos(a1) * radius,
-                    Mth.sin(a1) * radius, width, color);
-        }
+        sketch.draw(buffer, pose, camera, c.y + camera.y, draw.fade());
     }
 
     /**
      * One angular rune standing on the ring at {@code angle}: a stave across the band with two or three strokes off it,
      * chosen by {@code seed}, so every sigil reads differently.
      */
-    private static void glyph(VertexConsumer buffer, PoseStack.Pose pose, Vector3f c, float angle, float radius, float half, float seed, int color) {
-        float ox = Mth.cos(angle) * radius;
-        float oz = Mth.sin(angle) * radius;
-        // the band's own directions at the rune: out from the middle, and along the ring
-        float rx = Mth.cos(angle);
-        float rz = Mth.sin(angle);
-        float tx = -rz;
-        float tz = rx;
+    private static void glyph(FlatPixels.Sketch sketch, double cx, double cz, float angle, float radius, float half, float seed, int color) {
+        Rune rune = new Rune(sketch, cx + Mth.cos(angle) * radius, cz + Mth.sin(angle) * radius, Mth.cos(angle), Mth.sin(angle), color);
         int shape = Math.floorMod((int) (Mth.sin(seed * 12.9898F) * 43758.547F), 6);
-        float width = 0.03F;
         // the stave, out across the band
-        stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, 0.0F, -half, 0.0F, half, width, color);
+        rune.stroke(0.0F, -half, 0.0F, half);
         switch (shape) {
             case 0 -> {
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, 0.0F, half, half * 0.7F, half * 0.3F, width, color);
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, 0.0F, 0.0F, half * 0.7F, -half * 0.4F, width, color);
+                rune.stroke(0.0F, half, half * 0.7F, half * 0.3F);
+                rune.stroke(0.0F, 0.0F, half * 0.7F, -half * 0.4F);
             }
             case 1 -> {
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, -half * 0.6F, half * 0.6F, half * 0.6F, -half * 0.2F, width, color);
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, -half * 0.6F, -half * 0.2F, half * 0.6F, half * 0.6F, width, color);
+                rune.stroke(-half * 0.6F, half * 0.6F, half * 0.6F, -half * 0.2F);
+                rune.stroke(-half * 0.6F, -half * 0.2F, half * 0.6F, half * 0.6F);
             }
             case 2 -> {
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, 0.0F, half * 0.2F, -half * 0.6F, half, width, color);
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, 0.0F, half * 0.2F, half * 0.6F, half, width, color);
+                rune.stroke(0.0F, half * 0.2F, -half * 0.6F, half);
+                rune.stroke(0.0F, half * 0.2F, half * 0.6F, half);
             }
             case 3 -> {
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, 0.0F, half, half * 0.6F, 0.0F, width, color);
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, half * 0.6F, 0.0F, 0.0F, -half * 0.5F, width, color);
+                rune.stroke(0.0F, half, half * 0.6F, 0.0F);
+                rune.stroke(half * 0.6F, 0.0F, 0.0F, -half * 0.5F);
             }
             case 4 -> {
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, -half * 0.55F, -half, -half * 0.55F, half * 0.5F, width, color);
-                stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, -half * 0.55F, half * 0.5F, 0.0F, half, width, color);
+                rune.stroke(-half * 0.55F, -half, -half * 0.55F, half * 0.5F);
+                rune.stroke(-half * 0.55F, half * 0.5F, 0.0F, half);
             }
-            default -> stroke(buffer, pose, c, ox, oz, rx, rz, tx, tz, -half * 0.6F, 0.0F, half * 0.6F, 0.0F, width, color);
+            default -> rune.stroke(-half * 0.6F, 0.0F, half * 0.6F, 0.0F);
         }
     }
 
     /**
-     * A stroke of a rune between two points given along the ring ({@code a}) and out across it ({@code b}).
+     * Where a rune stands and which way its band runs there: {@code rx, rz} out from the middle of the sigil.
      */
-    private static void stroke(VertexConsumer buffer, PoseStack.Pose pose, Vector3f c, float ox, float oz, float rx, float rz, float tx, float tz,
-                               float a0, float b0, float a1, float b1, float width, int color) {
-        Glow.planeLine(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, ox + tx * a0 + rx * b0, oz + tz * a0 + rz * b0, ox + tx * a1 + rx * b1,
-                oz + tz * a1 + rz * b1, width, color);
+    private record Rune(FlatPixels.Sketch sketch, double x, double z, float rx, float rz, int color) {
+
+        /**
+         * A stroke between two points given along the ring ({@code a}) and out across it ({@code b}).
+         */
+        void stroke(float a0, float b0, float a1, float b1) {
+            float tx = -rz;
+            float tz = rx;
+            sketch.line(x + tx * a0 + rx * b0, z + tz * a0 + rz * b0, x + tx * a1 + rx * b1, z + tz * a1 + rz * b1, color, 2);
+        }
     }
 
     /**
-     * The column of light that bursts up out of the sigil's middle as it springs, thinning away.
+     * The column of light that bursts up out of the sigil's middle as it springs: white-hot down its heart, cooling to
+     * its edges, narrowing and thinning away.
      */
-    private static void column(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Draw draw) {
+    private static void column(PixelSprite sprite, Draw draw, float time) {
         float k = draw.sprung() / 12.0F;
         if (k >= 1.0F) {
             return;
@@ -357,50 +329,39 @@ public final class RuneFx {
         Vector3f c = draw.center();
         float fade = 1.0F - Ease.outCubic(k);
         float height = 2.5F + 3.5F * Ease.outCubic(k);
-        Vector3f[] points = {new Vector3f(c), new Vector3f(c.x, c.y + height * 0.5F, c.z), new Vector3f(c.x, c.y + height, c.z)};
-        float[] widths = {0.9F * fade, 0.6F * fade, 0.05F};
-        int[] colors = {Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.7F * fade), Glow.withAlpha(ScarletPalette.SCARLET, 0.45F * fade),
-                Glow.withAlpha(ScarletPalette.SCARLET, 0.0F)};
-        Glow.ribbon(buffer, pose, axes, points, widths, colors);
-        Glow.disc(buffer, pose, axes, c.x, c.y + 0.2F, c.z, 1.4F * fade, Glow.withAlpha(ScarletPalette.CORE, 0.5F * fade));
+        int frame = (int) Math.floor(time);
+        int width = Math.max(1, Math.round(7.0F * fade));
+        Vector3f right = sprite.right();
+        for (int n = -width; n <= width; n++) {
+            float edge = Math.abs(n) / (float) (width + 1);
+            if (!Pixels.shows(fade * (1.15F - edge), n, frame)) {
+                continue;
+            }
+            float off = n * Pixels.SIZE;
+            Vector3f base = new Vector3f(c).add(right.x * off, right.y * off, right.z * off);
+            Vector3f top = new Vector3f(base).add(0.0F, height * (1.0F - 0.5F * edge), 0.0F);
+            sprite.line(base, top, Pixels.opaque(edge < 0.3F ? Pixels.HOT : edge < 0.65F ? Pixels.PINK : Pixels.BRIGHT), 2, 1);
+        }
     }
 
     /**
-     * What a sprung sigil holds: bands of light closing in around it at the ankles, the waist and the chest, held by
-     * chains of light running down into the sigil, straining and flickering as they give out.
+     * What a sprung sigil holds: bands of it closing in around it at the ankles, the waist and the chest, held by
+     * chains running down into the sigil, straining and flickering as they give out.
      */
-    private static void chains(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Draw draw, Held held, float time) {
+    private static void chains(PixelSprite sprite, Draw draw, Held held, float time) {
         float close = Ease.outBack(Ease.clamp01(draw.sprung() / 7.0F));
         float strain = 0.65F + 0.35F * Mth.sin(time * 1.7F + held.feet().x * 3.0F);
-        for (Band band : bands(held, close, time)) {
-            Glow.ring(buffer, pose, band.x(), band.y(), band.z(), band.u(), band.v(), band.radius(), 0.15F,
-                    Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.85F * close * strain), 32);
-            Glow.ring(buffer, pose, band.x(), band.y(), band.z(), band.u(), band.v(), band.radius(), 0.04F,
-                    Glow.withAlpha(ScarletPalette.CORE, 0.7F * close), 32);
+        int frame = (int) Math.floor(time);
+        int band = Pixels.opaque(strain > 0.85F ? Pixels.PINK : Pixels.BRIGHT);
+        for (Band b : bands(held, close, time)) {
+            Wisps.ring(sprite, new Vector3f(b.x(), b.y(), b.z()), b.u(), b.v(), b.radius(), 0.0F, 1.0F, band, 2, 2);
         }
+        int n = 0;
         for (Vector3f[] link : links(draw, held, close)) {
-            Glow.ribbon(buffer, pose, axes, link, new float[] {0.11F, 0.11F},
-                    new int[] {Glow.withAlpha(ScarletPalette.SCARLET, 0.85F * strain), Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.85F * strain)});
-            Glow.ribbon(buffer, pose, axes, link, new float[] {0.035F, 0.035F},
-                    new int[] {Glow.withAlpha(ScarletPalette.CORE, 0.6F * strain), Glow.withAlpha(ScarletPalette.CORE, 0.6F * strain)});
-            Vector3f b = link[1];
-            Glow.spark(buffer, pose, axes, b.x, b.y, b.z, 0.035F, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, 0.7F * strain);
-        }
-    }
-
-    /**
-     * The scarlet beneath the bands and chains, so they keep their red against bright ground and sky.
-     */
-    private static void chainTints(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Draw draw, Held held) {
-        float close = Ease.outBack(Ease.clamp01(draw.sprung() / 7.0F));
-        int clear = GlowPass.tint(ScarletPalette.GLASS, 0.0F);
-        int glass = GlowPass.tint(ScarletPalette.GLASS, 0.6F * Math.clamp(close, 0.0F, 1.0F));
-        for (Band band : bands(held, close, 0.0F)) {
-            Glow.annulus(buffer, pose, band.x(), band.y(), band.z(), band.u(), band.v(), band.radius() - 0.14F, band.radius(), clear, glass, 32);
-            Glow.annulus(buffer, pose, band.x(), band.y(), band.z(), band.u(), band.v(), band.radius(), band.radius() + 0.14F, glass, clear, 32);
-        }
-        for (Vector3f[] link : links(draw, held, close)) {
-            Glow.tintRibbon(buffer, pose, axes, link, new float[] {0.26F, 0.26F}, new int[] {glass, glass});
+            if (Pixels.shows(strain + 0.15F, n++, frame)) {
+                sprite.line(link[0], link[1], Pixels.opaque(Pixels.SCARLET), 1, 2);
+                sprite.plot(link[1].x, link[1].y, link[1].z, Pixels.opaque(Pixels.HOT), 3, 1);
+            }
         }
     }
 
