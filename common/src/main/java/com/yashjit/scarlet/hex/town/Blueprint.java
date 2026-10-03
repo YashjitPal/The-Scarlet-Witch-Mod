@@ -18,19 +18,32 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 public final class Blueprint {
 
     private final Frame frame;
-    private final List<Piece> pieces = new ArrayList<>();
+    private final List<Piece> pieces;
     private final int[] stageTicks;
 
     /**
      * @param stageTicks how long each stage takes to build
      */
     public Blueprint(Frame frame, int... stageTicks) {
+        this(frame, new ArrayList<>(), stageTicks);
+    }
+
+    private Blueprint(Frame frame, List<Piece> pieces, int[] stageTicks) {
         this.frame = frame;
+        this.pieces = pieces;
         this.stageTicks = stageTicks;
     }
 
     public Frame frame() {
         return frame;
+    }
+
+    /**
+     * The same blueprint, laid out from further across and back into its part: what is put down through it is put
+     * down in this one, shifted over.
+     */
+    public Blueprint shifted(int a, int b) {
+        return new Blueprint(new Frame(frame.at(a, b, 0), frame.front()), pieces, stageTicks);
     }
 
     public void set(int a, int b, int y, Role role, int paint, BlockState template, int stage) {

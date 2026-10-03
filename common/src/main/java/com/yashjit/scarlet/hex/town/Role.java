@@ -5,7 +5,7 @@ package com.yashjit.scarlet.hex.town;
  * always of the same shape, so a makeover keeps every block's facing, half and connections.
  */
 public enum Role {
-    /** Ground cut away to level a lot. Always air. */
+    /** Whatever stood where the town goes, and ground cut away to level it. Always air. */
     CLEAR,
     /** Ground raised to level a lot. */
     FILL,
@@ -52,7 +52,35 @@ public enum Role {
     FRIDGE,
     COUNTER,
     SINK,
-    PLANT;
+    PLANT,
+    /**
+     * Not built at all: leaves of a tree the town cut through, kept from withering while the Hex stands. The block is
+     * left as it was, only held fast. Saved roles count by position, so every role added since comes after it.
+     */
+    PRESERVE,
+    /** Brick for the town's public buildings: its library, chapel and school. */
+    CIVIC_WALL,
+    /** A shop's awning over its window. */
+    AWNING,
+    SAND,
+    /** The painted frame of a playground's climbing frame and swings. */
+    PLAY_FRAME,
+    /** A playground slide. */
+    SLIDE,
+    CHAIN,
+    BELL,
+    /** A sign on a shop or a public building saying what it is, which by its paint: see {@link Signs}. */
+    SIGN,
+    /** A fruit tree's leaves, and its blossom. */
+    ORCHARD_LEAVES,
+    ORCHARD_BLOSSOM,
+    /** A country lane's packed earth. */
+    LANE,
+    HAY,
+    /** A barn's red boards. */
+    BARN_WALL,
+    /** A bed upstairs, both halves of it. */
+    BED;
 
     private static final Role[] VALUES = values();
 

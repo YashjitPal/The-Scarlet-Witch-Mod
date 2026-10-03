@@ -203,7 +203,8 @@ The centerpiece. Inspired by Westview.
 - The caster can **walk out** and it stays up.
 - The caster can **grow or shrink** it anytime.
 - It **collapses if the caster stops wearing the crown** (death, stolen, or taken off). A few seconds of flickering warning first, so an accident isn't a disaster.
-- When it collapses, **the wall rushes inward and everything it passes over changes back**, like the finale.
+- When it collapses, **the wall closes in, slowly at first and gathering speed, and everything it passes over changes back**, like the finale. The bigger the hex, the longer the fall: about 7 seconds for a freshly cast hex, up to 16 for the largest.
+- **The caster's home goes last, and not with the wall.** When the falling wall reaches it, the house holds on alone, even after the hex is gone. For about 10 seconds it glitches through the eras, wilder and wilder: all of it jumps into another era for a moment, or each part into its own (one era's walls under another's roof), patches of it drain to black and white, bits of it blink out, and red static crawls over it. The caster's clothes slip through the era outfits with it. Then it goes part by part, the way it went up but backward: the rooms empty, the yard and porch go, then the roof, the walls, the timber frame and the floor. Each block glitches out red as it goes, and last of all the land comes back as it was. It takes about as long as it took to build, some 15 seconds. Casting a new hex over it, or by it, puts it all back at once.
 - One hex per caster; while it stands it reserves part of the caster's energy bar.
 - **Shape: a hexagon**, like the Westview anomaly on S.W.O.R.D.'s map. Seen from above it is a regular hexagon, with flat walls facing north and south and corners pointing east and west. The six walls stand straight up without end, and nothing closes over the top. Seen from the ground, they rise high over the town (taller for a bigger hex) and fade away into the sky. The corners, where one wall meets the next, glow. The radius is measured to the middle of a wall, so the corners stand about 15% further out. The hex is everything within its walls, as high and as deep as the world goes, so a hex cast on a hill still comes down to the valley.
 
@@ -246,30 +247,53 @@ The centerpiece. Inspired by Westview.
   - They follow **sitcom routines**: wander, chat, sit on couches, watch the era TV, wave at players.
   - They never attack, and creepers never explode.
   - **Attack one and the spell breaks for that mob:** it turns back into what it really is and fights back.
-  - A resident that leaves the hex turns back at the wall. When the hex collapses, each one turns back as the inward-rushing wall passes it.
+  - A resident that leaves the hex turns back at the wall. When the hex collapses, each one turns back as the inward-moving wall passes it.
 - **Rewrites:** things that cross in get rewritten to fit (arrows into flowers, etc.).
 - **Sky:** the caster controls time of day and weather inside.
-- **Restyle blocks:** hold a block in your off hand and sweep your aim to paint blocks into it. Everything changes back when the hex falls. **Breaking a restyled block gives the original block**, so the hex can't be used to farm materials.
+- **Restyle blocks:** hold a block in your off hand and sweep your aim to paint blocks into it. Your other arm flings out at what you paint and a straight, crackling beam of scarlet magic flies from the palm. Everything changes back when the hex falls. **Breaking a restyled block gives the original block**, so the hex can't be used to farm materials.
 - **Era outfits:** everyone inside, players and residents, wears era clothes, like Wanda and Vision each episode.
   - Assigned automatically: each person always gets the same outfit for a given era (picked from the era's wardrobe by their UUID).
   - Fitted like armor (chest, legs, shoes) over the skin. Casual, well-fitting and gender neutral.
   - Real armor is hidden while inside but keeps protecting, and reappears outside.
   - The caster's own suit-up costume takes priority over the era outfit.
-- **Everything era-related exists only inside.** The era's picture (black and white, warm 70s color, videotape and so on) is only seen from within: from outside, everything in the hex looks normal through the wall. Step out and it falls away with a quick TV-static flicker: normal colors, normal clothes, armor back.
+- **Everything era-related exists only inside.** The era's picture (black and white, warm 70s color, videotape and so on) is only seen from within: from outside, everything in the hex looks normal through the wall. Step out and it falls away with a quick TV-static flicker: normal colors, normal clothes, armor back. The one exception is the home a fallen hex leaves glitching behind it, which slips through the eras' pictures wherever it is seen from.
 
 ### Homes and the town
 
 The Hex builds Westview.
 
 - **Your home:** the caster can raise a sitcom house anywhere inside the Hex. A scarlet outline previews the lot where you aim, scrolling turns it, and a click confirms.
+  - Started from the Showrunner remote while the Hex stands. Right-click raises it there, left-click cancels, and the outline shows crossed out where it can't stand (past the wall, on deep water, or on land too steep to level).
+  - The old house dissolves, and so does whatever of the town stood on the new lot. Its old lot takes an ordinary house. The town remembers where the home stood, so casting again by it brings it back there.
+  - While it goes up, the caster raises both arms to it and a crackling beam flies from each palm, jumping from block to block as they land.
   - It builds itself the way the house does in WandaVision: scarlet light traces the lot, the timber frame rises from the ground, then the walls, windows and roof close in, and the rooms furnish themselves.
   - When casting, the Hex can start from your home: the house builds first, then the Hex bursts out from it and spreads.
+  - **It's never the same house twice.** Each town picks its home from five two-story designs: a colonial under a portico, a farmhouse with a porch across its front, a foursquare under a hipped roof, a front-gabled house with a porch wrapping round one side, and a wide house under a hipped roof. Its paint, shutters, chimney, flowers, hedge or picket fence and shade tree vary on top of that. A town the Hex remembers raises the same home again.
+  - **Cast it by something standing and the home is made of it.** The Hex looks for a house, a ruin, a shell of walls or a bare foundation within about 10 blocks of the caster. It carries them inside, through the walls if it must, and lays the town out from its front door. Nothing of it is torn down: it keeps its shape, is made over in the era's look, and is finished around what stands.
+    - Fallen walls close up with windows in them, a floor goes down where there is none, and a door goes in its front if it has none.
+    - A ruin with no roof rises two stories under a new roof, with a stair up to a bedroom. One that still has its roof keeps its shape, recessed porches and all.
+    - A stoop, the yard, the fence and gate, a mailbox and a furnished living room go wherever there's room.
+    - When the Hex falls it goes part by part like any home, and the building comes back as it was, chests and all. Buildings another Hex has made are left alone.
 - **The town:** where the land inside is open, or holds a vanilla village, the Hex can build a whole sitcom suburb as its wave spreads. That means streets with sidewalks and street lamps, rows of houses with lawns, picket fences and mailboxes, and a town square. Each house assembles as the wave passes over its lot.
-  - **It never replaces anything that was there.** Player builds, village houses, and anything else that isn't natural ground are left exactly as they were. The town is laid out around them. In a village, the paths become streets and new houses fill the empty lots.
+  - **Real suburban sizes.** Lots are 17 by 19 blocks and stories 5 blocks tall. Every house is picked at random: long, low ranch houses (often with a garage and a driveway up to it), bungalows, colonials, foursquares and cottages, with stoops, porticos, full-width or wraparound porches, and bedrooms with beds. Civic buildings, parks and orchard plots sit centered on the same lots.
+  - **It never tears down anything that was there.** Player builds and village houses keep their shape but are made over in the era's style, the way Westview's own buildings became sitcom houses: every block takes on the part it plays (wall, trim, roof, window, door, floor, fence) and that part's era look. A building that stays becomes what it was in the town: the library, the church, a shop, a barn. Farms become flower gardens. Chests, beds, furnaces, workbenches and the like are left just as they are. The town is laid out around everything else that isn't natural ground. In a village, the paths become streets and new houses fill the empty lots.
   - **Growing the Hex extends the town** as the wall moves out. Shrinking it takes down whatever ends up outside.
 - **Era makeovers:** homes, streets and furniture are built from era blocks that restyle with the era. That's picket-fence pastels in the 1950s, wood paneling and earth tones in the 1970s, bold colors in the 1980s, and beige modern in the 2000s. An era change sweeps through the town with a channel-change flicker.
-- **It exists only while the Hex stands.** Every block the Hex builds remembers what was there before. When the Hex collapses, the inward-rushing wall takes the town down with it and leaves the land as it was. Breaking a Hex-built block gives nothing, so the town can't be farmed for materials.
-- *(Proposed:)* when casting, the caster chooses what the Hex builds: nothing, just their home, or the whole town. Villagers inside get era outfits like everyone else.
+- **It exists only while the Hex stands.** Every block the Hex builds remembers what was there before. When the Hex collapses, the inward-moving wall takes the town down with it and leaves the land as it was. Only the caster's home outlasts it for a little while, glitching through the eras before it goes part by part (see the lifecycle above). Breaking a Hex-built block gives nothing, so the town can't be farmed for materials.
+- The caster chooses on the Showrunner remote what their next Hex builds: nothing, just their home, a whole town, or a farmhouse among orchards in blossom with country lanes and a red barn, every tree it covers turned into a fruit tree.
+- *(Proposed:)* villagers inside get era outfits like everyone else.
+
+### The Showrunner remote
+
+The caster's controls for their Hex, opened with the Showrunner key once the crown has mastered the Hex. It's styled as an old television remote in dark bakelite with round buttons that light scarlet, and it slides up beside the view without pausing anything, so every change is seen happening.
+
+- **Channel:** the era.
+- **A new episode every morning:** episodes mode on or off.
+- **Time of day and weather** inside the Hex.
+- **Name:** the Hex's name for its title cards.
+- **Your home, somewhere new:** puts the remote down to place the home (see above).
+- **Your next Hex builds:** what the next cast raises.
+- A little display at the top shows the era and episode on air, or "off the air" with no Hex standing.
 
 ### Era decorations
 

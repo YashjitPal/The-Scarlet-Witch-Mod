@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.ClientMannequin;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
@@ -126,8 +127,13 @@ public final class NeoForgeClientPlatform implements ClientPlatform {
     }
 
     private static void registerHuds(RegisterGuiLayersEvent event) {
+        // NeoForge draws modded layers even while the HUD is hidden (F1); vanilla's own hide with it
         for (Hud hud : HUDS) {
-            event.registerAbove(VanillaGuiLayers.CROSSHAIR, hud.id(), hud.layer()::render);
+            event.registerAbove(VanillaGuiLayers.CROSSHAIR, hud.id(), (graphics, deltaTracker) -> {
+                if (!Minecraft.getInstance().gui.hud.isHidden()) {
+                    hud.layer().render(graphics, deltaTracker);
+                }
+            });
         }
         for (StatusBarLift lift : LIFTS) {
             lift(event, lift, StatusBar.VITALS, VanillaGuiLayers.PLAYER_HEALTH, VanillaGuiLayers.ARMOR_LEVEL, VanillaGuiLayers.FOOD_LEVEL,

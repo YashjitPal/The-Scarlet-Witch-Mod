@@ -1,39 +1,53 @@
 package com.yashjit.scarlet.client.hex;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.Scarlet;
-import com.yashjit.scarlet.client.fx.ScarletFx;
+import com.yashjit.scarlet.client.fx.Glitch;
+import com.yashjit.scarlet.client.fx.SlipFx;
+import com.yashjit.scarlet.client.render.Glow;
+import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.hex.Era;
 import com.yashjit.scarlet.hex.HexSnapshot;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.network.ResidentsPayload;
-import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.core.ClientAsset;
-import net.minecraft.util.RandomSource;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.PlayerModelType;
 import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Which mobs this client draws as a Hex's townspeople, and how each one looks: dressed for the era of the Hex it
- * lives in, always the same person for the same mob. When one is rewritten or turns back it flickers between its two
- * selves for a moment, in a burst of TV static.
+ * lives in, always the same person for the same mob.
+ *
+ * <p>When one is rewritten, as the wall sweeps over it or it walks in, it glitches red into its new self: it flickers
+ * between the two, more and more often the new one, while red bars tear across it and red static crawls over it.
+ * Turning back is the same, the other way. While its Hex is unsteady, parted or its caster hurt, residents slip now and
+ * then: into another era's clothes, or out of their disguise altogether, for a moment.
  */
 public final class ResidentsClient {
 
     /** Townspeople per era; the last half have slim arms. */
     public static final int PEOPLE = 6;
-    private static final int FLICKER_TICKS = 12;
+    private static final float CHANGE_TICKS = 26.0F;
 
     private static IntOpenHashSet residents = new IntOpenHashSet();
-    /** When each mob last changed between its two selves. */
-    private static final Int2LongOpenHashMap CHANGED = new Int2LongOpenHashMap();
+    /** When each mob began changing between its two selves. */
+    private static final Int2DoubleOpenHashMap CHANGED = new Int2DoubleOpenHashMap();
     private static final Map<Integer, PlayerSkin> SKINS = new HashMap<>();
     private static @Nullable ClientLevel seenLevel;
 
@@ -43,47 +57,64 @@ public final class ResidentsClient {
     public static void receive(ResidentsPayload payload) {
         Minecraft minecraft = Minecraft.getInstance();
         forgetIfLeft(minecraft.level);
-        long now = minecraft.level != null ? minecraft.level.getGameTime() : 0L;
+        ClientLevel level = minecraft.level;
+        double now = level != null ? level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false) : 0.0;
         IntOpenHashSet next = new IntOpenHashSet(payload.ids());
+        IntOpenHashSet changed = new IntOpenHashSet();
         for (int id : residents) {
             if (!next.contains(id)) {
-                CHANGED.put(id, now);
+                changed.add(id);
             }
         }
         for (int id : next) {
             if (!residents.contains(id)) {
-                CHANGED.put(id, now);
+                changed.add(id);
             }
         }
         residents = next;
+        for (int id : changed) {
+            CHANGED.put(id, now);
+            if (level != null && level.getEntity(id) instanceof Entity entity) {
+                // the crackle of a picture losing its signal
+                level.playLocalSound(entity.getX(), entity.getY() + 1.0, entity.getZ(), SoundEvents.FIRE_EXTINGUISH, SoundSource.NEUTRAL, 0.25F,
+                        1.9F, false);
+            }
+        }
     }
 
     public static void tick(Minecraft minecraft) {
         forgetIfLeft(minecraft.level);
         ClientLevel level = minecraft.level;
-        if (level == null || minecraft.isPaused() || CHANGED.isEmpty()) {
+        if (level == null || minecraft.isPaused()) {
             return;
         }
-        long now = level.getGameTime();
-        RandomSource random = ScarletFx.random();
-        var iterator = CHANGED.int2LongEntrySet().fastIterator();
-        while (iterator.hasNext()) {
-            var entry = iterator.next();
-            long age = now - entry.getLongValue();
-            if (age > FLICKER_TICKS) {
-                iterator.remove();
+        double now = level.getGameTime();
+        CHANGED.int2DoubleEntrySet().removeIf(entry -> now - entry.getDoubleValue() > CHANGE_TICKS);
+        for (int id : CHANGED.keySet()) {
+            Entity entity = level.getEntity(id);
+            if (entity != null) {
+                AABB box = entity.getBoundingBox();
+                Glitch.crawl(new Vec3(box.minX, box.minY, box.minZ), new Vec3(box.maxX, box.maxY, box.maxZ), 1.0F);
+            }
+        }
+        if (Hexes.clientHexes().isEmpty()) {
+            return;
+        }
+        Vec3 camera = minecraft.gameRenderer.mainCamera().position();
+        for (int id : residents) {
+            Entity entity = level.getEntity(id);
+            if (entity == null || entity.distanceToSqr(camera) > 48 * 48) {
                 continue;
             }
-            Entity entity = level.getEntity(entry.getIntKey());
-            if (entity == null) {
-                continue;
-            }
-            // static crawls over them while they change
-            for (int i = 0; i < Math.round(3 * ScarletFx.density()); i++) {
-                Vec3 at = entity.position().add((random.nextFloat() - 0.5F) * entity.getBbWidth() * 1.4F, random.nextFloat() * 1.9F,
-                        (random.nextFloat() - 0.5F) * entity.getBbWidth() * 1.4F);
-                int grey = 0x9A9A9A + random.nextInt(0x40) * 0x010101;
-                ScarletFx.spark(at, new Vec3(0, 0.005, 0), 3 + random.nextInt(4), 0.035F, 0xFFFFFF, grey, 0.0F, 0.8F);
+            Glitch.Slip slip = slip(entity, now);
+            if (slip != slip(entity, now - 1.0)) {
+                if (slip != Glitch.Slip.NONE) {
+                    // the red magic that made them takes hold of them as they slip
+                    SlipFx.body(entity, (long) now);
+                } else {
+                    AABB box = entity.getBoundingBox();
+                    Glitch.puff(new Vec3(box.minX, box.minY, box.minZ), new Vec3(box.maxX, box.maxY, box.maxZ));
+                }
             }
         }
     }
@@ -97,36 +128,111 @@ public final class ResidentsClient {
     }
 
     /**
-     * Whether to draw a mob as a townsperson right now. Mid-change it flicks between its two selves, settling on the
-     * new one.
+     * How far a mob is through changing between its two selves: 0 to 1, or -1 when it is not changing.
      */
-    public static boolean drawsAsResident(Entity entity) {
-        boolean resident = residents.contains(entity.getId());
-        long changed = CHANGED.getOrDefault(entity.getId(), Long.MIN_VALUE);
-        if (changed != Long.MIN_VALUE && seenLevel != null) {
-            long age = seenLevel.getGameTime() - changed;
-            if (age >= 0 && age < FLICKER_TICKS && (age / 2) % 2 == 0 && age < FLICKER_TICKS - 3) {
-                return !resident;
-            }
+    private static float change(Entity entity, double now) {
+        double since = CHANGED.getOrDefault(entity.getId(), Double.NaN);
+        if (Double.isNaN(since) || now - since < 0.0 || now - since > CHANGE_TICKS) {
+            return -1.0F;
         }
-        return resident;
+        return (float) ((now - since) / CHANGE_TICKS);
     }
 
     /**
-     * Who a resident is: dressed for its Hex's era, and always the same person for the same mob.
+     * How a resident is slipping right now, while its Hex is unsteady: into another era's clothes, or out of its
+     * disguise altogether.
+     */
+    private static Glitch.Slip slip(Entity entity, double now) {
+        HexSnapshot hex = Hexes.clientHexAt(entity.position(), now);
+        return Glitch.slip(now, entity.getId(), hex == null ? 0.0F : HexClient.unrest(hex, now));
+    }
+
+    /**
+     * Whether to draw a mob as a townsperson right now. Mid-change it flicks between its two selves, settling on the
+     * new one; in an unsteady Hex it flickers out of its disguise now and then.
+     */
+    public static boolean drawsAsResident(Entity entity) {
+        boolean resident = residents.contains(entity.getId());
+        if (seenLevel == null) {
+            return resident;
+        }
+        double now = seenLevel.getGameTime() + Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        float change = change(entity, now);
+        if (change >= 0.0F) {
+            return Glitch.showsNew(Glitch.frame(now), entity.getId(), change) == resident;
+        }
+        return resident && slip(entity, now) != Glitch.Slip.GONE;
+    }
+
+    /**
+     * The red glitch over everyone being rewritten.
+     */
+    public static void submit(SubmitNodeCollector collector, PoseStack poseStack) {
+        Minecraft minecraft = Minecraft.getInstance();
+        ClientLevel level = minecraft.level;
+        if (level == null) {
+            return;
+        }
+        double now = level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        Vec3 camera = minecraft.gameRenderer.mainCamera().position();
+        List<Draw> draws = new ArrayList<>();
+        for (int id : CHANGED.keySet()) {
+            Entity entity = level.getEntity(id);
+            if (entity != null) {
+                float change = change(entity, now);
+                if (change >= 0.0F) {
+                    // strongest in the thick of it, easing in and out
+                    float intensity = (float) Math.sin(Math.PI * Math.min(1.0F, change * 1.15F));
+                    draws.add(draw(entity, partialTick, camera, intensity));
+                }
+            }
+        }
+        if (draws.isEmpty()) {
+            return;
+        }
+        long frame = Glitch.frame(now);
+        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
+            Glow.Billboard axes = Glow.billboard(pose);
+            for (Draw draw : draws) {
+                Glitch.draw(buffer, pose, axes, draw.center(), draw.width(), draw.height(), draw.intensity(), frame, draw.seed());
+            }
+        });
+    }
+
+    private static Draw draw(Entity entity, float partialTick, Vec3 camera, float intensity) {
+        Vec3 center = entity.getPosition(partialTick).add(0.0, entity.getBbHeight() * 0.5, 0.0).subtract(camera);
+        return new Draw(center.toVector3f(), entity.getBbWidth() * 1.3F, entity.getBbHeight() * 1.05F, intensity, entity.getId());
+    }
+
+    /**
+     * Who a resident is: dressed for its Hex's era, and always the same person for the same mob. In an unsteady Hex
+     * their clothes jump into other eras now and then.
      */
     public static PlayerSkin skin(Entity entity) {
-        Era era = eraAt(entity.position());
+        Era era = shownEra(entity);
         int person = Math.floorMod(entity.getUUID().hashCode(), PEOPLE);
         return SKINS.computeIfAbsent(era.ordinal() * PEOPLE + person, key -> PlayerSkin.insecure(
                 new ClientAsset.ResourceTexture(Scarlet.id("entity/resident/" + name(era) + "_" + person)), null, null,
                 person >= PEOPLE / 2 ? PlayerModelType.SLIM : PlayerModelType.WIDE));
     }
 
+    /**
+     * The era a resident is dressed for right now: its Hex's, or another for a moment while it slips.
+     */
+    private static Era shownEra(Entity entity) {
+        Era era = eraAt(entity.position());
+        if (seenLevel == null) {
+            return era;
+        }
+        double now = seenLevel.getGameTime() + Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        return slip(entity, now) == Glitch.Slip.ERA ? Glitch.slipEra(now, entity.getId(), era) : era;
+    }
+
     public static Era eraAt(Vec3 point) {
         double now = seenLevel != null ? seenLevel.getGameTime() : 0.0;
         HexSnapshot hex = Hexes.clientHexAt(point, now);
-        return hex != null ? hex.eraValue() : Era.FIFTIES;
+        return hex != null ? Hexes.eraAt(hex, point, now) : Era.FIFTIES;
     }
 
     /** The era's name in texture paths. */
@@ -139,5 +245,8 @@ public final class ResidentsClient {
             case TWO_THOUSANDS -> "two_thousands";
             case PRESENT -> "present";
         };
+    }
+
+    private record Draw(Vector3f center, float width, float height, float intensity, int seed) {
     }
 }

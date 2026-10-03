@@ -1,5 +1,6 @@
 package com.yashjit.scarlet;
 
+import com.yashjit.scarlet.config.ScarletServerConfig;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.registry.ScarletCreativeTabs;
 import com.yashjit.scarlet.registry.ScarletDataComponents;
@@ -26,6 +27,7 @@ public final class Scarlet {
      * Declares every registry entry. Must run before the loader opens its registries for mods.
      */
     public static void init() {
+        ScarletServerConfig.load();
         ScarletDataComponents.bootstrap();
         ScarletItems.bootstrap();
         ScarletEntities.bootstrap();

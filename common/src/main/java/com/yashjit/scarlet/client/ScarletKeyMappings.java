@@ -13,10 +13,16 @@ public final class ScarletKeyMappings {
 
     public static final KeyMapping SPELL_WHEEL = new KeyMapping("key.scarlet.spell_wheel", InputConstants.KEY_R, CATEGORY);
 
+    /** Unbound to begin with: a double tap of jump does the same. */
+    public static final KeyMapping LEVITATE = new KeyMapping("key.scarlet.levitate", InputConstants.UNKNOWN.getValue(), CATEGORY);
+
+    /** The remote for a caster's Hex: its era, episodes, sky, name, and what the next one builds. */
+    public static final KeyMapping SHOWRUNNER = new KeyMapping("key.scarlet.showrunner", InputConstants.KEY_H, CATEGORY);
+
     private ScarletKeyMappings() {
     }
 
     public static List<KeyMapping> all() {
-        return List.of(SUIT_UP, SPELL_WHEEL);
+        return List.of(SUIT_UP, SPELL_WHEEL, LEVITATE, SHOWRUNNER);
     }
 }

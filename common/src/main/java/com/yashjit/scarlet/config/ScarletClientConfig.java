@@ -26,6 +26,8 @@ public final class ScarletClientConfig {
     public boolean instantTransformations = false;
     public boolean reduceFlashing = false;
     public boolean reduceCameraShake = false;
+    /** While your home rises around you as you found a Hex, the view circles it, coming back to your eyes for the burst. */
+    public boolean cinematicFounding = true;
 
     public static ScarletClientConfig get() {
         return instance;

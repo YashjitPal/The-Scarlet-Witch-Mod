@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.hex;
 
+import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.yashjit.scarlet.hex.town.HexTown;
@@ -36,16 +37,19 @@ public final class Hex {
             Codec.INT.optionalFieldOf("season", 1).forGetter(hex -> hex.season),
             Codec.BOOL.optionalFieldOf("episodes", false).forGetter(hex -> hex.episodes),
             Codec.LONG.optionalFieldOf("episode_day", 0L).forGetter(hex -> hex.episodeDay),
-            HexTown.CODEC.optionalFieldOf("town").forGetter(hex -> Optional.ofNullable(hex.town))
+            HexTown.CODEC.optionalFieldOf("town").forGetter(hex -> Optional.ofNullable(hex.town)),
+            Codec.mapPair(HexSky.CODEC.optionalFieldOf("sky", HexSky.WORLD), HexPaint.CODEC.optionalFieldOf("paint"))
+                    .forGetter(hex -> Pair.of(hex.sky, hex.paint.size() > 0 ? Optional.of(hex.paint) : Optional.empty()))
     ).apply(i, (caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius, eraSince, episode, season, episodes,
-                episodeDay, town) -> {
-        Hex hex = new Hex(caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius);
+                episodeDay, town, look) -> {
+        Hex hex = new Hex(caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius, look.getSecond().orElseGet(HexPaint::new));
         hex.eraSince = eraSince;
         hex.episode = episode;
         hex.season = season;
         hex.episodes = episodes;
         hex.episodeDay = episodeDay;
         hex.town = town.orElse(null);
+        hex.sky = look.getFirst();
         return hex;
     }));
 
@@ -59,8 +63,12 @@ public final class Hex {
     long phaseSince;
     /** The radius when the current phase began, which the collapse shrinks from. */
     float phaseRadius;
-    /** When the era last changed, for the channel-change flicker. */
+    /** When the era last changed, as it spreads out over the Hex from its middle. */
     long eraSince;
+    /** The era before, still showing wherever the new one hasn't spread to yet. Not saved: a reload finishes a change. */
+    Era previousEra;
+    /** When the caster's home stood finished while founding, for them to come down in it; -1 until then. */
+    long homeStoodAt = -1;
     /** Which episode is on: the first when cast, then the next with every change of era. */
     int episode = 1;
     /** Which season is on. Running past the present back to the 1950s begins the next. */
@@ -70,13 +78,36 @@ public final class Hex {
     /** The day the current episode began, in episodes mode. */
     long episodeDay;
     @Nullable HexTown town;
+    /**
+     * Where its caster took hold of its wall to part it, while it stands parted. Not saved: an opening closes on a
+     * reload.
+     */
+    @Nullable Vec3 tearAt;
+    /** How far each edge of the opening stands from where it was taken hold of, in blocks. */
+    float opening;
+    /** Whether its caster has hold of the opening right now, widening or closing it. */
+    boolean parting;
+    /** How shaken it was by the last blow to its caster, at {@link #stressAt}. */
+    float stress;
+    long stressAt;
+    /** The time of day and weather its caster has set inside it. */
+    HexSky sky = HexSky.WORLD;
+    /** The blocks its caster has restyled. */
+    final HexPaint paint;
 
     Hex(UUID caster, String casterName, Vec3 center, float radius, Era era, String name, Phase phase, long phaseSince, float phaseRadius) {
+        this(caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius, new HexPaint());
+    }
+
+    private Hex(UUID caster, String casterName, Vec3 center, float radius, Era era, String name, Phase phase, long phaseSince, float phaseRadius,
+                HexPaint paint) {
+        this.paint = paint;
         this.caster = caster;
         this.casterName = casterName;
         this.center = center;
         this.radius = radius;
         this.era = era;
+        this.previousEra = era;
         this.name = name;
         this.phase = phase;
         this.phaseSince = phaseSince;
@@ -119,6 +150,10 @@ public final class Hex {
         return episodes;
     }
 
+    public HexSky sky() {
+        return sky;
+    }
+
     public @Nullable HexTown town() {
         return town;
     }
@@ -135,7 +170,11 @@ public final class Hex {
 
     HexSnapshot snapshot() {
         return new HexSnapshot(caster, casterName, center, radius, era.ordinal(), name, phase.ordinal(), phaseSince, phaseRadius, eraSince,
-                episode, season);
+                previousEra.ordinal(), episode, season, tearAt, opening, parting, stress, stressAt, sky, episodes);
+    }
+
+    public float unrest(double now) {
+        return HexUnrest.unrest(tearAt == null ? -1.0F : opening, HexUnrest.stress(stress, stressAt, now));
     }
 
     public enum Phase implements StringRepresentable {

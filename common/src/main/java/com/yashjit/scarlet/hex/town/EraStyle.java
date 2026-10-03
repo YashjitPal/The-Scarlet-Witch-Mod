@@ -111,6 +111,28 @@ public final class EraStyle {
         era(Role.SINK, Blocks.CAULDRON, Blocks.CAULDRON, Blocks.CAULDRON, Blocks.CAULDRON, Blocks.CAULDRON, Blocks.CAULDRON);
         era(Role.PLANT, Blocks.POTTED_FERN, Blocks.POTTED_FERN, Blocks.POTTED_FERN, Blocks.POTTED_FERN, Blocks.POTTED_FERN,
                 Blocks.POTTED_FERN);
+        era(Role.CIVIC_WALL, Blocks.BRICKS, Blocks.BRICKS, Blocks.MUD_BRICKS, Blocks.BRICKS, Blocks.SMOOTH_SANDSTONE, Blocks.POLISHED_TUFF);
+        era(Role.AWNING, Blocks.CHERRY_STAIRS, Blocks.WARPED_STAIRS, Blocks.ACACIA_STAIRS, Blocks.PURPUR_STAIRS, Blocks.MANGROVE_STAIRS,
+                Blocks.DARK_OAK_STAIRS);
+        era(Role.SAND, Blocks.SAND, Blocks.SAND, Blocks.SAND, Blocks.SAND, Blocks.SAND, Blocks.SAND);
+        era(Role.PLAY_FRAME, concrete(DyeColor.RED), concrete(DyeColor.CYAN), concrete(DyeColor.ORANGE), concrete(DyeColor.MAGENTA),
+                concrete(DyeColor.BLUE), concrete(DyeColor.LIGHT_GRAY));
+        era(Role.SLIDE, Blocks.QUARTZ_STAIRS, Blocks.QUARTZ_STAIRS, Blocks.SMOOTH_SANDSTONE_STAIRS, Blocks.QUARTZ_STAIRS,
+                Blocks.SMOOTH_QUARTZ_STAIRS, Blocks.POLISHED_DIORITE_STAIRS);
+        era(Role.CHAIN, Blocks.IRON_CHAIN, Blocks.IRON_CHAIN, Blocks.IRON_CHAIN, Blocks.IRON_CHAIN, Blocks.IRON_CHAIN, Blocks.IRON_CHAIN);
+        era(Role.BELL, Blocks.BELL, Blocks.BELL, Blocks.BELL, Blocks.BELL, Blocks.BELL, Blocks.BELL);
+        // the same in every era, so a makeover never loses what it says
+        era(Role.SIGN, Blocks.OAK_WALL_SIGN, Blocks.OAK_WALL_SIGN, Blocks.OAK_WALL_SIGN, Blocks.OAK_WALL_SIGN, Blocks.OAK_WALL_SIGN,
+                Blocks.OAK_WALL_SIGN);
+        era(Role.ORCHARD_LEAVES, Blocks.OAK_LEAVES, Blocks.OAK_LEAVES, Blocks.OAK_LEAVES, Blocks.OAK_LEAVES, Blocks.OAK_LEAVES, Blocks.OAK_LEAVES);
+        era(Role.ORCHARD_BLOSSOM, Blocks.FLOWERING_AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES,
+                Blocks.FLOWERING_AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES);
+        era(Role.LANE, Blocks.DIRT_PATH, Blocks.DIRT_PATH, Blocks.DIRT_PATH, Blocks.DIRT_PATH, Blocks.DIRT_PATH, Blocks.DIRT_PATH);
+        era(Role.HAY, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK);
+        era(Role.BARN_WALL, terracotta(DyeColor.RED), terracotta(DyeColor.RED), terracotta(DyeColor.RED), concrete(DyeColor.RED),
+                terracotta(DyeColor.RED), Blocks.DARK_OAK_PLANKS);
+        era(Role.BED, Blocks.BED.pick(DyeColor.LIGHT_BLUE), Blocks.BED.pick(DyeColor.CYAN), Blocks.BED.pick(DyeColor.ORANGE),
+                Blocks.BED.pick(DyeColor.PINK), Blocks.BED.pick(DyeColor.LIGHT_GRAY), Blocks.BED.pick(DyeColor.GRAY));
     }
 
     private EraStyle() {
@@ -172,6 +194,10 @@ public final class EraStyle {
     public static boolean isStyleOf(Role role, int paint, BlockState state) {
         if (role == Role.CLEAR) {
             return state.isAir();
+        }
+        if (role == Role.PRESERVE) {
+            // held as it was, never built in any era's style
+            return false;
         }
         for (Era era : Era.values()) {
             if (state.is(block(role, era, paint))) {

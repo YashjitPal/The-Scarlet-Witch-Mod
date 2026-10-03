@@ -47,7 +47,18 @@ public final class Glow {
      * A disc of the given radius (in the pose's local units) centered at x, y, z.
      */
     public static void disc(VertexConsumer buffer, PoseStack.Pose pose, Billboard axes, float x, float y, float z, float radius, int argb) {
-        int rim = argb & 0x00FFFFFF;
+        disc(buffer, pose, axes, x, y, z, radius, argb, argb & 0x00FFFFFF);
+    }
+
+    /**
+     * A disc for the tint pass, whose colors are premultiplied, so it fades out to no color at all rather than to its
+     * color without alpha.
+     */
+    public static void tintDisc(VertexConsumer buffer, PoseStack.Pose pose, Billboard axes, float x, float y, float z, float radius, int tint) {
+        disc(buffer, pose, axes, x, y, z, radius, tint, 0);
+    }
+
+    private static void disc(VertexConsumer buffer, PoseStack.Pose pose, Billboard axes, float x, float y, float z, float radius, int argb, int rim) {
         Vector3f r = axes.right();
         Vector3f u = axes.up();
         for (int i = 0; i < SEGMENTS; i++) {
@@ -78,6 +89,18 @@ public final class Glow {
      * edges. Width and color are given per point.
      */
     public static void ribbon(VertexConsumer buffer, PoseStack.Pose pose, Billboard axes, Vector3f[] points, float[] widths, int[] colors) {
+        ribbon(buffer, pose, axes, points, widths, colors, true);
+    }
+
+    /**
+     * A ribbon for the tint pass, whose colors are premultiplied, so its edges fade out to no color at all.
+     */
+    public static void tintRibbon(VertexConsumer buffer, PoseStack.Pose pose, Billboard axes, Vector3f[] points, float[] widths, int[] tints) {
+        ribbon(buffer, pose, axes, points, widths, tints, false);
+    }
+
+    private static void ribbon(VertexConsumer buffer, PoseStack.Pose pose, Billboard axes, Vector3f[] points, float[] widths, int[] colors,
+                               boolean keepEdgeColor) {
         Vector3f forward = new Vector3f(axes.right()).cross(axes.up());
         Vector3f[] sides = new Vector3f[points.length];
         for (int i = 0; i < points.length; i++) {
@@ -91,10 +114,12 @@ public final class Glow {
             Vector3f b = points[i + 1];
             int ca = colors[i];
             int cb = colors[i + 1];
+            int ea = keepEdgeColor ? ca & 0x00FFFFFF : 0;
+            int eb = keepEdgeColor ? cb & 0x00FFFFFF : 0;
             for (float sign : new float[] {1.0F, -1.0F}) {
                 buffer.addVertex(pose, a.x, a.y, a.z).setColor(ca);
-                buffer.addVertex(pose, a.x + sides[i].x * sign, a.y + sides[i].y * sign, a.z + sides[i].z * sign).setColor(ca & 0x00FFFFFF);
-                buffer.addVertex(pose, b.x + sides[i + 1].x * sign, b.y + sides[i + 1].y * sign, b.z + sides[i + 1].z * sign).setColor(cb & 0x00FFFFFF);
+                buffer.addVertex(pose, a.x + sides[i].x * sign, a.y + sides[i].y * sign, a.z + sides[i].z * sign).setColor(ea);
+                buffer.addVertex(pose, b.x + sides[i + 1].x * sign, b.y + sides[i + 1].y * sign, b.z + sides[i + 1].z * sign).setColor(eb);
                 buffer.addVertex(pose, b.x, b.y, b.z).setColor(cb);
             }
         }
@@ -160,6 +185,19 @@ public final class Glow {
      */
     public static void planeLine(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float ax, float ay,
                                  float bx, float by, float width, int argb) {
+        planeLine(buffer, pose, x, y, z, u, v, ax, ay, bx, by, width, argb, argb & 0x00FFFFFF);
+    }
+
+    /**
+     * A line for the tint pass, whose colors are premultiplied, so its edges fade out to no color at all.
+     */
+    public static void tintPlaneLine(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float ax,
+                                     float ay, float bx, float by, float width, int tint) {
+        planeLine(buffer, pose, x, y, z, u, v, ax, ay, bx, by, width, tint, 0);
+    }
+
+    private static void planeLine(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float ax, float ay,
+                                  float bx, float by, float width, int argb, int clear) {
         float dx = bx - ax;
         float dy = by - ay;
         float length = (float) Math.sqrt(dx * dx + dy * dy);
@@ -168,7 +206,6 @@ public final class Glow {
         }
         float nx = -dy / length * width * 0.5F;
         float ny = dx / length * width * 0.5F;
-        int clear = argb & 0x00FFFFFF;
         float pax = x + u.x * ax + v.x * ay;
         float pay = y + u.y * ax + v.y * ay;
         float paz = z + u.z * ax + v.z * ay;

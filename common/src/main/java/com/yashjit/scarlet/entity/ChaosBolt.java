@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.entity;
 
+import com.yashjit.scarlet.hex.HexRipples;
 import com.yashjit.scarlet.magic.Mastery;
 import com.yashjit.scarlet.network.ChaosImpactPayload;
 import com.yashjit.scarlet.platform.Services;
@@ -58,11 +59,31 @@ public class ChaosBolt extends ThrowableProjectile {
 
     @Override
     public void tick() {
+        Vec3 from = position();
         super.tick();
-        if (!level().isClientSide() && isAlive() && tickCount > LIFETIME) {
+        if (!(level() instanceof ServerLevel level) || !isAlive()) {
+            return;
+        }
+        Vec3 wall = HexRipples.crossing(level, from, position());
+        if (wall != null) {
+            strikeHex(level, wall);
+        } else if (tickCount > LIFETIME) {
             burst(position(), getDeltaMovement().normalize().reverse(), false, false);
             discard();
         }
+    }
+
+    /**
+     * No chaos blast goes through the wall of a Hex: it bursts on it, and the wall flares red and ripples from where
+     * it was struck.
+     */
+    private void strikeHex(ServerLevel level, Vec3 at) {
+        burst(at, getDeltaMovement().normalize().reverse(), false, false);
+        HexRipples.ripple(level, at, HexRipples.BLAST);
+        level.playSound(null, at.x, at.y, at.z, SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0F, 1.7F);
+        level.playSound(null, at.x, at.y, at.z, SoundEvents.RESPAWN_ANCHOR_DEPLETE.value(), SoundSource.PLAYERS, 0.7F, 1.5F);
+        level.playSound(null, at.x, at.y, at.z, SoundEvents.AMETHYST_CLUSTER_BREAK, SoundSource.PLAYERS, 0.8F, 0.8F);
+        discard();
     }
 
     @Override

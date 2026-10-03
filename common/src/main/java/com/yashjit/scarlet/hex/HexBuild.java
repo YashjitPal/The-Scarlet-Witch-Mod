@@ -12,7 +12,12 @@ public enum HexBuild implements StringRepresentable {
     TOWN("town"),
     /** Just the caster's home, which the Hex bursts out from. */
     HOME("home"),
-    NOTHING("nothing");
+    NOTHING("nothing"),
+    /**
+     * The caster's farmhouse among orchards in blossom, with country lanes and a red barn, every tree it covers turned
+     * into a fruit tree: the peaceful life Wanda hides away in.
+     */
+    ORCHARD("orchard");
 
     public static final Codec<HexBuild> CODEC = StringRepresentable.fromEnum(HexBuild::values);
     private static final HexBuild[] VALUES = values();
@@ -26,6 +31,13 @@ public enum HexBuild implements StringRepresentable {
     @Override
     public String getSerializedName() {
         return id;
+    }
+
+    /**
+     * Whether it builds out over the whole Hex as it spreads, rather than just the caster's home or nothing.
+     */
+    public boolean isTown() {
+        return this == TOWN || this == ORCHARD;
     }
 
     public Component displayName() {

@@ -14,6 +14,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -61,8 +62,31 @@ public final class LaughTrack {
         }
         HURT.clear();
         HURT.putAll(seen);
+        if (funny) {
+            laugh(minecraft, now);
+        }
+    }
+
+    /**
+     * A gag played out inside the Hex you're in, such as a bomb rolling in as a cake, gets a laugh now and then.
+     */
+    public static void gag(Minecraft minecraft, Vec3 at) {
+        ClientLevel level = minecraft.level;
+        LocalPlayer self = minecraft.player;
+        if (level == null || self == null) {
+            return;
+        }
+        long now = level.getGameTime();
+        HexSnapshot around = Hexes.clientHexAt(self.position(), now);
+        HexSnapshot theirs = Hexes.clientHexAt(at, now);
+        if (around != null && around.eraValue().ordinal() <= Era.EIGHTIES.ordinal() && theirs != null && theirs.caster().equals(around.caster())) {
+            laugh(minecraft, now);
+        }
+    }
+
+    private static void laugh(Minecraft minecraft, long now) {
         RandomSource random = ScarletFx.random();
-        if (funny && now - lastLaugh >= COOLDOWN_TICKS && random.nextFloat() < CHANCE) {
+        if (now - lastLaugh >= COOLDOWN_TICKS && random.nextFloat() < CHANCE) {
             lastLaugh = now;
             roll(minecraft.getSoundManager(), random);
         }

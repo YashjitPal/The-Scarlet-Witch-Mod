@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.client.magic;
 
+import com.yashjit.scarlet.client.ScarletKeyMappings;
 import com.yashjit.scarlet.client.anim.CastGestures;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.magic.Magic;
@@ -12,6 +13,7 @@ import com.yashjit.scarlet.player.ScarletPlayerData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.phys.EntityHitResult;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,7 +26,8 @@ import org.jspecify.annotations.Nullable;
  *     <li>Toggled spells flip once per press.</li>
  * </ul>
  *
- * <p>Levitation also answers a double tap of jump, the way creative flight does.
+ * <p>Levitation is not on the wheel: a double tap of jump, the way creative flight works, or its own key, lifts you
+ * off or sets you down at any time, so you can fly and cast together.
  */
 public final class CastInput {
 
@@ -40,6 +43,23 @@ public final class CastInput {
     private static long lastJumpPress = ScarletPlayerData.NEVER;
 
     private CastInput() {
+    }
+
+    /**
+     * Whether a click goes to the spell before whatever is under the crosshair gets it. While a channel is held the
+     * click is the spell's alone; and Mind Control and Telekinesis are for taking hold of creatures, so with an empty
+     * hand they reach for one rather than trade with it, ride it or feed it.
+     */
+    public static boolean claimsClick(Minecraft minecraft) {
+        LocalPlayer player = minecraft.player;
+        if (player == null || !CrownItem.isWearingCrown(player) || !player.getMainHandItem().isEmpty()) {
+            return false;
+        }
+        if (holding != null) {
+            return true;
+        }
+        Spell spell = Magic.state(player).selectedSpell();
+        return (spell == Spell.MIND_CONTROL || spell == Spell.TELEKINESIS) && minecraft.hitResult instanceof EntityHitResult;
     }
 
     /**
@@ -105,23 +125,35 @@ public final class CastInput {
             Services.NETWORK.sendToServer(new CastPayload(false, holding.ordinal()));
             holding = null;
         }
+        long now = player.level().getGameTime();
         boolean jumpDown = minecraft.options.keyJump.isDown() && minecraft.gui.screen() == null;
         if (jumpDown && !jumpWasDown) {
-            long now = player.level().getGameTime();
-            if (now - lastJumpPress <= DOUBLE_TAP_TICKS && canLevitateByJumping(player)) {
-                toggle(player, Spell.LEVITATION, Magic.state(player), now);
+            if (now - lastJumpPress <= DOUBLE_TAP_TICKS && canLevitate(player)) {
+                MagicState state = Magic.state(player);
+                // in creative the same double tap has just turned vanilla flight on or off; levitation follows it
+                boolean wanted = player.getAbilities().instabuild ? player.getAbilities().flying : !state.levitating();
+                if (wanted != state.levitating()) {
+                    toggle(player, Spell.LEVITATION, state, now);
+                }
                 lastJumpPress = ScarletPlayerData.NEVER;
             } else {
                 lastJumpPress = now;
             }
         }
         jumpWasDown = jumpDown;
+        while (ScarletKeyMappings.LEVITATE.consumeClick()) {
+            if (canLevitate(player)) {
+                toggle(player, Spell.LEVITATION, Magic.state(player), now);
+            }
+        }
     }
 
-    private static boolean canLevitateByJumping(LocalPlayer player) {
-        // creative and spectator players already fly on a double tap
-        return CrownItem.isWearingCrown(player) && !player.getAbilities().instabuild && !player.isSpectator()
-                && Mastery.rank(player) >= Spell.LEVITATION.rank();
+    /**
+     * Levitation is the crown's own gift rather than a spell on the wheel: whoever wears one and has the mastery for
+     * it can rise or land at any time, whatever spell they have chosen.
+     */
+    private static boolean canLevitate(LocalPlayer player) {
+        return CrownItem.isWearingCrown(player) && !player.isSpectator() && Mastery.rank(player) >= Spell.LEVITATION.rank();
     }
 
     private static void toggle(LocalPlayer player, Spell spell, MagicState state, long now) {

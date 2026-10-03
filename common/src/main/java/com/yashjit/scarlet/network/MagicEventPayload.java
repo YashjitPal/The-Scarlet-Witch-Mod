@@ -18,6 +18,20 @@ public record MagicEventPayload(int entityId, int kind, Vec3 position) implement
     public static final int SHIELD_SHATTER = 1;
     public static final int LIFT_OFF = 2;
     public static final int TOUCH_DOWN = 3;
+    /** Energy gathering between the hands, at the caster's feet. */
+    public static final int SHOCKWAVE_GATHER = 4;
+    /** The wave bursting out, from the caster's feet. */
+    public static final int SHOCKWAVE = 5;
+    /** The caster dissolving, where they stand. */
+    public static final int MIST_OUT = 6;
+    /** The caster forming again, where they arrive. */
+    public static final int MIST_IN = 7;
+    /** A block torn out of the ground by Telekinesis, at the hole it left. */
+    public static final int TORN_OUT = 8;
+    /** Something thrown by Telekinesis slamming into the world, where it hit. */
+    public static final int SLAM = 9;
+    /** A Rune Trap cast with nowhere to write it, sputtering out in the hand. */
+    public static final int RUNE_FIZZLE = 10;
 
     public static final Type<MagicEventPayload> TYPE = new Type<>(Scarlet.id("magic_event"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MagicEventPayload> STREAM_CODEC = StreamCodec.composite(

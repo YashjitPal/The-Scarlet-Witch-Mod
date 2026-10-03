@@ -17,6 +17,8 @@
     "minecraft:pillager",
     "minecraft:vindicator",
     "minecraft:evoker",
-    "minecraft:illusioner"
+    "minecraft:illusioner",
+    "minecraft:villager",
+    "minecraft:wandering_trader"
   ]
 }

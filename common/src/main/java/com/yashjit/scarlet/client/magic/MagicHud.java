@@ -3,8 +3,15 @@ package com.yashjit.scarlet.client.magic;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
+import com.yashjit.scarlet.client.hex.Ejections;
+import com.yashjit.scarlet.client.hex.HomePlacement;
 import com.yashjit.scarlet.client.platform.ClientPlatform;
 import com.yashjit.scarlet.crown.CrownItem;
+import com.yashjit.scarlet.hex.Hex;
+import com.yashjit.scarlet.hex.HexPaint;
+import com.yashjit.scarlet.hex.HexShape;
+import com.yashjit.scarlet.hex.HexSnapshot;
+import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.magic.MagicState;
 import com.yashjit.scarlet.magic.Mastery;
@@ -17,6 +24,9 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The casting HUD: a slim chaos energy bar laid just above the experience bar while a crown is worn, with vanilla's
@@ -43,6 +53,11 @@ public final class MagicHud {
     private static Spell refusedSpell = Spell.CHAOS_BOLT;
     private static int lastSelected = -1;
     private static double selectedAt = -1.0E9;
+    private static final double TIP_TICKS = 100.0;
+    /** When the crown first went on this session, for the tip on how to fly. */
+    private static double crownedAt = -1.0E9;
+    private static float hintShown;
+    private static @Nullable Component lastHint;
 
     private MagicHud() {
     }
@@ -89,11 +104,92 @@ public final class MagicHud {
         float energy = Magic.energy(state, now, max);
         boolean idle = energy >= max - 0.01F && now - state.lastCastAt() > 60 && !SpellWheel.isOpen();
         idleDim = Ease.damp(idleDim, idle ? 1.0F : 0.0F, idle ? 1.5F : 12.0F, seconds);
+        if (crowned && crownedAt < 0.0) {
+            crownedAt = now;
+        }
+        Component hint = hint(minecraft, player, state, now);
+        hintShown = Ease.damp(hintShown, hint != null ? 1.0F : 0.0F, hint != null ? 8.0F : 5.0F, seconds);
+        if (hint != null) {
+            lastHint = hint;
+        }
         if (shown > 0.01F) {
             energyBar(graphics, energy / max, energy < state.selectedSpell().cost(), now);
             caption(graphics, minecraft, now, state.selectedSpell());
+            if (hintShown > 0.02F && lastHint != null && !SpellWheel.isOpen()) {
+                hintLine(graphics, minecraft, lastHint, hintShown * shown);
+            }
         }
         SpellWheel.render(graphics, minecraft, seconds);
+    }
+
+    /**
+     * What is worth knowing right now, if anything: how to fly when the crown first goes on, and how to shape your Hex
+     * while its spell is chosen.
+     */
+    private static @Nullable Component hint(Minecraft minecraft, LocalPlayer player, MagicState state, double now) {
+        Component placing = HomePlacement.hint(minecraft);
+        if (placing != null) {
+            return placing;
+        }
+        if (now - crownedAt < TIP_TICKS && Mastery.rank(player) >= Spell.LEVITATION.rank() && !state.levitating()) {
+            return Component.translatable("hud.scarlet.levitate.tip", minecraft.options.keyJump.getTranslatedKeyMessage());
+        }
+        if (state.selectedSpell() != Spell.HEX || !Hexes.ownsHex(player)) {
+            return null;
+        }
+        HexSnapshot own = null;
+        for (HexSnapshot hex : Hexes.clientHexes()) {
+            if (hex.caster().equals(player.getUUID())) {
+                own = hex;
+            }
+        }
+        if (state.channeling(Spell.HEX) && own != null && own.parting()) {
+            return Component.translatable("hud.scarlet.hex.parting", Math.round(own.opening() * 2.0F));
+        }
+        boolean inked = own != null && own.phaseValue() == Hex.Phase.STANDING && HexPaint.ink(player.getOffhandItem()) != null
+                && HexShape.contains(own.center(), own.radius(), player.position());
+        if (state.channeling(Spell.HEX) && inked && !Ejections.holds(player)) {
+            return Component.translatable("hud.scarlet.hex.painting", player.getOffhandItem().getHoverName(),
+                    minecraft.options.keyShift.getTranslatedKeyMessage());
+        }
+        if (state.channeling(Spell.HEX) && own != null && !Ejections.holds(player)) {
+            return Component.translatable("hud.scarlet.hex.radius", Math.round(own.radius()), Math.round(Hexes.MAX_RADIUS));
+        }
+        if (own != null && !state.channeling(Spell.HEX) && minecraft.crosshairPickEntity instanceof LivingEntity aimed
+                && HexShape.contains(own.center(), own.radius(), aimed.position())) {
+            return Component.translatable("hud.scarlet.hex.throw", minecraft.options.keyUse.getTranslatedKeyMessage());
+        }
+        if (own != null && own.phaseValue() == Hex.Phase.STANDING) {
+            Vec3 eye = player.getEyePosition();
+            Vec3 reach = eye.add(player.getLookAngle().scale(Hexes.TEAR_REACH));
+            if (HexShape.contains(own.center(), own.radius(), eye) != HexShape.contains(own.center(), own.radius(), reach)) {
+                return own.parted()
+                        ? Component.translatable("hud.scarlet.hex.widen", minecraft.options.keyUse.getTranslatedKeyMessage(),
+                                minecraft.options.keyShift.getTranslatedKeyMessage())
+                        : Component.translatable("hud.scarlet.hex.part", minecraft.options.keyUse.getTranslatedKeyMessage());
+            }
+        }
+        if (inked && !state.channeling(Spell.HEX)) {
+            return Component.translatable("hud.scarlet.hex.paint", minecraft.options.keyUse.getTranslatedKeyMessage(),
+                    player.getOffhandItem().getHoverName());
+        }
+        if (now - selectedAt < TIP_TICKS || now - state.lastCastAt() < TIP_TICKS) {
+            return Component.translatable("hud.scarlet.hex.controls", minecraft.options.keyUse.getTranslatedKeyMessage(),
+                    minecraft.options.keyShift.getTranslatedKeyMessage());
+        }
+        return null;
+    }
+
+    private static void hintLine(GuiGraphicsExtractor graphics, Minecraft minecraft, Component text, float alpha) {
+        int y = graphics.guiHeight() - 71 - Math.round(VITALS_LIFT * shown);
+        if (minecraft.gameMode != null && !minecraft.gameMode.canHurtPlayer()) {
+            y += 14;
+        }
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(graphics.guiWidth() / 2.0F, y);
+        graphics.pose().scale(0.75F);
+        graphics.centeredText(minecraft.font, text, 0, 0, ARGB.color(0.85F * alpha, 0xE6D6DA));
+        graphics.pose().popMatrix();
     }
 
     private static void energyBar(GuiGraphicsExtractor graphics, float fraction, boolean low, double now) {

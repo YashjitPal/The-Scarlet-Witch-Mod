@@ -29,9 +29,98 @@ abstract class AvatarRenderStateMixin implements CastPoseState {
     @Unique
     private float scarlet$burst;
 
+    @Unique
+    private float scarlet$gather;
+
+    @Unique
+    private float scarlet$hold;
+
+    @Unique
+    private float scarlet$tear;
+
+    @Unique
+    private float scarlet$spread;
+
+    @Unique
+    private float scarlet$found;
+
+    @Unique
+    private float scarlet$control;
+
+    @Unique
+    private float scarlet$beam;
+
+    @Unique
+    private boolean scarlet$beamRight;
+
+    @Unique
+    private float scarlet$raise;
+
+    @Override
+    public float scarlet$beam() {
+        return scarlet$beam;
+    }
+
+    @Override
+    public boolean scarlet$beamRight() {
+        return scarlet$beamRight;
+    }
+
+    @Override
+    public float scarlet$raise() {
+        return scarlet$raise;
+    }
+
+    @Override
+    public void scarlet$setBeam(float beam, boolean right, float raise) {
+        scarlet$beam = beam;
+        scarlet$beamRight = right;
+        scarlet$raise = raise;
+    }
+
+    @Override
+    public float scarlet$found() {
+        return scarlet$found;
+    }
+
+    @Override
+    public float scarlet$control() {
+        return scarlet$control;
+    }
+
+    @Override
+    public void scarlet$setControl(float control) {
+        scarlet$control = control;
+    }
+
+    @Override
+    public void scarlet$setFound(float found) {
+        scarlet$found = found;
+    }
+
+    @Override
+    public float scarlet$tear() {
+        return scarlet$tear;
+    }
+
+    @Override
+    public float scarlet$spread() {
+        return scarlet$spread;
+    }
+
     @Override
     public float scarlet$burst() {
         return scarlet$burst;
+    }
+
+    @Override
+    public float scarlet$gather() {
+        return scarlet$gather;
+    }
+
+    @Override
+    public float scarlet$hold() {
+        return scarlet$hold;
     }
 
     @Override
@@ -65,7 +154,11 @@ abstract class AvatarRenderStateMixin implements CastPoseState {
     }
 
     @Override
-    public void scarlet$set(float rightStrike, float leftStrike, float shield, float recoil, float levitate, float lean, float burst) {
+    public void scarlet$set(float rightStrike, float leftStrike, float shield, float recoil, float levitate, float lean, float burst, float gather,
+                            float hold, float tear, float spread) {
+        scarlet$hold = hold;
+        scarlet$tear = tear;
+        scarlet$spread = spread;
         scarlet$rightStrike = rightStrike;
         scarlet$leftStrike = leftStrike;
         scarlet$shield = shield;
@@ -73,5 +166,6 @@ abstract class AvatarRenderStateMixin implements CastPoseState {
         scarlet$levitate = levitate;
         scarlet$lean = lean;
         scarlet$burst = burst;
+        scarlet$gather = gather;
     }
 }

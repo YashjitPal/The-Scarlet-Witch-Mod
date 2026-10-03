@@ -2,6 +2,7 @@ package com.yashjit.scarlet.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.client.anim.FirstPersonGestures;
+import com.yashjit.scarlet.client.magic.MindControlClient;
 import net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
@@ -20,6 +21,17 @@ abstract class FirstPersonHandsMixin {
     @Shadow
     private void renderPlayerArm(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int lightCoords, float inverseArmHeight,
                                  float attackValue, HumanoidArm arm, PlayerRenderState playerState) {
+    }
+
+    /**
+     * Inside a mind you hold, your own hands are back with your body.
+     */
+    @Inject(method = "submitHandsWithItems", at = @At("HEAD"), cancellable = true)
+    private void scarlet$noHandsInsideAnotherMind(float partialTicks, PoseStack poseStack, SubmitNodeCollector submitNodeCollector,
+                                                  PlayerRenderState playerState, FirstPersonHandsAndItemsRenderState state, CallbackInfo ci) {
+        if (MindControlClient.inside()) {
+            ci.cancel();
+        }
     }
 
     @Inject(method = "renderPlayerArm", at = @At("HEAD"))

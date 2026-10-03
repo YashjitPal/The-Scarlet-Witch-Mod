@@ -1,15 +1,21 @@
 package com.yashjit.scarlet.event;
 
 import com.yashjit.scarlet.crown.CrownItem;
+import com.yashjit.scarlet.hex.HexEjection;
+import com.yashjit.scarlet.hex.HexRipples;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.magic.Magic;
+import com.yashjit.scarlet.magic.MindControl;
+import com.yashjit.scarlet.magic.RuneTraps;
+import com.yashjit.scarlet.magic.Telekinesis;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.player.SuitUp;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -36,13 +42,31 @@ public final class ScarletEvents {
         if (entity instanceof Mob mob) {
             Residents.struck(mob, source.getEntity());
         }
-        return !(entity instanceof ServerPlayer player) || !Magic.shieldBlocks(player, source, amount);
+        if (!(entity instanceof ServerPlayer player)) {
+            return true;
+        }
+        if (source.is(DamageTypes.IN_WALL) && Hexes.isFounding(player)) {
+            // carried in through the walls of what their home is made of
+            return false;
+        }
+        if (Magic.shieldBlocks(player, source, amount)) {
+            return false;
+        }
+        if (amount > 0.0F && !player.isInvulnerableTo(player.level(), source)) {
+            Hexes.hurt(player, amount);
+            MindControl.hurt(player);
+        }
+        return true;
     }
 
     public static void onServerTick(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
             Hexes.tick(level);
+            HexEjection.tick(level);
+            RuneTraps.tick(level);
         }
+        Telekinesis.sweep(server);
+        MindControl.sweep(server);
     }
 
     public static void onPlayerTick(ServerPlayer player) {
@@ -53,5 +77,6 @@ public final class ScarletEvents {
         Magic.tick(player);
         Hexes.syncIfNeeded(player);
         Residents.syncIfNeeded(player);
+        HexRipples.watch(player);
     }
 }

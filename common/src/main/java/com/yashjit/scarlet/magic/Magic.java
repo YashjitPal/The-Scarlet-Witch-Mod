@@ -2,14 +2,18 @@ package com.yashjit.scarlet.magic;
 
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.crown.CrownItem;
+import com.yashjit.scarlet.hex.HexEjection;
+import com.yashjit.scarlet.hex.HexPaint;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.network.MagicEventPayload;
 import com.yashjit.scarlet.platform.Services;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
@@ -59,6 +63,12 @@ public final class Magic {
     private static final Identifier SHIELD_SLOW = Scarlet.id("chaos_shield_slow");
 
     private static final Map<UUID, List<PendingCast>> PENDING = new HashMap<>();
+    /** Casters whose Hex channel took hold of the wall to part it, rather than resizing the Hex. */
+    private static final Set<UUID> TEARING = new HashSet<>();
+    /** Casters whose Hex channel took hold of someone inside it, to throw them out. */
+    private static final Set<UUID> EJECTING = new HashSet<>();
+    /** Casters whose Hex channel is restyling what they look at with the block in their off hand. */
+    private static final Set<UUID> PAINTING = new HashSet<>();
 
     private Magic() {
     }
@@ -123,13 +133,20 @@ public final class Magic {
             return Refusal.COOLDOWN;
         }
         float energy = energy(state, now, maxEnergy(player));
-        if (spell.input() == Spell.Input.TAP ? energy < spell.cost() : energy < MIN_SUSTAIN) {
+        if (!shrinkingHex(player, spell) && (spell.input() == Spell.Input.TAP ? energy < spell.cost() : energy < MIN_SUSTAIN)) {
             return Refusal.ENERGY;
         }
         if (spell == Spell.HEX && !Hexes.ownsHex(player) && energy < Hexes.CAST_COST) {
             return Refusal.ENERGY;
         }
         return Refusal.NONE;
+    }
+
+    /**
+     * Drawing your own Hex in takes nothing out of you, so it can always be done, even spent.
+     */
+    private static boolean shrinkingHex(Player player, Spell spell) {
+        return spell == Spell.HEX && player.isShiftKeyDown() && Hexes.ownsHex(player) && HexPaint.ink(player.getOffhandItem()) == null;
     }
 
     // ---------------------------------------------------------------- server
@@ -187,7 +204,7 @@ public final class Magic {
 
     public static void select(ServerPlayer player, int index) {
         MagicState state = state(player);
-        if (state.selected() != index) {
+        if (state.selected() != index && Spell.WHEEL.contains(Spell.byIndex(index))) {
             Services.PLAYER_DATA.setMagic(player, state.withSelected(index));
         }
     }
@@ -196,8 +213,9 @@ public final class Magic {
         MagicState state = state(player);
         float energy = energy(state, now, maxEnergy(player)) - spell.cost();
         boolean offHand = castArm(player, state.castCount()) != player.getMainArm();
-        Services.PLAYER_DATA.setMagic(player, state.withCast(spell, energy, now));
-        PENDING.computeIfAbsent(player.getUUID(), id -> new ArrayList<>()).add(new PendingCast(spell, offHand, now + RELEASE_DELAY));
+        Services.PLAYER_DATA.setMagic(player, spell.strikes() ? state.withCast(spell, energy, now) : state.withSpent(spell, energy, now));
+        PENDING.computeIfAbsent(player.getUUID(), id -> new ArrayList<>()).add(new PendingCast(spell, offHand, now + spell.windUp()));
+        SpellCasts.begin(player, spell);
         Mastery.grant(player, 1);
     }
 
@@ -207,6 +225,16 @@ public final class Magic {
         if (spell == Spell.CHAOS_SHIELD) {
             slowForShield(player, true);
             SpellCasts.shieldRaised(player);
+        } else if (spell == Spell.TELEKINESIS) {
+            Telekinesis.start(player, now);
+        } else if (spell == Spell.MIND_CONTROL) {
+            MindControl.start(player, now);
+        } else if (spell == Spell.HEX && !player.isShiftKeyDown() && HexEjection.seize(player)) {
+            EJECTING.add(player.getUUID());
+        } else if (spell == Spell.HEX && Hexes.beginPart(player, !player.isShiftKeyDown())) {
+            TEARING.add(player.getUUID());
+        } else if (spell == Spell.HEX && HexPaint.canPaint(player)) {
+            PAINTING.add(player.getUUID());
         }
     }
 
@@ -220,7 +248,20 @@ public final class Magic {
         }
         Spell spell = Spell.byIndex(state.channel());
         MagicState stopped = state.withChannel(MagicState.NO_CHANNEL, energy(state, now, maxEnergy(player)), now);
-        Services.PLAYER_DATA.setMagic(player, stopped.withCooldown(spell, now + (shattered ? SHATTER_COOLDOWN : spell.cooldown())));
+        int cooldown = spell == Spell.MIND_CONTROL ? MindControl.stop(player) : -1;
+        if (cooldown < 0) {
+            cooldown = shattered ? SHATTER_COOLDOWN : spell.cooldown();
+        }
+        Services.PLAYER_DATA.setMagic(player, stopped.withCooldown(spell, now + cooldown));
+        if (spell == Spell.TELEKINESIS) {
+            Telekinesis.stop(player);
+        } else if (spell == Spell.HEX && TEARING.remove(player.getUUID())) {
+            Hexes.endPart(player);
+        } else if (spell == Spell.HEX && EJECTING.remove(player.getUUID())) {
+            HexEjection.fling(player);
+        } else if (spell == Spell.HEX && PAINTING.remove(player.getUUID())) {
+            HexPaint.stop(player);
+        }
         if (spell == Spell.CHAOS_SHIELD) {
             slowForShield(player, false);
             if (shattered) {
@@ -282,15 +323,22 @@ public final class Magic {
     public static void tick(ServerPlayer player) {
         long now = player.level().getGameTime();
         runPending(player, now);
+        Telekinesis.tick(player, now);
         MagicState state = state(player);
         if (state.channeling()) {
-            boolean exhausted = energy(state, now, maxEnergy(player)) <= 0.001F;
+            boolean exhausted = energy(state, now, maxEnergy(player)) <= 0.001F && !shrinkingHex(player, Spell.byIndex(state.channel()));
             if (exhausted || !CrownItem.isWearingCrown(player) || !player.getMainHandItem().isEmpty() || !player.isAlive()) {
                 stopChannel(player, now, exhausted);
             } else if (state.channeling(Spell.CHAOS_SHIELD)) {
                 deflectProjectiles(player, now);
-            } else if (state.channeling(Spell.HEX)
-                    && !Hexes.resize(player, player.isShiftKeyDown() ? -Hexes.RESIZE_SPEED : Hexes.RESIZE_SPEED, now)) {
+            } else if (state.channeling(Spell.TELEKINESIS) && !Telekinesis.hold(player, now)) {
+                stopChannel(player, now, false);
+            } else if (state.channeling(Spell.MIND_CONTROL) && !MindControl.hold(player, now)) {
+                stopChannel(player, now, false);
+            } else if (state.channeling(Spell.HEX) && (EJECTING.contains(player.getUUID()) ? !HexEjection.hold(player)
+                    : TEARING.contains(player.getUUID()) ? !Hexes.part(player, !player.isShiftKeyDown())
+                    : PAINTING.contains(player.getUUID()) ? !HexPaint.paint(player, now)
+                    : !Hexes.resize(player, !player.isShiftKeyDown(), now))) {
                 stopChannel(player, now, false);
             }
             state = state(player);

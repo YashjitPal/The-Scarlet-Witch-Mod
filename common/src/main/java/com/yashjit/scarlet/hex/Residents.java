@@ -4,13 +4,18 @@ import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.network.ResidentsPayload;
 import com.yashjit.scarlet.platform.Services;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.TagKey;
@@ -21,7 +26,8 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -73,22 +79,31 @@ public final class Residents {
         }
         Found found = FOUND.computeIfAbsent(level.dimension(), key -> new Found());
         IntOpenHashSet inside = new IntOpenHashSet();
+        List<Hex> standing = new ArrayList<>();
+        List<Float> walls = new ArrayList<>();
         for (Hex hex : data.all()) {
             float wall = Hexes.wallRadius(hex, now);
-            if (wall < 1.0F) {
-                continue;
+            if (wall >= 1.0F) {
+                standing.add(hex);
+                walls.add(wall);
             }
-            double reach = HexShape.reach(wall);
-            AABB box = new AABB(hex.center.x - reach, level.getMinY(), hex.center.z - reach, hex.center.x + reach, level.getMaxY() + 1,
-                    hex.center.z + reach);
-            for (Mob mob : level.getEntitiesOfClass(Mob.class, box, mob -> mob.isAlive() && mob.is(CAN_LIVE_HERE))) {
-                if (!HexShape.contains(hex.center, wall, mob.position()) || isAwake(mob)) {
+        }
+        if (!standing.isEmpty()) {
+            // a Hex can be as tall as the world and hundreds of blocks across: going through everything once costs
+            // less than searching a box that size
+            for (Entity entity : level.getAllEntities()) {
+                if (!(entity instanceof Mob mob) || !mob.isAlive() || !mob.is(CAN_LIVE_HERE) || isAwake(mob)) {
                     continue;
                 }
-                if (!isResident(mob)) {
-                    rewrite(level, mob);
+                for (int i = 0; i < standing.size(); i++) {
+                    if (HexShape.contains(standing.get(i).center, walls.get(i), mob.position())) {
+                        if (!isResident(mob)) {
+                            rewrite(level, mob);
+                        }
+                        inside.add(mob.getId());
+                        break;
+                    }
                 }
-                inside.add(mob.getId());
             }
         }
         // whoever was here last time and isn't now has crossed the wall, or the wall has crossed them
@@ -159,6 +174,34 @@ public final class Residents {
             Vec3 at = mob.position();
             level.playSound(null, at.x, at.y, at.z, SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.HOSTILE, 1.0F, 0.5F);
         }
+    }
+
+    /**
+     * What a townsperson sounds like, in place of the monster underneath: no groans, hisses, rattles or clicks, just
+     * footsteps like anyone's on whatever they walk on, and a person's cry when they're hurt or killed. Splashes,
+     * swimming and falls sound as they would for a player. Hit one and its own voice comes back with its true self.
+     *
+     * @return whether the sound was taken over, so isn't to be played as it was
+     */
+    public static boolean voice(Entity entity, SoundEvent sound, float volume, float pitch) {
+        String path = sound.location().getPath();
+        if (!path.startsWith("entity.") || path.startsWith("entity.player.") || path.startsWith("entity.generic.")) {
+            return false;
+        }
+        if (path.endsWith(".step")) {
+            BlockState below = entity.level().getBlockState(entity.blockPosition().below());
+            SoundType type = below.getSoundType();
+            entity.playSound(type.getStepSound(), type.getVolume() * 0.15F, type.getPitch());
+        } else if (path.startsWith("entity.hostile.")) {
+            // the monster versions of what a player sounds like
+            BuiltInRegistries.SOUND_EVENT.get(Identifier.withDefaultNamespace("entity.player." + path.substring("entity.hostile.".length())))
+                    .ifPresent(human -> entity.playSound(human.value(), volume, pitch));
+        } else if (path.contains(".hurt")) {
+            entity.playSound(SoundEvents.PLAYER_HURT, volume, pitch);
+        } else if (path.endsWith(".death")) {
+            entity.playSound(SoundEvents.PLAYER_DEATH, volume, pitch);
+        }
+        return true;
     }
 
     /**

@@ -10,42 +10,46 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.FlowerBedBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
- * How the town tells open land from anything that was already there. It only ever builds on natural ground (grass,
- * dirt, sand, gravel, bare stone, snow, village paths) and only clears what grows on it (grass, ferns, flowers, snow).
- * Everything else, from player builds and village houses to trees and water, is left exactly as it is.
+ * How the town reads the land it is rewritten over.
+ *
+ * <p>Under whatever stands on it, a village, a forest, someone's base, a field of wool, lies the natural ground: grass,
+ * dirt, sand, gravel, stone, snow. The town finds it by looking down through everything else, and levels itself on it.
+ * Everything above that ground is cleared away into the Hex's memory and put back exactly as it was when the Hex
+ * falls. Only what can't be broken is never touched, and lakes and the sea are left as they are.
  */
 public final class Terrain {
 
     /** Natural ground the town may build on; the {@code scarlet:hex_ground} block tag. */
     public static final TagKey<Block> GROUND = TagKey.create(Registries.BLOCK, Scarlet.id("hex_ground"));
+    /** Blocks the town must never clear, past what can't be broken anyway; the {@code scarlet:hex_untouchable} tag. */
+    public static final TagKey<Block> UNTOUCHABLE = TagKey.create(Registries.BLOCK, Scarlet.id("hex_untouchable"));
 
     public static final int NO_GROUND = Integer.MIN_VALUE;
 
     private Terrain() {
     }
 
-    /**
-     * The height of the natural ground at a column, or {@link #NO_GROUND} if something else stands on top there:
-     * a build, a tree, water.
-     */
-    public static int ground(ServerLevel level, int x, int z) {
-        int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
-        if (top < level.getMinY()) {
-            return NO_GROUND;
-        }
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(x, top, z);
-        BlockState state = level.getBlockState(pos);
-        if (!isGround(state)) {
-            return NO_GROUND;
-        }
-        return top;
-    }
-
     public static boolean isGround(BlockState state) {
         return state.is(GROUND) && state.getFluidState().isEmpty();
+    }
+
+    /**
+     * Water, lava or ice: what a pond, a river or the sea is made of.
+     */
+    public static boolean isWater(BlockState state) {
+        return !state.getFluidState().isEmpty() || state.is(BlockTags.ICE);
+    }
+
+    /**
+     * What the town may never clear: anything that can't be broken, like bedrock, portals and command blocks.
+     */
+    public static boolean isUntouchable(ServerLevel level, BlockPos pos, BlockState state) {
+        if (state.isAir() || state.canBeReplaced() && !state.is(UNTOUCHABLE)) {
+            return false;
+        }
+        return state.is(UNTOUCHABLE) || state.getDestroySpeed(level, pos) < 0.0F;
     }
 
     /**
@@ -64,23 +68,24 @@ public final class Terrain {
     }
 
     /**
-     * Whether the town may put a block where this one is.
+     * Whether the town may put a block where this one is, once the land has been cleared.
      */
     public static boolean isReplaceable(BlockState state) {
         return isClearable(state) || isGround(state);
     }
 
     /**
-     * Whether the column above a point is open to the given height: only air and what grows on the ground, no leaves
-     * or anything built.
+     * One column of land as the town reads it.
+     *
+     * @param surface     the height of its natural ground, or {@link #NO_GROUND}
+     * @param water       how deep water, lava or ice lies over that ground
+     * @param top         the height of the highest block of anything in it
+     * @param untouchable whether anything above the ground can't be cleared
      */
-    public static boolean isOpenAbove(ServerLevel level, int x, int y, int z, int height) {
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (int dy = 1; dy <= height; dy++) {
-            if (!isClearable(level.getBlockState(pos.set(x, y + dy, z)))) {
-                return false;
-            }
+    public record Column(int surface, int water, int top, boolean untouchable) {
+
+        public boolean isLand(int shallow) {
+            return surface != NO_GROUND && water <= shallow;
         }
-        return true;
     }
 }

@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.yashjit.scarlet.hex.Era;
 import com.yashjit.scarlet.hex.Hex;
@@ -18,7 +19,8 @@ import net.minecraft.server.level.ServerPlayer;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@code /scarlet hex era|build|name|episodes|dispel}: the Hex's controls as commands, for casters and server operators.
+ * {@code /scarlet hex era|build|name|episodes|dispel|forget}: the Hex's controls as commands, for casters and server
+ * operators.
  *
  * <ul>
  *     <li>{@code era <era>} moves your Hex to another era, beginning its next episode. Operators can change the Hex
@@ -27,6 +29,8 @@ import org.jspecify.annotations.Nullable;
  *     <li>{@code name <name>} names your Hex, for its title card.</li>
  *     <li>{@code episodes <on|off>} lets the era move on by itself every morning.</li>
  *     <li>{@code dispel} brings your Hex down; {@code dispel all} takes down every Hex in the dimension at once.</li>
+ *     <li>{@code forget} forgets the towns your fallen Hexes left behind in the dimension, so the next one you cast
+ *     raises a new town even over ground an old one stood on.</li>
  * </ul>
  */
 public final class ScarletCommands {
@@ -47,6 +51,10 @@ public final class ScarletCommands {
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 Arrays.stream(HexBuild.values()).map(HexBuild::getSerializedName), builder))
                                         .executes(context -> build(context.getSource(), StringArgumentType.getString(context, "what")))))
+                        .then(Commands.literal("size")
+                                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                                .then(Commands.argument("radius", FloatArgumentType.floatArg(Hexes.MIN_RADIUS, Hexes.MAX_RADIUS))
+                                        .executes(context -> size(context.getSource(), FloatArgumentType.getFloat(context, "radius")))))
                         .then(Commands.literal("name")
                                 .then(Commands.argument("name", StringArgumentType.greedyString())
                                         .executes(context -> name(context.getSource(), StringArgumentType.getString(context, "name")))))
@@ -57,7 +65,9 @@ public final class ScarletCommands {
                                 .executes(context -> dispel(context.getSource()))
                                 .then(Commands.literal("all")
                                         .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-                                        .executes(context -> dispelAll(context.getSource()))))));
+                                        .executes(context -> dispelAll(context.getSource()))))
+                        .then(Commands.literal("forget")
+                                .executes(context -> forget(context.getSource())))));
     }
 
     private static int era(CommandSourceStack source, String name) {
@@ -85,6 +95,17 @@ public final class ScarletCommands {
         }
         Services.PLAYER_DATA.set(player, Services.PLAYER_DATA.get(player).withHexBuild(build));
         source.sendSuccess(() -> Component.translatable("command.scarlet.hex.build", build.displayName()), false);
+        return 1;
+    }
+
+    private static int size(CommandSourceStack source, float radius) {
+        Hex hex = target(source);
+        if (hex == null) {
+            source.sendFailure(Component.translatable("command.scarlet.hex.no_hex"));
+            return 0;
+        }
+        Hexes.setSize(source.getLevel(), hex, radius);
+        source.sendSuccess(() -> Component.translatable("command.scarlet.hex.size", hex.name(), Math.round(radius)), true);
         return 1;
     }
 
@@ -126,6 +147,17 @@ public final class ScarletCommands {
         Hexes.release(source.getLevel(), hex);
         source.sendSuccess(() -> Component.translatable("command.scarlet.hex.dispel", hex.name()), false);
         return 1;
+    }
+
+    private static int forget(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            source.sendFailure(Component.translatable("command.scarlet.hex.no_hex"));
+            return 0;
+        }
+        int count = HexData.of(source.getLevel()).forget(player.getUUID());
+        source.sendSuccess(() -> Component.translatable("command.scarlet.hex.forget", count), false);
+        return count;
     }
 
     private static int dispelAll(CommandSourceStack source) {

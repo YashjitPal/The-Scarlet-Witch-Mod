@@ -5,12 +5,16 @@ import com.yashjit.scarlet.client.anim.CastPoses;
 import com.yashjit.scarlet.client.anim.FirstPersonGestures;
 import com.yashjit.scarlet.client.costume.CostumeRendering;
 import com.yashjit.scarlet.client.costume.FirstPersonCostume;
+import com.yashjit.scarlet.client.magic.Hands;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Avatar;
+import net.minecraft.world.entity.player.PlayerModelType;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -46,5 +50,10 @@ abstract class AvatarRendererMixin {
     private void scarlet$costumeOnFirstPersonArm(PoseStack poseStack, SubmitNodeCollector collector, int lightCoords, Identifier skinTexture,
                                                  ModelPart arm, boolean hasSleeve, CallbackInfo ci) {
         FirstPersonCostume.render((AvatarRenderer<?>) (Object) this, poseStack, collector, lightCoords, arm);
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player != null) {
+            Hands.recordFirstPerson(arm == ((AvatarRenderer<?>) (Object) this).getModel().rightArm, player.getSkin().model() == PlayerModelType.SLIM,
+                    poseStack, arm);
+        }
     }
 }

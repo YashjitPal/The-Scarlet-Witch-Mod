@@ -2,6 +2,7 @@ package com.yashjit.scarlet.client.anim;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.client.fx.ShieldFx;
+import com.yashjit.scarlet.client.fx.ShockwaveFx;
 import com.yashjit.scarlet.crown.CrownItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
@@ -17,6 +18,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *     <li>A striking arm reaches toward the crosshair.</li>
  *     <li>Holding the shield raises both palms in front of you, straining against it.</li>
+ *     <li>Gathering a Shockwave draws both hands in together; it bursts out of them flung wide.</li>
  *     <li>The empty off hand, which vanilla never shows, rises into view while you cast and sinks away when you
  *     stop.</li>
  * </ul>
@@ -35,6 +37,23 @@ public final class FirstPersonGestures {
     private static final float SHIELD_Y = 0.25F;
     private static final float SHIELD_Z = -0.24F;
     private static final float RECOIL_X = 0.3F;
+    private static final float HOLD_X = -0.6F;
+    private static final float HOLD_Y = 0.2F;
+    private static final float HOLD_Z = -0.08F;
+    private static final float TEAR_X = -0.6F;
+    private static final float TEAR_IN = -0.2F;
+    private static final float TEAR_OUT = 0.75F;
+    private static final float GATHER_X = -0.45F;
+    private static final float GATHER_Y = 0.15F;
+    private static final float GATHER_Z = -0.4F;
+    private static final float FLING_X = -0.3F;
+    private static final float FLING_Z = 0.6F;
+    private static final float BEAM_X = -0.72F;
+    private static final float BEAM_Y = 0.12F;
+    private static final float BEAM_Z = 0.06F;
+    private static final float RAISE_X = -0.85F;
+    private static final float RAISE_Y = 0.15F;
+    private static final float RAISE_Z = 0.12F;
 
     /**
      * Development only: holds both arms at full reach with this swing (x, y, z) instead of the real gesture.
@@ -51,7 +70,8 @@ public final class FirstPersonGestures {
      * Applied just before vanilla positions an empty-handed arm: a slight push forward, toward the crosshair.
      */
     public static void transform(PoseStack poseStack, HumanoidArm arm) {
-        float reach = Math.max(Math.min(extension(arm), 1.2F), shield());
+        float reach = Math.max(Math.min(extension(arm), 1.2F), Math.max(Math.max(shield(), Math.max(hold(), tear())), Math.max(gather(), fling())));
+        reach = Math.max(reach, Math.max(beam(arm), raise()));
         if (reach <= 0.0F) {
             return;
         }
@@ -82,6 +102,47 @@ public final class FirstPersonGestures {
             arm.yRot += side * SHIELD_Y * shield;
             arm.zRot += side * SHIELD_Z * shield;
         }
+        float hold = hold();
+        if (hold > 0.0F) {
+            float tremble = Mth.sin((float) now() * 2.2F) * 0.015F * side;
+            arm.xRot += (HOLD_X + tremble + (right ? -0.06F : 0.06F)) * hold;
+            arm.yRot += side * HOLD_Y * hold;
+            arm.zRot += side * HOLD_Z * hold;
+        }
+        float tear = tear();
+        if (tear > 0.0F) {
+            LocalPlayer player = Minecraft.getInstance().player;
+            float spread = player == null ? 0.0F : PoseBlends.of(player).spread;
+            float tremble = Mth.sin((float) now() * 2.4F) * 0.02F * side;
+            arm.xRot += (TEAR_X + tremble) * tear;
+            arm.zRot += side * (TEAR_IN + TEAR_OUT * spread) * tear;
+        }
+        float gather = gather();
+        if (gather > 0.0F) {
+            float tremble = Mth.sin((float) now() * 2.6F) * 0.02F * side;
+            arm.xRot += (GATHER_X + tremble) * gather;
+            arm.yRot += side * GATHER_Y * gather;
+            arm.zRot += side * GATHER_Z * gather;
+        }
+        float fling = fling();
+        if (fling > 0.0F) {
+            arm.xRot += FLING_X * fling;
+            arm.zRot += side * FLING_Z * fling;
+        }
+        float beam = beam(right ? HumanoidArm.RIGHT : HumanoidArm.LEFT);
+        if (beam > 0.0F) {
+            float tremble = Mth.sin((float) now() * 2.3F) * 0.015F * side;
+            arm.xRot += (BEAM_X + tremble) * beam;
+            arm.yRot += side * BEAM_Y * beam;
+            arm.zRot += side * BEAM_Z * beam;
+        }
+        float raise = raise();
+        if (raise > 0.0F) {
+            float tremble = Mth.sin((float) now() * 2.0F) * 0.015F * side;
+            arm.xRot += (RAISE_X + tremble) * raise;
+            arm.yRot += side * RAISE_Y * raise;
+            arm.zRot += side * RAISE_Z * raise;
+        }
         float extension = extension(right ? HumanoidArm.RIGHT : HumanoidArm.LEFT);
         if (extension == 0.0F) {
             return;
@@ -105,7 +166,8 @@ public final class FirstPersonGestures {
         if (player == null) {
             return;
         }
-        boolean wanted = debugSwing != null || shield() > 0.02F
+        boolean wanted = debugSwing != null || shield() > 0.02F || hold() > 0.02F || tear() > 0.02F || gather() > 0.02F || fling() > 0.02F
+                || raise() > 0.02F
                 || offHandEmpty && CrownItem.isWearingCrown(player) && CastGestures.sinceLastStrike(player, now()) < OFF_HAND_LINGER;
         offHandPresence = Ease.damp(offHandPresence, wanted ? 1.0F : 0.0F, wanted ? 10.0F : 4.0F, seconds);
         if (!offHandEmpty || offHandPresence < 0.01F) {
@@ -117,6 +179,49 @@ public final class FirstPersonGestures {
     private static float shield() {
         LocalPlayer player = Minecraft.getInstance().player;
         return player == null || debugSwing != null ? 0.0F : PoseBlends.of(player).shield;
+    }
+
+    private static float gather() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player == null || debugSwing != null ? 0.0F : ShockwaveFx.gather(player, now());
+    }
+
+    /**
+     * Reaching out to hold something, with Telekinesis or a mind with Mind Control.
+     */
+    private static float hold() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null || debugSwing != null) {
+            return 0.0F;
+        }
+        PoseBlends.Blend blend = PoseBlends.of(player);
+        return Math.max(blend.hold, blend.control);
+    }
+
+    private static float tear() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player == null || debugSwing != null ? 0.0F : PoseBlends.of(player).tear;
+    }
+
+    /**
+     * The main arm flung out at what its beam of magic paints.
+     */
+    private static float beam(HumanoidArm arm) {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player == null || debugSwing != null || arm != player.getMainArm() ? 0.0F : PoseBlends.of(player).beam;
+    }
+
+    /**
+     * Both arms raised to a home going up far off.
+     */
+    private static float raise() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player == null || debugSwing != null ? 0.0F : PoseBlends.of(player).raise;
+    }
+
+    private static float fling() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player == null || debugSwing != null ? 0.0F : ShockwaveFx.fling(player, now());
     }
 
     private static float extension(HumanoidArm arm) {

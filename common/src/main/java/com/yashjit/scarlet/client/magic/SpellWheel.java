@@ -36,8 +36,9 @@ public final class SpellWheel {
     private static float openness;
     private static float cursorX;
     private static float cursorY;
+    /** Slot on the wheel under the cursor, or -1. */
     private static int hovered = -1;
-    private static final float[] HOVER = new float[Spell.count()];
+    private static final float[] HOVER = new float[Spell.WHEEL.size()];
 
     private SpellWheel() {
     }
@@ -58,9 +59,9 @@ public final class SpellWheel {
         } else if (!held && open) {
             open = false;
             if (player != null && hovered >= 0) {
-                Spell spell = Spell.byIndex(hovered);
-                if (selectable(player, spell) && Magic.state(player).selected() != hovered) {
-                    Services.NETWORK.sendToServer(new SelectSpellPayload(hovered));
+                Spell spell = Spell.WHEEL.get(hovered);
+                if (selectable(player, spell) && Magic.state(player).selectedSpell() != spell) {
+                    Services.NETWORK.sendToServer(new SelectSpellPayload(spell.ordinal()));
                     player.playSound(SoundEvents.AMETHYST_BLOCK_CHIME, 0.7F, 1.35F);
                 }
             }
@@ -79,8 +80,8 @@ public final class SpellWheel {
         }
         if (length > DEAD_ZONE) {
             double angle = Math.atan2(cursorX, -cursorY);
-            double slot = angle / (Math.PI * 2 / Spell.count());
-            hovered = Math.floorMod((int) Math.round(slot), Spell.count());
+            double slot = angle / (Math.PI * 2 / Spell.WHEEL.size());
+            hovered = Math.floorMod((int) Math.round(slot), Spell.WHEEL.size());
         }
     }
 
@@ -120,14 +121,14 @@ public final class SpellWheel {
                     ARGB.color(0.4F * openness, ScarletPalette.CRIMSON));
         }
 
-        for (int i = 0; i < Spell.count(); i++) {
-            Spell spell = Spell.byIndex(i);
-            double angle = Math.PI * 2 * i / Spell.count() - Math.PI / 2;
+        for (int i = 0; i < Spell.WHEEL.size(); i++) {
+            Spell spell = Spell.WHEEL.get(i);
+            double angle = Math.PI * 2 * i / Spell.WHEEL.size() - Math.PI / 2;
             float x = cx + (float) Math.cos(angle) * radius;
             float y = cy + (float) Math.sin(angle) * radius;
             float hover = HOVER[i];
             boolean selectable = selectable(player, spell);
-            boolean selected = state.selected() == i;
+            boolean selected = state.selectedSpell() == spell;
             float size = scale * (1.0F + 0.2F * hover);
             float glow = 0.3F * hover + (selected ? 0.22F : 0.0F);
             if (glow > 0.01F) {
@@ -142,7 +143,7 @@ public final class SpellWheel {
             }
         }
 
-        Spell focus = hovered >= 0 ? Spell.byIndex(hovered) : state.selectedSpell();
+        Spell focus = hovered >= 0 ? Spell.WHEEL.get(hovered) : state.selectedSpell();
         boolean focusSelectable = selectable(player, focus);
         Component subtitle;
         if (Mastery.rank(player) < focus.rank()) {

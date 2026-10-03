@@ -77,7 +77,7 @@ public record MagicState(int selected, float energy, long energyAt, long lastCas
     });
 
     public Spell selectedSpell() {
-        return Spell.byIndex(selected);
+        return Spell.choosable(selected);
     }
 
     public boolean channeling() {

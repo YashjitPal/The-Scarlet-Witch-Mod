@@ -20,7 +20,7 @@ import org.joml.Vector3f;
  */
 public final class MagicLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 
-    private static final float PALM_Y = 10.5F / 16.0F;
+    static final float PALM_Y = 10.5F / 16.0F;
 
     public MagicLayer(RenderLayerParent<AvatarRenderState, PlayerModel> parent, EntityModelSet models) {
         super(parent);
