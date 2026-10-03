@@ -46,9 +46,9 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *     <li>Taking hold: scarlet tendrils wind out of both of the caster's palms and grow into the creature's head, beads
  *     of light racing along them into it. A crown of light gathers around its head, two rings turning on tilted axes,
- *     and its eyes kindle red.</li>
+ *     and a creature's eyes kindle red.</li>
  *     <li>Held: the tendrils give way to a single trembling thread from the caster's brow to its head, pulsing like a
- *     heartbeat, and wisps curl up off its head. The caster's own eyes burn red, their mind elsewhere.</li>
+ *     heartbeat, and wisps curl up off its head.</li>
  *     <li>Let go: the thread snaps back in a burst of sparks. A creature set free stays loyal a while, a faint ember in
  *     its eyes fading as its loyalty runs out.</li>
  *     <li>Inside: the view dives in through a red flash, and the edges of the picture stay scarlet, curling with wisps
@@ -66,8 +66,6 @@ public final class MindControlFx {
     private static final double SNAP_TICKS = 12.0;
     private static final double DIVE_TICKS = 14.0;
     private static final double RETURN_TICKS = 10.0;
-    /** How far in front of a player's eyes their face is. */
-    static final float HEAD_OUT = 0.28F;
 
     private static final List<Snap> SNAPS = new ArrayList<>();
     private static @Nullable Hum hum;
@@ -184,9 +182,10 @@ public final class MindControlFx {
             float reach = Ease.outCubic((float) ((now - link.since) / MindControl.SEIZE_TICKS));
             float inside = link.insideAt < 0.0 ? 0.0F : Ease.clamp01((float) ((now - link.insideAt) / 10.0));
             Vec3 head = target.getEyePosition(partialTick);
-            draws.add(new Draw(head.subtract(camera).toVector3f(), size(target), faceOut(target), target.getViewYRot(partialTick),
+            // a player's eyes are wherever their skin puts them, so only a creature's can be lit
+            draws.add(new Draw(head.subtract(camera).toVector3f(), size(target), faceOut(target), !(target instanceof Player), target.getViewYRot(partialTick),
                     Hands.palm(caster, HumanoidArm.RIGHT).subtract(camera).toVector3f(), Hands.palm(caster, HumanoidArm.LEFT).subtract(camera).toVector3f(),
-                    caster.getEyePosition(partialTick).subtract(camera).toVector3f(), caster.getViewYRot(partialTick), reach, inside,
+                    caster.getEyePosition(partialTick).subtract(camera).toVector3f(), reach, inside,
                     target == viewer, ScarletFx.isFirstPersonViewOf(caster), entry.getIntKey() * 0.618F, time, CorruptionClient.darkness(caster)));
         }
         List<Ember> embers = new ArrayList<>();
@@ -252,13 +251,11 @@ public final class MindControlFx {
                 if (thread != null) {
                     drawThread(buffer, pose, axes, thread, draw);
                 }
-                if (draw.inside() > 0.01F && !draw.ownFirstPerson()) {
-                    // the caster's own eyes burn red, their mind elsewhere
-                    eyes(buffer, pose, axes, draw.brow(), 1.0F, HEAD_OUT, draw.casterYaw(), draw.inside(), draw.time());
-                }
                 if (!draw.viewedFromInside()) {
                     crown(buffer, pose, axes, draw.head(), draw.size(), draw.reach(), draw.seed(), draw.time());
-                    eyes(buffer, pose, axes, draw.head(), draw.size(), draw.out(), draw.yaw(), draw.reach(), draw.time() + draw.seed());
+                    if (draw.lightEyes()) {
+                        eyes(buffer, pose, axes, draw.head(), draw.size(), draw.out(), draw.yaw(), draw.reach(), draw.time() + draw.seed());
+                    }
                 }
             }
             Glow.darken(before);
@@ -689,7 +686,7 @@ public final class MindControlFx {
      * @param viewedFromInside the view is looking out through the held head itself
      * @param ownFirstPerson   the view is the caster's own eyes
      */
-    private record Draw(Vector3f head, float size, float out, float yaw, Vector3f rightPalm, Vector3f leftPalm, Vector3f brow, float casterYaw, float reach,
+    private record Draw(Vector3f head, float size, float out, boolean lightEyes, float yaw, Vector3f rightPalm, Vector3f leftPalm, Vector3f brow, float reach,
                         float inside, boolean viewedFromInside, boolean ownFirstPerson, float seed, float time, float darkness) {
     }
 

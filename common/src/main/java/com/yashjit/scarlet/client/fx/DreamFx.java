@@ -40,7 +40,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *     <li>Sitting down to it: wisps gather and begin to turn about the body as it settles cross-legged and rises.</li>
  *     <li>The body left behind: hovering cross-legged in a slow swirl of scarlet wisps rising and turning about it, a
- *     faint ring of light on the ground beneath, sparks drifting up off it and its eyes burning red.</li>
+ *     faint ring of light on the ground beneath, and sparks drifting up off it and off its hands.</li>
  *     <li>The spirit leaving: light streaking up out of the head, and a ring bursting out from the chest.</li>
  *     <li>The spirit coming back: light drawn in from all around into the head, and a flash.</li>
  *     <li>The creature it is in: its eyes burn red and embers rise off its head; when the spirit leaves, a burst.</li>
@@ -206,9 +206,7 @@ public final class DreamFx {
             }
             boolean ownEyes = entity == viewer && minecraft.options.getCameraType().isFirstPerson();
             Vec3 feet = entity.getPosition(partialTick);
-            float yaw = entity instanceof LivingEntity living ? Mth.rotLerp(partialTick, living.yBodyRotO, living.yBodyRot) : entity.getYRot();
-            sitters.add(new Sitter(feet.subtract(camera).toVector3f(), Meditation.eyes(entity, now), yaw, sit, Meditation.lift(entity, now), ownEyes,
-                    entity.getId() * 0.618F, darkness(entity)));
+            sitters.add(new Sitter(feet.subtract(camera).toVector3f(), sit, Meditation.lift(entity, now), ownEyes, entity.getId() * 0.618F, darkness(entity)));
         }
         List<Gaze> gazes = new ArrayList<>();
         for (Int2FloatMap.Entry entry : DreamwalkClient.possessed().int2FloatEntrySet()) {
@@ -278,8 +276,6 @@ public final class DreamFx {
                 if (!sitter.ownEyes()) {
                     Glow.disc(buffer, pose, axes, feet.x, feet.y + CHEST * 0.8F + sitter.lift() * 0.3F, feet.z, 0.75F,
                             Glow.withAlpha(ScarletPalette.SCARLET, 0.07F * sitter.sit()));
-                    Vector3f head = new Vector3f(feet).add(0.0F, sitter.eyes(), 0.0F);
-                    MindControlFx.eyes(buffer, pose, axes, head, 1.0F, MindControlFx.HEAD_OUT, sitter.yaw(), sitter.sit(), time + sitter.seed());
                 }
             }
             for (Gaze gaze : gazes) {
@@ -400,10 +396,9 @@ public final class DreamFx {
     /**
      * Someone sat dreamwalking, or rising to, as laid out this frame relative to the camera.
      *
-     * @param eyes    how high their eyes are above their feet in the pose
      * @param ownEyes the view is their own, in the first person
      */
-    private record Sitter(Vector3f feet, float eyes, float yaw, float sit, float lift, boolean ownEyes, float seed, float darkness) {
+    private record Sitter(Vector3f feet, float sit, float lift, boolean ownEyes, float seed, float darkness) {
     }
 
     private record Wisp(Vector3f[] points, float[] widths, float[] alphas) {

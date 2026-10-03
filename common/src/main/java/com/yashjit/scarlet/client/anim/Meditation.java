@@ -21,8 +21,6 @@ public final class Meditation {
     public static final float SIT_DROP = 0.586F;
     /** How far it then rises above the ground. */
     public static final float HOVER = 0.3F;
-    /** Standing eye height, from which the pose lowers the eyes. */
-    private static final float STANDING_EYES = 1.62F;
     private static final float STAND_TICKS = 10.0F;
     private static final float BOB = 0.05F;
 
@@ -51,13 +49,6 @@ public final class Meditation {
         float sit = Ease.inOutCubic(Ease.clamp01(rise / 0.45F));
         float lift = Ease.inOutCubic(Ease.clamp01((rise - 0.4F) / 0.6F));
         return -SIT_DROP * sit + (HOVER + Mth.sin((float) now * 0.06F + entity.getId()) * BOB) * lift;
-    }
-
-    /**
-     * Where the eyes are above the feet in the pose.
-     */
-    public static float eyes(Entity entity, double now) {
-        return STANDING_EYES + offset(entity, now);
     }
 
     /**

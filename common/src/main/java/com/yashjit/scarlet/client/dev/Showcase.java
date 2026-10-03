@@ -36,6 +36,9 @@ import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.BackupConfirmScreen;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.core.Registry;
@@ -75,6 +78,8 @@ public final class Showcase {
     private static final String WORLD = "scarlet-showcase";
     private static final @Nullable String SCENE = System.getProperty("scarlet.showcase");
     private static final boolean QUIT = Boolean.getBoolean("scarlet.showcase.quit");
+    /** A server to play the scene on instead of the test world, given by {@code -PshowcaseServer=<address>}. */
+    private static final @Nullable String SERVER = System.getProperty("scarlet.showcase.server");
     private static final int SETTLE_TICKS = 60;
 
     private static State state = State.WAITING_FOR_MENU;
@@ -209,6 +214,11 @@ public final class Showcase {
     }
 
     private static void openWorld(Minecraft minecraft) {
+        if (SERVER != null && !SERVER.isBlank()) {
+            ConnectScreen.startConnecting(new TitleScreen(), minecraft, ServerAddress.parseString(SERVER), new ServerData("Showcase", SERVER, ServerData.Type.OTHER),
+                    false, null);
+            return;
+        }
         if (minecraft.getLevelSource().levelExists(WORLD)) {
             minecraft.createWorldOpenFlows().openWorld(WORLD, () -> minecraft.gui.setScreen(new TitleScreen()));
             return;
@@ -927,6 +937,34 @@ public final class Showcase {
                     .key(InputConstants.KEY_DOWN).key(InputConstants.KEY_DOWN).key(InputConstants.KEY_DOWN).key(InputConstants.KEY_DOWN)
                     .shot("settings_hex", 6)
                     .then(minecraft -> minecraft.gui.setScreen(null), 4);
+            // on a dedicated server (-PshowcaseServer): suited up, a bolt cast, then dreamwalking into a pig nearby,
+            // looking back at the body left behind and seeing it close, and a blow to it snapping the spirit back
+            case "online" -> s
+                    .command("gamemode creative")
+                    .command("difficulty peaceful")
+                    .command("time set noon")
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("item replace entity @s armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @s weapon.mainhand with minecraft:air")
+                    .command("item replace entity @s hotbar.8 with scarlet:darkhold")
+                    .command("execute at @s run spawnpoint @s ~ ~ ~14")
+                    .command("execute at @s run summon minecraft:pig ~ ~ ~14 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    .land().ensureUnsuited().face(0, 0).playerCamera().hideHud(false)
+                    .suitUp().shot("online_suited", 40)
+                    .select(Spell.CHAOS_BOLT).tap().shot("online_bolt", 1)
+                    .select(Spell.DREAMWALK).then(minecraft -> {
+                    }, 30)
+                    .then(minecraft -> Services.NETWORK.sendToServer(DreamPayload.go(Level.OVERWORLD)), 80)
+                    .dreamCamera().shot("online_inside", 10)
+                    .subjectBody().aimHeldAtSubject().shot("online_looking_back", 6)
+                    .look(2.6, 25, 6, 0.8).hideHud(true).shot("online_body", 6)
+                    .dreamCamera().hideHud(false)
+                    .command("damage @e[type=scarlet:dream_body,limit=1] 1")
+                    .shot("online_woke", 10)
+                    .suitUp().then(minecraft -> {
+                    }, 40)
+                    .command("item replace entity @s hotbar.8 with minecraft:air")
+                    .select(Spell.CHAOS_BOLT);
             // leaving the game with the spirit away: quitting, or the game crashing straight after a save
             case "dreamquit", "dreamcrash" -> s
                     .land()
@@ -1726,11 +1764,17 @@ public final class Showcase {
             return this;
         }
 
+        /**
+         * Runs a command on the test world as the server, or on a server played on, as the player (who must be an
+         * operator there).
+         */
         Scene command(String command) {
             return then(minecraft -> {
                 IntegratedServer server = minecraft.getSingleplayerServer();
                 if (server != null) {
                     server.execute(() -> server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command));
+                } else if (minecraft.player != null) {
+                    minecraft.player.connection.sendCommand(command);
                 }
             }, 2);
         }

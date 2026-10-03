@@ -23,6 +23,9 @@ loom {
             if (project.hasProperty('showcase')) {
                 vmArg("-Dscarlet.showcase=${project.property('showcase')}")
                 vmArg("-Dscarlet.showcase.quit=${project.hasProperty('showcaseQuit')}")
+                if (project.hasProperty('showcaseServer')) {
+                    vmArg("-Dscarlet.showcase.server=${project.property('showcaseServer')}")
+                }
                 programArgs('--width', '1280', '--height', '720', '--username', 'Showcase')
             }
         }

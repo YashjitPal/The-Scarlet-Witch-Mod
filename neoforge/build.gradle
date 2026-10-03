@@ -22,6 +22,9 @@ neoForge {
             if (project.hasProperty('showcase')) {
                 systemProperty('scarlet.showcase', project.property('showcase').toString())
                 systemProperty('scarlet.showcase.quit', project.hasProperty('showcaseQuit').toString())
+                if (project.hasProperty('showcaseServer')) {
+                    systemProperty('scarlet.showcase.server', project.property('showcaseServer').toString())
+                }
                 programArguments.addAll('--width', '1280', '--height', '720', '--username', 'Showcase')
             }
         }

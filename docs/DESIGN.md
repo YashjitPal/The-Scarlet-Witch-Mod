@@ -192,8 +192,7 @@ They burn steadily while the shield is held and smolder while levitating.
 ### Dreamwalking
 
 - **Casting it** (mastery VI, sat on solid ground, 30 energy to begin): every dimension opens up to choose from, each a window into the dark showing what it is made of and where in it your spirit would arrive. That is where you last stood there, else where you would wake from death, else by the world's spawn, else where a portal from the spawn would come out (or the End's landing). Click one or press its number.
-- Your **body sits down cross-legged** and rises a little off the ground over two seconds, hands held open over the knees and eyes burning red, as wisps gather and turn about it and the dark closes in on your view (WandaVision finale / Doctor Strange). A blow while it settles breaks the meditation.
-- Your **spirit goes into the creature nearest where it arrives**, even in the **Nether or End** (Minecraft's dimensions stand in for the multiverse), as long as it is not already held or carried, nor a boss. The view opens out of the dark into its eyes and you steer it as with Mind Control: walk, sprint, jump, fly if it flies, and strike the way it does. Its eyes burn scarlet for everyone who sees it, and embers rise off its head. Its name and health show at the top of your view, which is edged in black-crimson. Should no creature be there, you get up again.
+- Your **body sits down cross-legged** and rises a little off the ground over two seconds, hands held open over the knees and wreathed in magic, as wisps gather and turn about it and the dark closes in on your view (WandaVision finale / Doctor Strange). A blow while it settles breaks the meditation.- Your **spirit goes into the creature nearest where it arrives**, even in the **Nether or End** (Minecraft's dimensions stand in for the multiverse), as long as it is not already held or carried, nor a boss. The view opens out of the dark into its eyes and you steer it as with Mind Control: walk, sprint, jump, fly if it flies, and strike the way it does. Its eyes burn scarlet for everyone who sees it, and embers rise off its head. Its name and health show at the top of your view, which is edged in black-crimson. Should no creature be there, you get up again.
 - Your **body stays behind**, hovering cross-legged in a slow swirl of scarlet wisps over a faint ring of light, sparks drifting off it and its hands, in your skin, clothes, crown and costume. Other players can see it, and hostile creatures that catch sight of it go for it. Its ground is kept loaded and moving while you are away.
 - If your **body gets hurt, your spirit snaps back** into it instantly, in time to defend yourself.
 - **Waking:** press use. It also ends when the creature dies or goes, when your energy runs out (being away drains 1.6 a second), and when you leave the game. However it ends you come back to your body with a flash and get up, and the spell rests ten seconds.
@@ -375,6 +374,8 @@ Every power is built from layers, timed together:
 7. **Light:** glow on nearby surfaces.
 8. **Screen:** vignette pulses, a touch of chromatic aberration on big moments.
 9. **Sound:** layered, with variations so nothing repeats.
+
+Nothing is drawn over a player's eyes. A skin's eyes can be anywhere on its face, or not there at all, so there is no knowing where to put a glow. Creatures' eyes, which are always in the same place, can burn red.
 
 Glows are pure added light: they must never hide or smear what is behind them. They test depth but never write it. Without improved transparency, world glows are drawn last, after water, clouds and weather. With it, they only report their closest depth to the transparency system, never its depth range or opacity.
 
