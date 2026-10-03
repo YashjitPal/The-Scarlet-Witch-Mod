@@ -479,6 +479,42 @@ public final class Showcase {
                     .shot("hex_warning_a", 20).shot("hex_warning_b", 30)
                     .shot("hex_collapse_a", 55).shot("hex_collapse_b", 15).shot("hex_collapse_c", 15).shot("hex_gone", 30)
                     .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]");
+            // the Hex's wall: spreading, standing seen from far off, up close and edge-on, struck by a bolt, seen faintly from
+            // inside, and flaring with static as the era changes
+            case "wall" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("time set noon")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX)
+                    .look(44, 25, 14, 1.0)
+                    .tap().shot("wall_spreading", 8).shot("wall_spreading_b", 14)
+                    .shot("wall_outside", 60)
+                    .look(80, 10, 8, 12.0).shot("wall_far", 4)
+                    // out past the south wall, looking back at it from six blocks off, then from two, then along it
+                    .command("execute as @a at @s run tp @s ~ ~ ~30 180 0")
+                    .playerCamera().hideHud(true).shot("wall_close", 10)
+                    .command("execute as @a at @s run tp @s ~ ~ ~-3.5")
+                    .shot("wall_near", 8)
+                    .face(250, 0).shot("wall_grazing", 6)
+                    // a bolt through it
+                    .face(180, 0).select(Spell.CHAOS_BOLT).tap().shot("wall_struck", 2).shot("wall_struck_after", 10)
+                    // from inside, faint
+                    .command("execute as @a at @s run tp @s ~ ~ ~-8 0 0")
+                    .then(minecraft -> {
+                    }, 40).shot("wall_inside", 4)
+                    // back outside as the era changes: the whole wall flares with static
+                    .command("execute as @a at @s run tp @s ~ ~ ~12 180 0")
+                    .then(minecraft -> {
+                    }, 40)
+                    .remote(ShowrunnerPayload.ERA, 2).shot("wall_era_a", 1).shot("wall_era_b", 2)
+                    .select(Spell.HEX)
+                    .dispelHexes()
+                    .command("execute as @a at @s run tp @s ~ ~ ~-30.5 0 0");
             case "mind" -> s
                     .land()
                     .dispelHexes()

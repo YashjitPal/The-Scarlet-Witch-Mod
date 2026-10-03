@@ -219,7 +219,7 @@ The centerpiece. Inspired by Westview.
 
 ### Look
 
-- **From outside:** a shimmering, staticky wall. It is mostly clear, with a faint honeycomb whose cells light up at random, TV-static sparkles, and slow bands rolling down it. It is brighter where seen edge-on and up its corners. Through it, the town looks just as it really is, in normal colors: the era is only seen from inside. While spreading or collapsing it burns scarlet, and when the era changes the wall flares with static.
+- **From outside:** a glitching wall, made of the same glitches the Hex's blocks show as it writes them. It is mostly clear, under the faint snow of a dead channel, and all of it is laid out on a grid of eighths of a block: bars of red light tear across it, red pixels flicker over it (now and then two side by side), a patch of it now and then breaks up hard for a few frames, and white-hot scanlines with scarlet trails roll down it. Struck, it glitches harder around the blow. It is brighter where seen edge-on and up its corners. Through it, the town looks just as it really is, in normal colors: the era is only seen from inside. While spreading or collapsing it burns scarlet, and when the era changes the wall flares with static.
 - **From inside:** your **whole view is in the era**, like being inside the show.
 - Implemented as a screen shader that reconstructs each pixel's world position. Works on Vulkan and OpenGL.
 

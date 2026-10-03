@@ -44,7 +44,7 @@ import org.joml.Vector4f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Draws the Hex over the finished world: the staticky wall from outside, and the era all around you from inside. The
+ * Draws the Hex over the finished world: the glitching wall from outside, and the era all around you from inside. The
  * homes fallen Hexes leave standing slip through the eras wherever they are seen from.
  *
  * <p>The shader works out where each pixel's surface is in the world from the depth buffer, so walls are cut

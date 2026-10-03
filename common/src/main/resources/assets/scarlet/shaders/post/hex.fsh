@@ -55,8 +55,12 @@ layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 fragColor;
 
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
-// blocks across a cell of the wall's honeycomb
-const float CELL = 1.4;
+// Texels to a block of the wall: as blocky as Minecraft's own textures, like the glitches of everything the Hex makes.
+const float WALL_TEXELS = 8.0;
+// Blocks of wall each run of tearing bars is laid out along.
+const float BAR_RUN = 8.0;
+// Blocks between the scanlines rolling down the wall.
+const float SCAN_GAP = 12.0;
 // The Hex's shape, as HexShape has it: six walls standing straight up without end. Opposite walls face the same way,
 // so three directions cover all six.
 const int WALLS = 6;
@@ -235,28 +239,60 @@ vec3 eraChange(vec3 world, int before, int after, float k, vec3 local, vec2 uv, 
     return mix(prior, next, smoothstep(0.0, 1.0, k));
 }
 
-// A honeycomb of unit cells: x is the distance to the nearest border, yz the cell.
-vec3 honeycomb(vec2 p) {
-    const vec2 s = vec2(1.0, 1.7320508);
-    vec4 centers = floor(vec4(p, p - vec2(0.5, 1.0)) / s.xyxy) + 0.5;
-    vec4 offsets = vec4(p - centers.xy * s, p - (centers.zw + 0.5) * s);
-    vec4 cell = dot(offsets.xy, offsets.xy) < dot(offsets.zw, offsets.zw)
-            ? vec4(offsets.xy, centers.xy)
-            : vec4(offsets.zw, centers.zw + 0.5);
-    vec2 a = abs(cell.xy);
-    return vec3(0.5 - max(dot(a, s * 0.5), a.x), cell.zw);
+// How big a texel of the wall is where it is seen with this footprint: an eighth of a block close by, doubling as the
+// wall recedes, so a texel never shrinks below a pixel and shimmers.
+float wallTexel(float footprint) {
+    return exp2(ceil(log2(max(footprint * 1.5 * WALL_TEXELS, 1.0)))) / WALL_TEXELS;
 }
 
-// The lines of the honeycomb and how brightly its cell is lit, at one point of a wall. Lines are drawn at least as wide
-// as a pixel there, so they never shimmer apart.
-vec2 honeycombAt(vec2 p, float footprint, float time, float lit) {
-    vec3 h = honeycomb(p);
-    float width = footprint * 1.5 + 0.02;
-    float line = (1.0 - smoothstep(0.0, width, h.x)) * clamp(0.06 / width, 0.0, 1.0);
-    float seed = hash12(h.yz * 1.37);
-    float pulse = hash12(h.yz + floor(time * 2.5 + seed * 4.0) * 0.61);
-    float glow = smoothstep(1.0 - 0.12 - lit * 0.5, 1.0, pulse) * (0.55 + 0.45 * sin(time * 9.0 + seed * 6.283));
-    return vec2(line, glow * smoothstep(0.0, 0.25, h.x));
+// One band of rows, each rows texels high, where bars of red light tear across the wall: whether a bar covers this
+// point, and how hot it burns, 0 scarlet to 1 white. They come and go frame by frame, more of them the higher chance.
+vec2 tearingBar(vec2 p, vec2 texel, float cell, float rows, float frame, float chance, float salt) {
+    float row = floor(texel.y / rows);
+    float run = floor(p.x / BAR_RUN);
+    vec2 key = vec2(row * 1.31 + salt, run * 2.07 - salt) + frame * vec2(3.71, 1.93);
+    if (hash12(key) < 1.0 - chance) {
+        return vec2(0.0);
+    }
+    float start = (run + hash12(key + 11.0) * 0.5) * BAR_RUN;
+    float end = start + (0.1 + hash12(key + 23.0) * 0.4) * BAR_RUN;
+    float x = (texel.x + 0.5) * cell;
+    float pick = hash12(key + 37.0);
+    return vec2(step(start, x) * step(x, end), pick > 0.8 ? 1.0 : pick > 0.4 ? 0.5 : 0.0);
+}
+
+// How the wall glitches at a point, all of it on its texel grid, the way everything the Hex makes glitches. x: the snow
+// of a dead channel, faint and everywhere; y: red glitch light, bars tearing across the wall and pixels flickering over
+// it; z: how hot that light burns, 0 scarlet to 1 white; w: scanlines rolling down it, each with a fading trail. Now and
+// then a patch of it breaks up hard for a few frames, its snow thick and jumping sideways: burst is 1 there. All of it
+// comes thicker the more the wall is lit.
+vec4 glitchAt(vec2 p, float footprint, float time, float lit, float seed, out float burst) {
+    float cell = wallTexel(footprint);
+    vec2 texel = floor(p / cell);
+    float frame = mod(floor(time * 15.0), 997.0);
+    float slow = mod(floor(time * 15.0 / 4.0), 997.0);
+    // the patches, three blocks by two, laid out unevenly row by row
+    float band = floor(p.y / 2.0);
+    vec2 tile = vec2(floor(p.x / 3.0 + hash12(vec2(band, seed)) * 3.0), band);
+    burst = step(0.988 - 0.04 * lit, hash12(tile + slow * vec2(7.3, 2.9) + seed));
+    vec2 jumped = texel + burst * vec2(floor(hash12(tile + frame * 1.7) * 7.0) - 3.0, 0.0);
+    float snow = hash12(jumped + mod(floor(time * 24.0), 997.0) * vec2(13.1, 7.7) + seed);
+    // red pixels flickering, now and then two side by side, a torn bit of a line
+    float chance = 0.004 + 0.03 * lit + 0.03 * burst;
+    float lone = step(1.0 - chance, hash12(texel + frame * vec2(5.3, 11.9) + seed + 71.0));
+    float pair = step(1.0 - chance * 0.5, hash12(vec2(floor(texel.x / 2.0), texel.y) + frame * vec2(9.1, 3.3) + seed + 131.0));
+    float pixel = max(lone, pair);
+    float pixelHeat = hash12(texel + frame * 2.3 + seed) > 0.7 ? 1.0 : 0.5;
+    // bars tearing across it, a texel thick, two, or three
+    vec2 bar = tearingBar(p, texel, cell, 1.0, frame, 0.010 + 0.05 * lit, seed);
+    vec2 thick = tearingBar(p, texel, cell, 2.0, frame, 0.006 + 0.04 * lit, seed + 17.0);
+    vec2 thicker = tearingBar(p, texel, cell, 3.0, frame, 0.003 + 0.03 * lit, seed + 31.0);
+    float red = max(max(bar.x, thick.x), max(thicker.x, pixel));
+    float heat = max(max(bar.x * bar.y, thick.x * thick.y), max(thicker.x * thicker.y, pixel * pixelHeat));
+    // a scanline every so far, rolling down, a texel thick with its trail fading above it
+    float above = mod((texel.y + 0.5) * cell + time * 2.4 + seed * 5.0, SCAN_GAP);
+    float scan = above < cell ? 1.0 : 0.3 * max(0.0, 1.0 - above / 3.0);
+    return vec4(snow, red, heat, scan);
 }
 
 // How a point of a wall is stirred by the blows it has taken: x the red rings racing out from each, y the white-hot
@@ -336,10 +372,11 @@ vec3 openingAt(vec3 hit, int face, vec3 center, float radius, vec4 tear, float t
     return vec3(0.0, level, bunched);
 }
 
-// The wall: mostly clear, a faint honeycomb with cells lighting up, TV static sparkling over it, bright where it is
-// seen edge-on and up the corners where one wall meets the next, with slow bands rolling down it. Where it has been
-// struck it flares red, and rings of red run out across it. Where its caster parts it, it stands open between two
-// burning edges.
+// The wall: mostly clear, but glitching the way everything the Hex makes glitches, on a grid of eighths of a block: the
+// faint snow of a dead channel all over it, bars of red light tearing across it, red pixels flickering over it, a patch
+// of it now and then breaking up hard, and scanlines rolling down it. It is bright where it is seen edge-on and up the
+// corners where one wall meets the next. Where it has been struck it flares red, rings of red run out across it, and it
+// glitches harder there. Where its caster parts it, it stands open between two burning edges.
 vec4 wallLayer(vec3 hit, float travel, vec3 center, float radius, int face, vec3 dir, float pixelAngle, float time, vec4 style,
                float strength, vec4 tear) {
     vec3 local = hit - center;
@@ -360,28 +397,28 @@ vec4 wallLayer(vec3 hit, float travel, vec3 center, float radius, int face, vec3
 
     vec3 stir = rippleAt(hit);
     vec2 surface = vec2(dot(local.xz, vec2(-f.y, f.x)), local.y);
-    vec2 comb = honeycombAt(surface / CELL + float(face) * 7.31, footprint / CELL, time, flare + stir.x + stir.y);
+    float burst;
+    vec4 glitch = glitchAt(surface, footprint, time, flare + stir.x + stir.y, float(face) * 7.31, burst);
+    // with flashing turned down, the red glitches show less
+    float red = glitch.y * mix(0.45, 1.0, clamp((Crossing.z - 0.45) / 0.55, 0.0, 1.0));
 
-    // the static clings to the wall, in specks a set size on it, coarser far off so they never shrink below a pixel
-    float speck = exp2(ceil(log2(max(footprint * 1.5, 0.125))));
-    float frame = mod(floor(time * 30.0), 997.0);
-    float grain = hash12(floor(surface / speck) + frame * vec2(13.1, 7.7));
-    float sparkle = smoothstep(0.975, 1.0, hash12(floor(surface / (speck * 2.0)) + frame * vec2(5.3, 11.9) + 71.0));
-    float bands = smoothstep(0.55, 1.0, 0.5 + 0.5 * sin(local.y * 0.9 - time * 2.4));
-
-    float alpha = 0.04 + 0.35 * rim + 0.12 * comb.x + 0.22 * comb.y + 0.05 * bands + 0.45 * sparkle * (0.35 + rim) + 0.4 * ridge;
-    alpha *= 0.85 + 0.3 * grain;
-    vec3 color = mix(vec3(0.94, 0.93, 0.98), vec3(1.0, 0.62, 0.7), clamp(rim * 0.4 + comb.y * 0.6, 0.0, 1.0));
+    float alpha = 0.03 + 0.35 * rim + (0.05 + 0.12 * burst) * glitch.x + 0.5 * red + 0.25 * glitch.w + 0.4 * ridge;
+    vec3 color = mix(vec3(0.94, 0.93, 0.98), vec3(1.0, 0.62, 0.7), clamp(rim * 0.4, 0.0, 1.0));
+    color *= 0.82 + 0.3 * glitch.x;
     color = mix(color, vec3(1.0, 0.9, 0.93), ridge * 0.6);
-    color += (grain - 0.5) * 0.12;
+    // the scanlines white-hot, their trails scarlet
+    vec3 scan = glitch.w > 0.99 ? vec3(1.0, 0.9, 0.925) : vec3(1.0, 0.45, 0.55);
+    color = mix(color, scan, min(1.0, glitch.w * 1.5));
+    vec3 hot = glitch.z > 0.75 ? vec3(1.0, 0.9, 0.925) : glitch.z > 0.25 ? vec3(1.0, 0.2, 0.333) : vec3(0.878, 0.078, 0.235);
+    color = mix(color, hot, red);
 
     // spreading out or rushing back in, it burns scarlet, as brightly seen from inside as out
-    float vivid = flare * (0.16 + 0.4 * rim + 0.35 * comb.x + 0.3 * ridge);
-    color = mix(color, mix(vec3(1.0, 0.36, 0.45), vec3(1.0, 0.85, 0.88), max(comb.x, ridge)), flare * 0.7);
+    float vivid = flare * (0.16 + 0.4 * rim + 0.4 * red + 0.3 * ridge);
+    color = mix(color, mix(vec3(1.0, 0.36, 0.45), vec3(1.0, 0.85, 0.88), max(red * 0.8, ridge)), flare * 0.7);
 
     // struck: it reddens where it was hit and in the rings running out from there, white-hot right at the blow, and
-    // the red lingers in the honeycomb around it. However hard it is hit, what stands inside still shows through.
-    vivid += min(0.6, 0.8 * stir.x + 0.35 * stir.z + 0.6 * stir.z * comb.x + 0.4 * stir.x * comb.x) + 1.0 * stir.y;
+    // the red lingers in the glitches around it. However hard it is hit, what stands inside still shows through.
+    vivid += min(0.6, 0.8 * stir.x + 0.35 * stir.z + 0.6 * stir.z * red + 0.4 * stir.x * red) + 1.0 * stir.y;
     color = mix(color, vec3(1.0, 0.08, 0.16), clamp(stir.x + stir.y + 0.9 * stir.z, 0.0, 1.0));
     color = mix(color, vec3(1.0, 0.88, 0.9), clamp(0.7 * stir.y * stir.y, 0.0, 0.7));
 
@@ -393,7 +430,7 @@ vec4 wallLayer(vec3 hit, float travel, vec3 center, float radius, int face, vec3
 
     // changing era, the whole wall flares with static
     float channel = style.w;
-    color = mix(color, vec3(grain), channel * 0.8);
+    color = mix(color, vec3(glitch.x), channel * 0.8);
     alpha = mix(alpha, 0.75, channel * 0.8);
 
     // parted: nothing where it stands open, the bunched wall reddening toward the edges, and the edges themselves
