@@ -4,6 +4,7 @@ import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.darkhold.Darkhold;
 import com.yashjit.scarlet.darkhold.Dreamwalk;
 import com.yashjit.scarlet.hex.HexEjection;
+import com.yashjit.scarlet.hex.HexMending;
 import com.yashjit.scarlet.hex.HexRipples;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.Residents;
@@ -69,6 +70,7 @@ public final class ScarletEvents {
     public static void onServerTick(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
             Hexes.tick(level);
+            HexMending.tick(level);
             HexEjection.tick(level);
             RuneTraps.tick(level);
         }

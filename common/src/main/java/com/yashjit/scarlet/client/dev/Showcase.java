@@ -1289,6 +1289,34 @@ public final class Showcase {
                     .shot("finale_going_d", 60).shot("finale_going_e", 60).shot("finale_going_f", 50)
                     .shot("finale_gone", 60)
                     .playerCamera();
+            // a blast inside the Hex mending itself: TNT goes off by a little stone hut with a chest in it, and the crater
+            // closes back in from its edge over ten seconds, nothing dropped and the chest still full
+            case "mend" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("time set noon")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-16 ~ ~-16 ~16 ~10 ~16 minecraft:air")
+                    .command("execute at @a run fill ~-3 ~ ~7 ~3 ~3 ~12 minecraft:stone_bricks hollow")
+                    .command("execute at @a run fill ~ ~ ~7 ~ ~1 ~7 minecraft:air")
+                    .command("execute at @a run setblock ~1 ~ ~10 minecraft:chest[facing=north]{Items:[{Slot:0b,id:\"minecraft:diamond\",count:5}]}")
+                    .command("execute at @a run setblock ~-2 ~1 ~6 minecraft:wall_torch[facing=north]")
+                    .command("execute at @a run setblock ~2 ~ ~6 minecraft:poppy")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().anchor()
+                    .tap().then(minecraft -> {
+                    }, 140)
+                    .view(-9, 5, 2, 0, 1, 9)
+                    .shot("mend_before", 4)
+                    .command("execute at @a run summon minecraft:tnt ~2.5 ~ ~5.5 {fuse:30}")
+                    .shot("mend_lit", 20).shot("mend_blast", 14)
+                    .shot("mend_a", 30).shot("mend_b", 40).shot("mend_c", 40).shot("mend_d", 40).shot("mend_e", 40).shot("mend_done", 40)
+                    .command("execute at @a run data get block ~1 ~ ~10 Items")
+                    .playerCamera().hideHud(false)
+                    .shot("mend_chest", 10);
             // the home a fallen Hex leaves, seen whole from across the street: it steps back through the eras one at a
             // time, each sweeping round it and up it, then goes a block at a time
             case "fallen" -> {

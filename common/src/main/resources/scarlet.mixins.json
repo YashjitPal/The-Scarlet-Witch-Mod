@@ -10,6 +10,7 @@
     "MobMixin",
     "PistonBaseBlockMixin",
     "PlayerListMixin",
+    "ServerExplosionMixin",
     "ServerGamePacketListenerImplMixin",
     "ServerLevelMixin",
     "ServerPlayerGameModeInvoker",
