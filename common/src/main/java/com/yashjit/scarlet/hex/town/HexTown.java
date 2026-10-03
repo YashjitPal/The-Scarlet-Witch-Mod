@@ -534,44 +534,6 @@ public final class HexTown {
         RAISED, ALREADY, BUSY, NO_ROOM
     }
 
-    /**
-     * Swings the caster's front door open, for them to step out onto the porch.
-     */
-    public void openHomeDoor(ServerLevel level, BlockPos center) {
-        Part home = home(center);
-        if (home == null) {
-            return;
-        }
-        // the door nearest the street, of all the home's doors
-        Frame frame = new Frame(home.origin(), home.front());
-        BlockPos street = frame.at(TownPlan.LOT_WIDTH / 2, 0, center.getY());
-        BlockPos lower = null;
-        double best = Double.MAX_VALUE;
-        for (Long2ObjectMap.Entry<Built> entry : built.long2ObjectEntrySet()) {
-            if (entry.getValue().part() != home.id() || entry.getValue().role() != Role.DOOR) {
-                continue;
-            }
-            BlockPos pos = BlockPos.of(entry.getLongKey());
-            BlockState state = level.getBlockState(pos);
-            double distance = pos.distSqr(street);
-            if (state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock && state.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.LOWER
-                    && distance < best) {
-                best = distance;
-                lower = pos;
-            }
-        }
-        BlockState door = lower == null ? null : level.getBlockState(lower);
-        if (door == null || door.getValue(BlockStateProperties.OPEN)) {
-            return;
-        }
-        level.setBlock(lower, door.setValue(BlockStateProperties.OPEN, true), Block.UPDATE_CLIENTS);
-        BlockState upper = level.getBlockState(lower.above());
-        if (upper.getBlock() == door.getBlock()) {
-            level.setBlock(lower.above(), upper.setValue(BlockStateProperties.OPEN, true), Block.UPDATE_CLIENTS);
-        }
-        level.playSound(null, lower, net.minecraft.sounds.SoundEvents.WOODEN_DOOR_OPEN, net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 0.9F);
-    }
-
     public boolean isHomeFinished(BlockPos center) {
         Part home = home(center);
         return home == null || finished.contains(home.id()) || !started.containsKey(home.id()) && !builds.containsKey(home.id());

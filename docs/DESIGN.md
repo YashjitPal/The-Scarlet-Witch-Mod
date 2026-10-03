@@ -214,7 +214,7 @@ The centerpiece. Inspired by Westview.
 - The caster can **grow or shrink** it anytime.
 - It **collapses if the caster stops wearing the crown** (death, stolen, or taken off). A few seconds of flickering warning first, so an accident isn't a disaster.
 - When it collapses, **the wall closes in, slowly at first and gathering speed, and everything it passes over changes back**, like the finale. The bigger the hex, the longer the fall: about 7 seconds for a freshly cast hex, up to 16 for the largest.
-- **The caster's home goes last, and not with the wall.** When the falling wall reaches it, the house holds on alone, even after the hex is gone. For about 10 seconds it glitches through the eras, wilder and wilder: all of it jumps into another era for a moment, or each part into its own (one era's walls under another's roof), patches of it drain to black and white, bits of it blink out, and red static crawls over it. The caster's clothes slip through the era outfits with it. Then it goes part by part, the way it went up but backward: the rooms empty, the yard and porch go, then the roof, the walls, the timber frame and the floor. Each block glitches out red as it goes, and last of all the land comes back as it was. It takes about as long as it took to build, some 15 seconds. Casting a new hex over it, or by it, puts it all back at once.
+- **The caster's home goes last, and not with the wall.** When the falling wall reaches it, the house holds on alone, even after the hex is gone. For about 10 seconds it steps back through the eras one at a time, the newest first, down to black and white, like the show rewinding to its first episode: each era sweeps round the house and spirals up it, a line of scarlet running ahead of it, the blocks turning to that era's as it reaches them and the picture of the house turning texel by texel with them, then holds a moment before the next, with the sound of a set changing channels as each begins. Red static crawls over it all the while. The caster's clothes turn with it, each era's as its sweep comes halfway round. Then it goes part by part, still in black and white, the way it went up but backward: the rooms empty, the yard and porch go, then the roof, the walls, the timber frame and the floor. Each block glitches out red as it goes, and last of all the land comes back as it was. It takes about as long as it took to build, some 15 seconds. Casting a new hex over it, or by it, puts it all back at once.
 - One hex per caster; while it stands it reserves part of the caster's energy bar.
 - **Shape: a hexagon**, like the Westview anomaly on S.W.O.R.D.'s map. Seen from above it is a regular hexagon, with flat walls facing north and south and corners pointing east and west. The six walls stand straight up without end, and nothing closes over the top. Seen from the ground, they rise high over the town (taller for a bigger hex) and fade away into the sky. The corners, where one wall meets the next, glow. The radius is measured to the middle of a wall, so the corners stand about 15% further out. The hex is everything within its walls, as high and as deep as the world goes, so a hex cast on a hill still comes down to the valley.
 
@@ -235,6 +235,8 @@ The centerpiece. Inspired by Westview.
 | 2000s | Flat, sitcom-camera look |
 | Present day | Normal colors, still inside the barrier |
 
+- **Changing era** spreads out from the middle of the hex to its wall over a few seconds, a thin line of scarlet glittering along its front. Into black and white or out of it, the color goes or comes the way Minecraft would paint it: texel by texel over every block's own 16 by 16 texture, each texel turning at its own moment in a crisp ordered dither and glinting warm white as it does. A pale wash comes first, as if tinted by hand, then the colors for real, the most vivid first and reds ahead of the rest, the dull walls and roads last, each block in its own time; going back to black and white, the reds linger longest. The sky turns last, over the last stretch before the wall. Between two eras in color the picture turns over the same way.
+
 ### Extras (all enabled)
 
 - **Old-TV framing** for older eras: 4:3 bars, rounded screen corners.
@@ -251,7 +253,7 @@ The centerpiece. Inspired by Westview.
 
 ### Reality warping
 
-- **Anyone can enter.** The caster can **kick** someone out: they get flung out through the wall, Monica-style, with a spectacular animation (the wall bulges and ripples, sparks, a boom). They can walk back in.
+- **Anyone can enter.** Walking through the wall, person or creature, flares it red where they pass, the red soaking out through it around them as rings run out across it, as a chaos blast striking it does, a little gentler. The caster can **kick** someone out: they get flung out through the wall, Monica-style, with a spectacular animation (the wall bulges and ripples, sparks, a boom). They can walk back in.
 - **Residents:** every hostile mob inside (zombies, skeletons, creepers, spiders and so on) is rewritten into a townsperson in era clothes. Animals stay animals. Bosses resist the hex.
   - They are the same mobs underneath, so nothing is ever lost or duplicated.
   - They follow **sitcom routines**: wander, chat, sit on couches, watch the era TV, wave at players.
@@ -265,7 +267,7 @@ The centerpiece. Inspired by Westview.
   - A resident that leaves the hex turns back at the wall. When the hex collapses, each one turns back as the inward-moving wall passes it.
 - **Rewrites:** things that cross in get rewritten to fit (arrows into flowers, etc.).
 - **Sky:** the caster controls time of day and weather inside.
-- **Restyle blocks:** hold a block in your off hand and sweep your aim to paint blocks into it. Your other arm flings out at what you paint and a straight, crackling beam of scarlet magic flies from the palm. Everything changes back when the hex falls. **Breaking a restyled block gives the original block**, so the hex can't be used to farm materials.
+- **Restyle blocks:** hold a block in your off hand and sweep your aim to paint blocks into it. Your other arm flings out at what you paint and a straight stream of scarlet magic pours from the palm, churning as it flows out, white-hot down its middle, tendrils of it twisting round it, splashing where it lands. Everything changes back when the hex falls. **Breaking a restyled block gives the original block**, so the hex can't be used to farm materials.
 - **Era outfits:** everyone inside, players and residents, wears era clothes, like Wanda and Vision each episode.
   - Assigned automatically: each person always gets the same outfit for a given era (picked from the era's wardrobe by their UUID).
   - Fitted like armor (chest, legs, shoes) over the skin. Casual, well-fitting and gender neutral.
@@ -280,9 +282,9 @@ The Hex builds Westview.
 - **Your home:** the caster can raise a sitcom house anywhere inside the Hex. A scarlet outline previews the lot where you aim, scrolling turns it, and a click confirms.
   - Started from the Showrunner remote while the Hex stands. Right-click raises it there, left-click cancels, and the outline shows crossed out where it can't stand (past the wall, on deep water, or on land too steep to level).
   - The old house dissolves, and so does whatever of the town stood on the new lot. Its old lot takes an ordinary house. The town remembers where the home stood, so casting again by it brings it back there.
-  - While it goes up, the caster raises both arms to it and a crackling beam flies from each palm, jumping from block to block as they land.
+  - While it goes up, the caster raises both arms to it and a stream of scarlet magic pours from each palm, jumping from block to block as they land.
   - It builds itself the way the house does in WandaVision: scarlet light traces the lot, the timber frame rises from the ground, then the walls, windows and roof close in, and the rooms furnish themselves.
-  - When casting, the Hex can start from your home: the house builds first, then the Hex bursts out from it and spreads.
+  - When casting, the Hex can start from your home: the house builds first, written a block at a time around the caster as they float in the middle of it, each block glitching in as it lands; then they come down onto its floor and the Hex bursts out of them where they stand and spreads.
   - **It's never the same house twice.** Each town picks its home from five two-story designs: a colonial under a portico, a farmhouse with a porch across its front, a foursquare under a hipped roof, a front-gabled house with a porch wrapping round one side, and a wide house under a hipped roof. Its paint, shutters, chimney, flowers, hedge or picket fence and shade tree vary on top of that. A town the Hex remembers raises the same home again.
   - **Cast it by something standing and the home is made of it.** The Hex looks for a house, a ruin, a shell of walls or a bare foundation within about 10 blocks of the caster. It carries them inside, through the walls if it must, and lays the town out from its front door. Nothing of it is torn down: it keeps its shape, is made over in the era's look, and is finished around what stands.
     - Fallen walls close up with windows in them, a floor goes down where there is none, and a door goes in its front if it has none.

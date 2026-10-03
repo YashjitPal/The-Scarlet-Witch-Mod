@@ -26,8 +26,8 @@ import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Restyling as everyone sees it. While a caster paints, a crackling beam of scarlet magic flies from their outstretched
- * hand to where they look and sprays sparks off the surface it lands on. Each block it paints is written in the way the
+ * Restyling as everyone sees it. While a caster paints, a beam of scarlet magic streams from their outstretched hand to
+ * where they look and sprays sparks off the surface it lands on. Each block it paints is written in the way the
  * Hex writes its town: its edges flare, a scanline runs down it and red pixels thin out over its faces. Blocks changing
  * back as the wall comes in over them snap back the same way.
  */
@@ -150,33 +150,24 @@ public final class PaintFx {
                     player.getId() * 0.618F, CorruptionClient.darkness(player)));
         }
         List<Written> written = List.copyOf(WRITTEN);
+        if (!written.isEmpty()) {
+            GlowPass.submit(collector, poseStack, (pose, buffer) -> {
+                long frame = Glitch.frame(now);
+                for (Written block : written) {
+                    BlockGlitch.draw(buffer, pose, level, block.pos(), camera, (float) (now - block.at()), 0.0F, frame, block.seed());
+                }
+            });
+        }
         if (!streams.isEmpty()) {
-            GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
-                Glow.Billboard axes = Glow.billboard(pose);
+            GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
                 float before = Glow.darkness();
                 for (Stream stream : streams) {
                     Glow.darken(stream.darkness());
-                    MagicBeam.tint(buffer, pose, axes, stream.from(), stream.to(), stream.presence());
+                    MagicBeam.draw(buffer, pose, stream.from(), stream.to(), now, stream.seed(), stream.presence());
                 }
                 Glow.darken(before);
             });
         }
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            long frame = Glitch.frame(now);
-            for (Written block : written) {
-                BlockGlitch.draw(buffer, pose, level, block.pos(), camera, (float) (now - block.at()), 0.0F, frame, block.seed());
-            }
-            if (streams.isEmpty()) {
-                return;
-            }
-            Glow.Billboard axes = Glow.billboard(pose);
-            float before = Glow.darkness();
-            for (Stream stream : streams) {
-                Glow.darken(stream.darkness());
-                MagicBeam.draw(buffer, pose, axes, stream.from(), stream.to(), now, stream.seed(), stream.presence());
-            }
-            Glow.darken(before);
-        });
     }
 
     private static Vec3 randomUnit(RandomSource random) {

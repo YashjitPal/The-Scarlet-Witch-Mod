@@ -2,20 +2,26 @@ package com.yashjit.scarlet.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.yashjit.scarlet.ScarletPalette;
+import com.yashjit.scarlet.client.magic.MagicLayer;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.util.Mth;
+import org.joml.Vector3f;
 
 /**
- * Scarlet wisps spiraling around the forearms with a hot glow cupped in each palm. Drawn in the arm's own space so they
- * follow every pose exactly, in third and first person.
+ * Magic on the arms, as pixel art: wisps of it curling up around the forearm, cooler toward the elbow and hot where
+ * light runs along them, and a ball of it churning in the palm, its rim flickering. Drawn in the arm's own space on a
+ * grid pinned at the palm, so it follows every pose exactly, in the third person and the first.
  */
 public final class ArmMagic {
 
     private static final int STRANDS = 3;
-    private static final int BEADS = 26;
+    private static final int POINTS = 14;
+    private static final float TAU = (float) (Math.PI * 2);
 
     private ArmMagic() {
     }
@@ -30,12 +36,12 @@ public final class ArmMagic {
         poseStack.pushPose();
         model.root().translateAndRotate(poseStack);
         (right ? model.rightArm : model.leftArm).translateAndRotate(poseStack);
-        GlowPass.submit(collector, poseStack, arm(right, slim, time, intensity, darkness));
+        GlowPass.submitPixels(collector, poseStack, arm(right, slim, time, intensity, darkness));
         poseStack.popPose();
     }
 
     /**
-     * Glow geometry for one arm, in the space of its shoulder pivot.
+     * Pixels for one arm, in the space of its shoulder pivot.
      */
     public static SubmitNodeCollector.CustomGeometryRenderer arm(boolean right, boolean slim, float time, float intensity, float darkness) {
         float axisX = (right ? -1.0F : 1.0F) * (slim ? 0.5F : 1.0F) / 16.0F;
@@ -48,27 +54,53 @@ public final class ArmMagic {
     }
 
     private static void emit(VertexConsumer buffer, PoseStack.Pose pose, float axisX, float time, float intensity) {
-        Glow.Billboard axes = Glow.billboard(pose);
+        PixelSprite sprite = new PixelSprite(pose, axisX, MagicLayer.PALM_Y, 0.0F);
+        int frame = (int) Math.floor(time);
         for (int k = 0; k < STRANDS; k++) {
-            float strandPhase = k * (float) (Math.PI * 2 / STRANDS);
-            for (int i = 0; i < BEADS; i++) {
-                float s = i / (float) (BEADS - 1);
-                float angle = s * (float) (Math.PI * 2.4) + time * 0.22F + strandPhase;
-                float radius = (2.7F + 0.6F * (float) Math.sin(time * 0.31F + s * 5.0F + k)) / 16.0F;
-                float x = axisX + (float) Math.cos(angle) * radius;
-                float z = (float) Math.sin(angle) * radius;
-                float y = (3.8F + s * 6.6F) / 16.0F;
-                float envelope = (float) Math.sin(s * Math.PI);
-                // a bright pulse travels along each strand so it reads as flowing energy
-                float travel = (float) Math.pow(0.5 + 0.5 * Math.sin(s * 9.0F - time * 0.55F + k * 2.1F), 3);
-                float alpha = intensity * envelope * (0.55F + 0.45F * travel);
-                float size = (0.24F + 0.2F * envelope + 0.12F * travel) / 16.0F;
-                int core = travel > 0.8F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
-                Glow.spark(buffer, pose, axes, x, y, z, size, core, ScarletPalette.SCARLET, Math.min(1.0F, alpha * 1.3F));
+            float phase = k * TAU / STRANDS;
+            Vector3f previous = null;
+            for (int i = 0; i <= POINTS; i++) {
+                // from just below the elbow, s = 0, down to the wrist
+                float s = i / (float) POINTS;
+                float angle = s * TAU * 1.2F + time * 0.22F + phase;
+                float radius = (2.7F + 0.6F * Mth.sin(time * 0.31F + s * 5.0F + k)) / 16.0F;
+                Vector3f at = new Vector3f(axisX + Mth.cos(angle) * radius, (3.8F + s * 6.6F) / 16.0F, Mth.sin(angle) * radius);
+                if (previous != null) {
+                    float envelope = Mth.sin(s * (float) Math.PI);
+                    // light running down each strand, so it reads as flowing
+                    float travel = (float) Math.pow(0.5 + 0.5 * Mth.sin(s * 9.0F - time * 0.55F + k * 2.1F), 3);
+                    if (Pixels.shows(intensity * (0.45F + 0.75F * envelope), i + frame, k)) {
+                        int step = travel > 0.75F ? Pixels.PINK : travel > 0.35F ? Pixels.BRIGHT : s < 0.3F ? Pixels.CRIMSON : Pixels.SCARLET;
+                        sprite.line(previous, at, Pixels.opaque(step), 1, 1);
+                    }
+                }
+                previous = at;
             }
         }
-        float palm = intensity * (0.75F + 0.25F * (float) Math.sin(time * 0.5F));
-        Glow.disc(buffer, pose, axes, axisX, 10.6F / 16.0F, 0.0F, 4.5F / 16.0F, Glow.withAlpha(ScarletPalette.SCARLET, palm * 0.45F));
-        Glow.disc(buffer, pose, axes, axisX, 10.6F / 16.0F, 0.0F, 1.6F / 16.0F, Glow.withAlpha(ScarletPalette.CORE, palm * 0.8F));
+        palm(sprite, time, intensity);
+        sprite.draw(buffer);
+    }
+
+    /**
+     * The ball of magic churning in the palm.
+     */
+    private static void palm(PixelSprite sprite, float time, float intensity) {
+        int frame = (int) Math.floor(time);
+        float radius = (1.5F + 0.5F * Mth.sin(time * 0.5F)) * intensity + 0.5F;
+        int reach = (int) Math.ceil(radius + 2.0F);
+        for (int i = -reach; i < reach; i++) {
+            for (int j = -reach; j < reach; j++) {
+                float x = i + 0.5F;
+                float y = j + 0.5F;
+                float r = (float) Math.sqrt(x * x + y * y);
+                float theta = (float) Math.atan2(y, x);
+                float flame = 1.5F * intensity * Pixels.noise(Mth.cos(theta) * 2.0F + frame * 0.5F, Mth.sin(theta) * 2.0F - frame * 0.35F, 23);
+                if (r >= radius + flame) {
+                    continue;
+                }
+                int step = r < radius * 0.45F ? Pixels.HOT : r < radius ? Pixels.PINK : r < radius + flame * 0.5F ? Pixels.BRIGHT : Pixels.SCARLET;
+                sprite.cell(i, j, Pixels.opaque(step), 2);
+            }
+        }
     }
 }

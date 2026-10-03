@@ -69,12 +69,11 @@ public final class Hexes {
     /** Longest the Hex waits for its caster's home to finish before bursting out anyway. */
     public static final int FOUNDING_LIMIT = 600;
     /**
-     * Once their home stands, ticks the caster takes to come down onto its floor, and then to drift out of its front door
-     * onto the porch, where the Hex bursts out of them over the street.
+     * Once their home stands, ticks the caster takes to come down onto its floor, and then until the Hex bursts out of
+     * them where they stand, a moment after.
      */
     public static final int LAND_TICKS = 20;
-    public static final int STEP_OUT_TICKS = 24;
-    public static final int LANDING_TICKS = LAND_TICKS + STEP_OUT_TICKS;
+    public static final int LANDING_TICKS = LAND_TICKS + 6;
     /** How near where their home stood a caster must cast over a town of theirs again for it to rise around them there. */
     public static final double HOME_RECALL = 16.0;
     /** How far off a caster can raise their home again inside their Hex, as far as they can aim. */
@@ -652,16 +651,12 @@ public final class Hexes {
                         play(level, hex.center, SoundEvents.GENERIC_EXPLODE.value(), 2.0F, 0.45F);
                         play(level, hex.center, SoundEvents.WARDEN_SONIC_BOOM, 1.2F, 0.6F);
                     } else {
-                        // floating in the middle of it as it rises, and walking out once down on its floor; its door
-                        // opens for them as they come down
+                        // floating in the middle of it as it rises, then down on its floor
                         hold(caster, !standing || now - hex.homeStoodAt < LAND_TICKS);
                         if (caster != null) {
                             // carried in through the walls of what stands there already; set after their own tick
                             // clears it, it holds while the moves they send before the next come in
                             caster.noPhysics = true;
-                        }
-                        if (standing && now - hex.homeStoodAt == LAND_TICKS - 6 && hex.town != null) {
-                            hex.town.openHomeDoor(level, BlockPos.containing(hex.center));
                         }
                     }
                 }

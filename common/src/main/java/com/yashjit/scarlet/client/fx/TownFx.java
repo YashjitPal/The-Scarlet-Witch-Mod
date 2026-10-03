@@ -40,9 +40,9 @@ import org.jspecify.annotations.Nullable;
  * settle into place. All the while the lot glitches red, as the Hex rewrites what was there into what it wants: red
  * bars tear across it, red pixels flicker over it, and red static crawls across it.
  *
- * <p>The caster's home, going up slowly around them, is written a block at a time: each block flickers in as an
- * outline where it will stand as their magic reaches for it, then snaps in glitching red, as {@link BlockGlitch} has
- * it.
+ * <p>The caster's home, going up slowly around them, is written a block at a time instead, with no outline climbing it:
+ * each block flickers in as an outline where it will stand as their magic reaches for it, then snaps in glitching red,
+ * as {@link BlockGlitch} has it.
  *
  * <p>None of it shows past the Hex's wall, where the town isn't. And as the wall moves in, or falls, the town glitches
  * out right where it passes, in red bars, static and sparks, as what stood there before comes back.
@@ -447,7 +447,10 @@ public final class TownFx {
                     Glitch.draw(buffer, pose, axes, center, area.size(), Math.max(1.5F, top), dissolve, frame, build.minX() * 17 + build.minZ() * 5);
                 }
                 float t = since - build.clearTicks();
-                draw(buffer, pose, build, t, camera, clip, area);
+                // the caster's home is written a block at a time, each glitching in as it lands, with no outline to climb
+                if (!home) {
+                    draw(buffer, pose, build, t, camera, clip, area);
+                }
                 // up close, the glitch over a whole lot would only be a flat red slab across the view
                 float glitch = glitch(build, t) * area.closeness(camera) * (home ? HOME_GLITCH : 1.0F);
                 if (glitch > 0.02F) {

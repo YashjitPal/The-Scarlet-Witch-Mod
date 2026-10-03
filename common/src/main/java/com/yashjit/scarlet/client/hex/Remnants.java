@@ -25,7 +25,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
@@ -33,36 +32,34 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The homes fallen Hexes have left standing, as this client shows them. Each holds on a while after its Hex has gone,
- * glitching through the eras ever more wildly: all of it jumps into another era for a moment, or its parts into
- * different ones at once, one era's walls under another's roof, or bits of it blink out of existence, while red static
- * crawls over it and the picture of it loses its signal and finds it again. Once it starts to go, a block at a time, it
- * glitches less and less, until the last of it has gone. Its caster's clothes slip through the eras with it.
+ * stepping back through the eras one at a time, the newest first, down to black and white, like the show rewinding to
+ * its first episode: each era sweeps round the house and up it in turn, its blocks turning as the sweep reaches them
+ * and the picture of it turning with them texel by texel, and holds a moment before the next. A set changing channels
+ * is heard as each begins, and red static crawls over it all the while. Then it goes a block at a time, still in black
+ * and white. Its caster's clothes turn with it.
  *
- * <p>None of it really changes until it goes: the eras it slips into are only shown here, worked out from what it was
- * built of.
+ * <p>None of it really changes until it goes: the eras it steps through are only shown here, worked out from what it
+ * was built of.
  */
 public final class Remnants {
 
-    /** How near the camera a home must be for this client to glitch it. */
+    /** How near the camera a home must be for this client to show it stepping through the eras. */
     private static final double SHOWN_FROM = 128.0;
-    /** How near their home its caster must be for their clothes to slip through the eras with it. */
+    /** How near their home its caster must be for their clothes to turn with it. */
     private static final double WORN_NEAR = 96.0;
     /** How long what a home is built of is kept without word of the home itself, which may come a moment later. */
     private static final int UNCLAIMED_TICKS = 100;
-    /** Blocks across each patch of a home that slips into an era of its own. */
-    private static final int PATCH_SHIFT = 2;
-
-    /** Showing itself as it is. */
-    public static final int STILL = 0;
-    /** All of it in another era. */
-    public static final int WHOLE = 1;
-    /** Each patch of it in an era of its own. */
-    public static final int MIXED = 2;
-    /** Bits of it gone. */
-    public static final int GONE = 3;
+    /** Ticks each era takes to sweep round a home, before it holds a moment for the next. */
+    private static final int SWEEP_TICKS = 26;
+    /** Ticks between showing each block its era again, before the last showing of it lets go. */
+    private static final int REFRESH_TICKS = 12;
+    private static final int EVERY_TICK = (1 << TownGlitchPayload.TICKS) - 1;
+    /** Of the way round a sweep comes to a block, how much is its height on the house, so it spirals up it. */
+    private static final float UP = 0.18F;
+    private static final double TAU = Math.PI * 2.0;
 
     private static final Int2ObjectMap<Built> BUILT = new Int2ObjectOpenHashMap<>();
-    private static final Int2ObjectMap<Flick> FLICKS = new Int2ObjectOpenHashMap<>();
+    private static final Int2ObjectMap<Shown> SHOWN = new Int2ObjectOpenHashMap<>();
     private static @Nullable ClientLevel seenLevel;
 
     private Remnants() {
@@ -76,6 +73,7 @@ public final class Remnants {
         }
         BUILT.put(payload.id(), new Built(Era.byIndex(payload.era()), payload.positions(), payload.roles(), payload.paints(),
                 minecraft.level.getGameTime()));
+        SHOWN.remove(payload.id());
     }
 
     public static void tick(Minecraft minecraft) {
@@ -88,7 +86,7 @@ public final class Remnants {
         List<RemnantSnapshot> remnants = Hexes.clientRemnants();
         BUILT.int2ObjectEntrySet().removeIf(entry -> remnants.stream().noneMatch(remnant -> remnant.id() == entry.getIntKey())
                 && now - entry.getValue().receivedAt() > UNCLAIMED_TICKS);
-        FLICKS.keySet().removeIf(id -> !BUILT.containsKey(id));
+        SHOWN.keySet().removeIf(id -> !BUILT.containsKey(id));
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         RandomSource random = ScarletFx.random();
         for (RemnantSnapshot remnant : remnants) {
@@ -99,30 +97,34 @@ public final class Remnants {
             }
             Vec3 min = Vec3.atLowerCornerOf(remnant.min());
             Vec3 max = Vec3.atLowerCornerOf(remnant.max()).add(1.0, 1.0, 1.0);
-            // red static crawling all over it, thicker the harder it glitches
-            Glitch.crawl(min, max, 0.6F + 1.6F * glitch);
-            Flick flick = FLICKS.get(remnant.id());
-            if (flick == null || now >= flick.next()) {
-                FLICKS.put(remnant.id(), flick(level, remnant, built, glitch, now, random));
+            // red static crawling over it, steady
+            Glitch.crawl(min, max, 0.4F + 0.6F * glitch);
+            Phase phase = phase(remnant, now);
+            if (phase != null) {
+                show(level, remnant, built, phase, now, random);
             }
         }
     }
 
     /**
-     * Its next slip: what kind, into which era, and when the one after it comes, sooner the harder it glitches.
+     * Shows each block of a home the era the sweeps have brought it to: those the sweep has just reached, and every
+     * now and then all of them again, before the last showing of them lets go.
      */
-    private static Flick flick(ClientLevel level, RemnantSnapshot remnant, Built built, float glitch, long now, RandomSource random) {
-        int kind = random.nextFloat() < 0.4F ? WHOLE : glitch > 0.55F && random.nextFloat() < 0.3F ? GONE : MIXED;
-        Era era = pickEra(random, built.era());
-        int seed = random.nextInt();
-        int pattern = pattern(random, kind);
-        int last = 31 - Integer.numberOfLeadingZeros(pattern);
-        long next = now + last + 1 + Math.round(14.0F * (1.0F - glitch)) + random.nextInt(3);
+    private static void show(ClientLevel level, RemnantSnapshot remnant, Built built, Phase phase, long now, RandomSource random) {
+        Shown shown = SHOWN.computeIfAbsent(remnant.id(), id -> new Shown(built.positions().length));
+        boolean refresh = now - shown.refreshedAt >= REFRESH_TICKS;
         LongArrayList positions = new LongArrayList();
-        List<BlockState> shown = new ArrayList<>();
+        List<BlockState> states = new ArrayList<>();
+        LongArrayList turned = new LongArrayList();
         for (int i = 0; i < built.positions().length; i++) {
-            long key = built.positions()[i];
-            BlockPos pos = BlockPos.of(key);
+            BlockPos pos = BlockPos.of(built.positions()[i]);
+            Era era = phase.sweep() >= reaches(remnant, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, phase.start()) ? phase.after()
+                    : phase.before();
+            boolean changed = era != shown.eras[i];
+            shown.eras[i] = era;
+            if (era == null || !changed && !refresh) {
+                continue;
+            }
             BlockState current = level.getBlockState(pos);
             Role role = Role.byIndex(built.roles()[i]);
             int paint = built.paints()[i];
@@ -130,91 +132,81 @@ public final class Remnants {
             if (current.isAir() || !EraStyle.isStyleOf(role, paint, current)) {
                 continue;
             }
-            BlockState other = switch (kind) {
-                case WHOLE -> EraStyle.state(role, era, paint, current);
-                case GONE -> walkable(role) || patch(pos, remnant.ground(), seed) < 0.55F ? current : Blocks.AIR.defaultBlockState();
-                default -> {
-                    float pick = patch(pos, remnant.ground(), seed);
-                    yield pick < 0.2F ? current : EraStyle.state(role, Era.byIndex((int) ((pick - 0.2F) / 0.8F * Era.values().length)), paint, current);
-                }
-            };
-            if (other != current) {
-                positions.add(key);
-                shown.add(other);
+            positions.add(pos.asLong());
+            states.add(EraStyle.state(role, era, paint, current));
+            if (changed) {
+                turned.add(pos.asLong());
             }
+        }
+        if (refresh) {
+            shown.refreshedAt = now;
         }
         if (!positions.isEmpty()) {
-            TownSlips.slip(level, positions.toLongArray(), shown.toArray(BlockState[]::new), pattern, false, true);
+            TownSlips.slip(level, positions.toLongArray(), states.toArray(BlockState[]::new), EVERY_TICK, false, true);
+        }
+        // the static of a changed channel where the sweep turns it
+        for (int i = 0; i < Math.min(2, turned.size()); i++) {
+            Vec3 at = Vec3.atCenterOf(BlockPos.of(turned.getLong(random.nextInt(turned.size()))));
+            Glitch.puff(at.subtract(0.6, 0.6, 0.6), at.add(0.6, 0.6, 0.6));
+        }
+        if (phase.index() != shown.phase && phase.sweep() < 1.0F) {
+            shown.phase = phase.index();
             Vec3 middle = remnant.middle();
-            float volume = 0.25F + 0.35F * glitch;
-            switch (kind) {
-                // a set changing channels, the picture jumping into another show
-                case WHOLE -> level.playLocalSound(middle.x, middle.y, middle.z, SoundEvents.BEACON_POWER_SELECT, SoundSource.BLOCKS, volume,
-                        0.7F + random.nextFloat() * 0.9F, false);
-                // the signal breaking up into bits of every channel at once
-                case MIXED -> level.playLocalSound(middle.x, middle.y, middle.z, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, volume,
-                        1.5F + random.nextFloat() * 0.5F, false);
-                // and lost altogether for a moment
-                default -> level.playLocalSound(middle.x, middle.y, middle.z, SoundEvents.ILLUSIONER_MIRROR_MOVE, SoundSource.BLOCKS, volume,
-                        1.4F + random.nextFloat() * 0.5F, false);
-            }
-            for (int i = 0; i < 2 + Math.round(4 * glitch); i++) {
-                Vec3 at = Vec3.atCenterOf(BlockPos.of(positions.getLong(random.nextInt(positions.size()))));
-                Glitch.puff(at.subtract(0.6, 0.6, 0.6), at.add(0.6, 0.6, 0.6));
+            level.playLocalSound(middle.x, middle.y, middle.z, SoundEvents.BEACON_POWER_SELECT, SoundSource.BLOCKS, 0.45F,
+                    0.6F + 0.15F * phase.after().ordinal(), false);
+        }
+    }
+
+    /**
+     * Where a home is in stepping back through the eras right now, or null if it isn't yet.
+     */
+    public static @Nullable Phase phase(RemnantSnapshot remnant, double now) {
+        double since = now - remnant.start();
+        if (since < 0.0) {
+            return null;
+        }
+        Built built = BUILT.get(remnant.id());
+        List<Era> eras = eras(built == null ? Era.PRESENT : built.era());
+        double each = RemnantSnapshot.GLITCH_TICKS / (double) eras.size();
+        int index = (int) Math.min(eras.size() - 1, Math.floor(since / each));
+        float sweep = (float) Math.clamp((since - index * each) / SWEEP_TICKS, 0.0, 1.0);
+        // each sweep sets off from somewhere new round it
+        float start = (float) ((index * 2.4 + remnant.id() * 0.9) % TAU);
+        return new Phase(index, index == 0 ? null : eras.get(index - 1), eras.get(index), sweep, start);
+    }
+
+    /**
+     * The eras a home steps back through: every one but the era it was built in, the newest first, down to black and
+     * white.
+     */
+    private static List<Era> eras(Era built) {
+        List<Era> eras = new ArrayList<>();
+        for (int i = Era.values().length - 1; i >= 0; i--) {
+            if (Era.values()[i] != built) {
+                eras.add(Era.values()[i]);
             }
         }
-        return new Flick(kind, era, seed, pattern, now, next);
+        return eras;
     }
 
     /**
-     * Black and white more often than its share: the eras a sitcom remembers best.
+     * How far round a sweep has come when it reaches a point of a home, 0 to 1: round the house from where it set off,
+     * and a little later the higher up, so it spirals up it. The picture of the home works this out the same way.
      */
-    private static Era pickEra(RandomSource random, Era built) {
-        Era era;
-        do {
-            era = random.nextFloat() < 0.45F ? (random.nextBoolean() ? Era.FIFTIES : Era.SIXTIES) : Era.byIndex(random.nextInt(Era.values().length));
-        } while (era == built);
-        return era;
-    }
-
-    /**
-     * Which ticks of a slip it shows its other self on, a bit each: a few frames all at once in another era, a stutter
-     * in and out of existence.
-     */
-    private static int pattern(RandomSource random, int kind) {
-        int bits = 0;
-        int tick = 0;
-        int flicks = kind == GONE ? 2 + random.nextInt(2) : 1 + (random.nextFloat() < 0.3F ? 1 : 0);
-        for (int flick = 0; flick < flicks && tick < TownGlitchPayload.TICKS; flick++) {
-            int on = kind == GONE ? 1 + random.nextInt(2) : kind == WHOLE ? 2 + random.nextInt(4) : 3 + random.nextInt(4);
-            for (int k = 0; k < on && tick < TownGlitchPayload.TICKS; k++, tick++) {
-                bits |= 1 << tick;
-            }
-            tick += 1 + random.nextInt(2);
+    private static float reaches(RemnantSnapshot remnant, double x, double y, double z, float start) {
+        Vec3 middle = remnant.middle();
+        double around = ((Math.atan2(z - middle.z, x - middle.x) - start) / TAU) % 1.0;
+        if (around < 0.0) {
+            around += 1.0;
         }
-        return bits;
+        double height = remnant.max().getY() + 1 - remnant.min().getY();
+        double up = Math.clamp((y - remnant.min().getY()) / height, 0.0, 1.0);
+        return (float) (around * (1.0 - UP) + up * UP);
     }
 
     /**
-     * A steady number from 0 to 1 for the patch a block lies in, for one slip.
-     */
-    private static float patch(BlockPos pos, int ground, int seed) {
-        long cell = (long) (pos.getX() >> PATCH_SHIFT) * 73856093L ^ (long) (pos.getY() - ground >> PATCH_SHIFT) * 19349663L
-                ^ (long) (pos.getZ() >> PATCH_SHIFT) * 83492791L;
-        return Glitch.hash(cell, seed, 13);
-    }
-
-    /**
-     * What someone could be standing on, which never blinks out from under them.
-     */
-    private static boolean walkable(Role role) {
-        return role == Role.FLOOR || role == Role.FOUNDATION || role == Role.PORCH || role == Role.STEP || role == Role.WALKWAY
-                || role == Role.LAWN || role == Role.FILL;
-    }
-
-    /**
-     * The red magic that still has hold of each home: red bars tearing across it, hard while it shows another self and
-     * faint between, fading as the camera comes up close to it, where it would only be a flat red slab across the view.
+     * The red magic that still has hold of each home: red bars tearing across it, harder while an era sweeps round it,
+     * fading as the camera comes up close to it, where it would only be a flat red slab across the view.
      */
     public static void submit(SubmitNodeCollector collector, PoseStack poseStack) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -227,7 +219,8 @@ public final class Remnants {
         List<Draw> draws = new ArrayList<>();
         for (RemnantSnapshot remnant : Hexes.clientRemnants()) {
             float glitch = remnant.glitch(now);
-            if (glitch <= 0.0F || !BUILT.containsKey(remnant.id()) || remnant.middle().distanceToSqr(camera) > SHOWN_FROM * SHOWN_FROM) {
+            Phase phase = phase(remnant, now);
+            if (glitch <= 0.0F || phase == null || !BUILT.containsKey(remnant.id()) || remnant.middle().distanceToSqr(camera) > SHOWN_FROM * SHOWN_FROM) {
                 continue;
             }
             Vec3 min = Vec3.atLowerCornerOf(remnant.min());
@@ -235,8 +228,8 @@ public final class Remnants {
             double dx = Math.max(0.0, Math.max(min.x - camera.x, camera.x - max.x));
             double dz = Math.max(0.0, Math.max(min.z - camera.z, camera.z - max.z));
             float closeness = Math.clamp((float) ((Math.sqrt(dx * dx + dz * dz) - 2.0) / 4.0), 0.0F, 1.0F);
-            float hold = style(remnant, now).kind() != STILL ? 0.75F : 0.18F;
-            float intensity = hold * (0.4F + 0.6F * glitch) * closeness;
+            float sweeping = phase.sweep() > 0.0F && phase.sweep() < 1.0F ? 0.22F : 0.08F;
+            float intensity = sweeping * (0.4F + 0.6F * glitch) * closeness;
             if (intensity > 0.02F) {
                 Vec3 middle = remnant.middle().subtract(camera);
                 draws.add(new Draw(middle.toVector3f(), (float) Math.max(max.x - min.x, max.z - min.z) * 1.05F, (float) (max.y - min.y), intensity,
@@ -256,39 +249,49 @@ public final class Remnants {
     }
 
     /**
-     * How a home is slipping right now, for the picture of it to slip with it.
-     *
-     * @return the kind of slip ({@link #STILL} while it shows itself), the era it slipped into and the slip's seed
+     * How strongly someone's clothes are caught up with the home a fallen Hex left by them, as hard as it glitches;
+     * otherwise 0.
      */
-    public static Style style(RemnantSnapshot remnant, double now) {
-        Flick flick = FLICKS.get(remnant.id());
-        if (flick == null) {
-            return Style.NONE;
-        }
-        int tick = (int) (now - flick.start());
-        boolean on = tick >= 0 && tick < TownGlitchPayload.TICKS && (flick.pattern() >> tick & 1) != 0;
-        return on ? new Style(flick.kind(), flick.era(), flick.seed()) : Style.NONE;
+    public static float worn(Player player, double now) {
+        RemnantSnapshot remnant = wornBy(player);
+        return remnant == null ? 0.0F : remnant.glitch(now);
     }
 
     /**
-     * How wildly someone's clothes slip through the eras: while their home is left glitching near them after their Hex
-     * fell, as hard as it glitches; otherwise 0.
+     * Where the home someone's clothes turn with is in stepping back through the eras, or null.
      */
-    public static float worn(Player player, double now) {
+    public static @Nullable Phase wornPhase(Player player, double now) {
+        RemnantSnapshot remnant = wornBy(player);
+        return remnant == null || remnant.glitch(now) <= 0.0F ? null : phase(remnant, now);
+    }
+
+    private static @Nullable RemnantSnapshot wornBy(Player player) {
         for (RemnantSnapshot remnant : Hexes.clientRemnants()) {
             if (remnant.caster().equals(player.getUUID()) && remnant.middle().distanceToSqr(player.position()) < WORN_NEAR * WORN_NEAR) {
-                return remnant.glitch(now);
+                return remnant;
             }
         }
-        return 0.0F;
+        return null;
     }
 
     private static void forgetIfLeft(@Nullable ClientLevel level) {
         if (level != seenLevel) {
             seenLevel = level;
             BUILT.clear();
-            FLICKS.clear();
+            SHOWN.clear();
         }
+    }
+
+    /**
+     * Where a home is in stepping back through the eras.
+     *
+     * @param index  which of its eras it is in, counting from the first
+     * @param before the era it is leaving, or null for as it was built
+     * @param after  the era sweeping round it
+     * @param sweep  how far round it the sweep has come, 0 to 1
+     * @param start  where round it the sweep set off from, in radians
+     */
+    public record Phase(int index, @Nullable Era before, Era after, float sweep, float start) {
     }
 
     /**
@@ -300,19 +303,19 @@ public final class Remnants {
     }
 
     /**
-     * @param start when it began
-     * @param next  when the one after it comes
+     * What this client is showing each block of a home: the era it shows, null for as it was built, by the block's place
+     * in what the home is built of.
      */
-    private record Flick(int kind, Era era, int seed, int pattern, long start, long next) {
+    private static final class Shown {
+        final @Nullable Era[] eras;
+        long refreshedAt = Long.MIN_VALUE / 4;
+        int phase = -1;
+
+        Shown(int blocks) {
+            this.eras = new Era[blocks];
+        }
     }
 
     private record Draw(Vector3f center, float width, float height, float intensity, int seed) {
-    }
-
-    /**
-     * @param kind {@link #STILL}, {@link #WHOLE}, {@link #MIXED} or {@link #GONE}
-     */
-    public record Style(int kind, Era era, int seed) {
-        static final Style NONE = new Style(STILL, Era.PRESENT, 0);
     }
 }

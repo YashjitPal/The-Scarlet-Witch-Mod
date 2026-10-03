@@ -6,21 +6,26 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Where things meet a Hex wall. A chaos blast bursts on it and sets it rippling red; anyone walking through it sends a
- * gentler ripple across it.
+ * Where things meet a Hex wall. A chaos blast bursts on it and sets it rippling red; anyone walking through it, person or
+ * creature, makes it flare red where they pass, the red soaking out through the wall around them as rings run out
+ * across it, as a blast does, a little gentler.
  */
 public final class HexRipples {
 
     /** Strength of the ripple a chaos blast makes. */
     public static final float BLAST = 1.0F;
-    private static final float PASSING = 0.3F;
+    private static final float PASSING = 0.75F;
+    /** Fewest ticks between the ripples one body makes, should it pace back and forth through a wall. */
+    private static final int PASSING_EVERY = 20;
     private static final double HEARD_FROM = 256.0;
 
-    private static final Map<ServerPlayer, Vec3> LAST = new WeakHashMap<>();
+    private static final Map<LivingEntity, Vec3> LAST = new WeakHashMap<>();
+    private static final Map<LivingEntity, Long> RIPPLED = new WeakHashMap<>();
 
     private HexRipples() {
     }
@@ -78,18 +83,27 @@ public final class HexRipples {
     }
 
     /**
-     * Every tick for each player: a ripple where they step through a wall.
+     * Every tick for each player and creature: a ripple where they step through a wall.
      */
-    public static void watch(ServerPlayer player) {
-        Vec3 now = player.position().add(0.0, player.getBbHeight() * 0.5, 0.0);
-        Vec3 before = LAST.put(player, now);
-        if (before == null || before.distanceToSqr(now) < 1.0E-6 || player.isSpectator()) {
+    public static void watch(LivingEntity entity) {
+        if (!(entity.level() instanceof ServerLevel level)) {
             return;
         }
-        ServerLevel level = player.level();
-        Vec3 at = crossing(level, before, now);
-        if (at != null) {
-            ripple(level, at, PASSING);
+        Vec3 now = entity.position().add(0.0, entity.getBbHeight() * 0.5, 0.0);
+        Vec3 before = LAST.put(entity, now);
+        if (before == null || before.distanceToSqr(now) < 1.0E-6 || entity.isSpectator()) {
+            return;
         }
+        Vec3 at = crossing(level, before, now);
+        if (at == null) {
+            return;
+        }
+        long tick = level.getGameTime();
+        Long last = RIPPLED.get(entity);
+        if (last != null && tick - last < PASSING_EVERY) {
+            return;
+        }
+        RIPPLED.put(entity, tick);
+        ripple(level, at, PASSING);
     }
 }

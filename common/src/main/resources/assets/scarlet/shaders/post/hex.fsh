@@ -40,9 +40,11 @@ layout(std140) uniform HexView {
     vec4 RemnantLow[2];
     // xyz the highest corner, w a seed of its own
     vec4 RemnantHigh[2];
-    // how each is slipping right now, x: 0 not at all, 1 all into one era, 2 each patch into its own, 3 bits of it gone;
-    // y: the era it slipped into, z: the slip's seed
+    // where each is in stepping back through the eras, x: the era it is leaving, y: the era sweeping round it, z: how far
+    // round it the sweep has come, w: where round it the sweep set off from, in radians
     vec4 RemnantStyle[2];
+    // xyz: where the camera is in the world's grid of blocks, as its position modulo 256
+    vec4 Grid;
 };
 
 // Seconds the view takes to come through a wall.
@@ -204,39 +206,73 @@ float hueOf(vec3 c) {
     return h / 6.0;
 }
 
-// Color coming into a black and white picture, the way a sitcom turned to color: first a pale tint over the grey as if
-// painted on by hand, keeping the grey's own light, then the colors blooming in for real, the most vivid first, the
-// flowers and the hedges, reds a little ahead of the rest, the dull walls and roads last. k runs from 0, all grey, to 1,
-// all color; run backwards it drains the color out the same way, the vivid reds lingering longest.
-vec3 colorIn(vec3 grey, vec3 color, float k, float scatter) {
+// The threshold of a 4 by 4 ordered dither at a cell, 0 to 1, the dither the mod's pixel magic fades by.
+float bayer4(vec2 cell) {
+    const float ORDER[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+    vec2 m = mod(cell, 4.0);
+    return ORDER[int(m.y) * 4 + int(m.x)] / 16.0;
+}
+
+// Which texel of the world a pixel shows, on the face it lies on: a sixteenth of a block close by, as Minecraft's own
+// textures are, coarser further off so a texel is never smaller than a pixel. xy: the texel across its face, z: a seed
+// for its block. The sky and your hand, which have no blocks, get small squares of the screen instead.
+vec3 texelCell(vec3 position, vec3 dir, vec3 normal, float footprint, vec2 pixel, bool onScreen) {
+    if (onScreen) {
+        vec2 square = floor(pixel / 3.0);
+        return vec3(square, hash12(floor(square / 5.0) + vec2(41.0, 13.0)));
+    }
+    vec3 world = position + Grid.xyz;
+    float size = exp2(ceil(log2(max(footprint * 1.5 * 16.0, 1.0)))) / 16.0;
+    vec3 texel = floor(world / size);
+    vec2 across = normal.x > normal.y && normal.x > normal.z ? texel.zy : normal.y > normal.z ? texel.xz : texel.xy;
+    // the block of air before the face, the same for all of it
+    vec3 block = floor(world - dir * 0.01);
+    return vec3(across, hash12(block.xz * 1.37 + block.y * vec2(5.3, 2.9)));
+}
+
+// Color coming into a black and white picture the way the Hex paints it: texel by texel over every block, each texel of
+// a face taking its color at its own moment in a crisp ordered dither, so the world's own textures are painted over a
+// pixel at a time. A pale wash comes first, as if tinted by hand, then the colors for real: the most vivid first, the
+// reds ahead of the rest, the dull walls and roads last, each block in its own time. k runs from 0, all grey, to 1, all
+// color; run backwards it drains out the same way, the vivid reds lingering longest. glint is how freshly the texel has
+// turned, 1 the moment it does and gone soon after.
+vec3 colorIn(vec3 grey, vec3 color, float k, vec3 cell, out float glint) {
     float hi = max(color.r, max(color.g, color.b));
     float lo = min(color.r, min(color.g, color.b));
     float saturation = hi > 1.0e-4 ? (hi - lo) / hi : 0.0;
     float hue = hueOf(color);
     float fromRed = min(hue, 1.0 - hue) * 2.0;
-    float delay = clamp(0.42 * (1.0 - saturation) + 0.18 * fromRed + (scatter - 0.5) * 0.12, 0.0, 0.62);
-    float tinted = smoothstep(0.0, 0.3, k);
-    float bloomed = smoothstep(delay, delay + 0.36, k);
-    vec3 tint = grey + (color - vec3(dot(color, LUMA))) * 0.45;
-    return mix(mix(grey, tint, tinted), color, bloomed);
+    float dither = bayer4(cell.xy);
+    float delay = clamp(0.34 * (1.0 - saturation) + 0.14 * fromRed + (cell.z - 0.5) * 0.14, 0.0, 0.56);
+    float washAt = 0.03 + 0.18 * dither + cell.z * 0.05;
+    float bloomAt = delay + 0.32 * dither;
+    float washed = step(washAt, k);
+    float bloomed = step(bloomAt, k);
+    glint = bloomed * (1.0 - smoothstep(0.0, 0.07, k - bloomAt));
+    vec3 wash = grey + (color - vec3(dot(color, LUMA))) * 0.4;
+    return mix(mix(grey, wash, washed), color, bloomed);
 }
 
 // The look of a point of the Hex while one era gives way to the next: k from 0, still the era before, to 1, all the new
-// one.
-vec3 eraChange(vec3 world, int before, int after, float k, vec3 local, vec2 uv, vec2 screen, float time) {
+// one. Into or out of black and white the color comes or goes texel by texel; from one era in color to another the
+// picture turns over texel by texel in the same dither. Each texel glints warm white as it turns.
+vec3 eraChange(vec3 world, int before, int after, float k, vec3 cell, vec2 uv, vec2 screen, float time) {
     vec3 prior = eraLook(world, before, uv, screen, time);
     vec3 next = eraLook(world, after, uv, screen, time);
-    // a little unevenness, so the color comes in patchily, as if brushed on
-    float scatter = hash12(floor(local.xz * 0.5) + vec2(3.1, 7.7));
     bool wasGrey = before <= 1;
     bool isGrey = after <= 1;
+    float glint;
+    vec3 look;
     if (wasGrey && !isGrey) {
-        return colorIn(prior, next, k, scatter);
+        look = colorIn(prior, next, k, cell, glint);
+    } else if (!wasGrey && isGrey) {
+        look = colorIn(next, prior, 1.0 - k, cell, glint);
+    } else {
+        float at = 0.06 + 0.82 * (0.7 * bayer4(cell.xy) + 0.3 * cell.z);
+        look = k >= at ? next : prior;
+        glint = step(at, k) * (1.0 - smoothstep(0.0, 0.07, k - at)) * 0.6;
     }
-    if (!wasGrey && isGrey) {
-        return colorIn(next, prior, 1.0 - k, scatter);
-    }
-    return mix(prior, next, smoothstep(0.0, 1.0, k));
+    return mix(look, vec3(1.0, 0.95, 0.9), glint * 0.38);
 }
 
 // How big a texel of the wall is where it is seen with this footprint: an eighth of a block close by, doubling as the
@@ -584,35 +620,30 @@ vec3 crossingLook(vec3 color, vec2 uv, vec2 screenUv, vec2 pixel, float p, float
     return mix(color, vec3(0.96, 0.9, 1.0), flash);
 }
 
-// A home left standing after its Hex fell, slipping through the eras with its blocks: all of it in another era for a
-// moment, or each patch of it in one of its own, or bits of it lost to the snow of a dead channel. In between, patch
-// after patch of it slips on its own, more of it the wilder it glitches, black and white most of all. Bars roll down it
-// like a set losing its hold, static crawls over it, and the magic on it keeps its own red.
-vec3 remnantLook(vec3 color, vec3 magic, vec3 local, vec2 uv, vec2 pixel, vec2 screen, float time, float amount, vec4 style, float seed) {
-    int kind = int(style.x + 0.5);
+// Of the way round a sweep comes to a point of a fallen Hex's home, how much is its height on the house, as Remnants
+// has it.
+const float REMNANT_UP = 0.18;
+
+// A home left standing after its Hex fell, stepping back through the eras one at a time with its blocks: each era
+// sweeps round the house and up it in turn, the picture turning over it texel by texel as an era spreads over a Hex, a
+// line of scarlet running round it ahead of the new era, and holds a moment before the next. Down to black and white,
+// it goes a block at a time. Grain crawls over it, and the magic on it keeps its own red. local: where the point is in
+// the box around it, size: the box's size, style: x the era it is leaving, y the era sweeping round it, z how far round
+// the sweep has come, w where round it the sweep set off from.
+vec3 remnantLook(vec3 color, vec3 magic, vec3 local, vec3 size, vec3 cell, vec2 uv, vec2 pixel, vec2 screen, float time, float amount, vec4 style) {
     vec3 world = max(color - magic, vec3(0.0));
-    vec3 cell = floor(local / 3.0);
-    float frame = floor(time * (4.0 + 10.0 * amount));
-    float pick = hash12(cell.xz * 1.37 + vec2(cell.y * 7.1, 0.0) + vec2(frame * 0.61, seed));
-    float which = hash12(cell.zx * 2.11 + vec2(frame * 0.37, cell.y * 5.3 + seed));
-    // black and white two times in three, and otherwise one of the eras in color
-    int era = which < 0.66 ? (which < 0.33 ? 0 : 1) : 2 + int(floor((which - 0.66) / 0.34 * 3.0));
-    vec3 look;
-    if (kind == 1) {
-        look = eraLook(world, int(style.y + 0.5), uv, screen, time);
-    } else if (kind == 2) {
-        float mixed = floor(hash12(cell.xz * 0.73 + vec2(cell.y * 3.3, style.z)) * 6.0);
-        look = eraLook(world, int(mixed), uv, screen, time);
-    } else if (kind == 3) {
-        look = mix(world, snow(pixel, time), step(0.45, pick) * 0.8);
-    } else {
-        float slipped = step(1.0 - (0.2 + 0.45 * amount), pick);
-        look = mix(world, eraLook(world, era, uv, screen, time), slipped);
-    }
-    float bar = smoothstep(0.9, 1.0, 0.5 + 0.5 * sin(local.y * 1.7 - time * 7.0 + seed));
-    look = mix(look, vec3(dot(look, LUMA)), bar * 0.5 * amount);
+    vec3 fromMiddle = local - size * 0.5;
+    float around = fract((atan(fromMiddle.z, fromMiddle.x) - style.w) / 6.2831853);
+    float up = clamp(local.y / max(size.y, 1.0), 0.0, 1.0);
+    float reached = style.z - (around * (1.0 - REMNANT_UP) + up * REMNANT_UP);
+    float k = clamp(reached / 0.06, 0.0, 1.0);
+    vec3 look = eraChange(world, int(style.x + 0.5), int(style.y + 0.5), k, cell, uv, screen, time);
+    // the line of scarlet running round it ahead of the new era, glittering texel by texel
+    float edge = exp(-reached * reached / 0.0007) * step(style.z, 0.999);
+    float glitter = hash12(cell.xy + cell.z * 61.0 + floor(time * 14.0) * vec2(5.0, 9.0));
+    look += vec3(1.0, 0.16, 0.24) * edge * (0.12 + 0.6 * step(0.8, glitter));
     float grain = hash12(floor(pixel / 2.0) + floor(time * 30.0) * vec2(7.0, 3.0));
-    look = mix(look, vec3(grain), 0.07 * amount);
+    look = mix(look, vec3(grain), 0.04 * amount);
     return look + magic;
 }
 
@@ -665,6 +696,8 @@ void main() {
 #endif
     vec4 world = InvProjView * vec4(uv * 2.0 - 1.0, ndcDepth, 1.0);
     vec3 position = world.xyz / world.w;
+    // which way the surface faces, from how it turns between pixels: worked out before anything branches, as it must be
+    vec3 normal = abs(cross(dFdx(position), dFdy(position)));
     vec3 eye = eyePosition();
     float dist = length(position - eye);
     vec3 dir = ray(uv, eye);
@@ -745,18 +778,22 @@ void main() {
         vec3 world = max(scene - magic, vec3(0.0));
         vec3 inEra;
         if (around >= 0 && EraChange.w > 0.5) {
-            // a new era spreading out from the middle: how far it has come in here, the sky last of all
+            // a new era spreading out from the middle: how far it has come in here, the sky last of all, over the last
+            // stretch before the wall
             vec3 center = Shapes[around].xyz;
+            bool sky = dist >= 1.0e8;
             vec3 local = hand ? -center : position - center;
-            float level = dist >= 1.0e8 ? Shapes[around].w + EraChange.z : shapeLevel(local, 1.0);
+            float level = sky ? Shapes[around].w : shapeLevel(local, 1.0);
             float ahead = EraChange.y - level;
             float k = clamp(ahead / EraChange.z, 0.0, 1.0);
-            inEra = eraChange(world, int(EraChange.x + 0.5), insideEra, k, local, uv, screen, time);
-            // the front itself is her magic, a thin scarlet shimmer running out over the ground and everything on it
-            if (dist < 1.0e8) {
+            vec3 cell = texelCell(position, dir, normal, dist * pixelAngle, pixel, hand || sky);
+            inEra = eraChange(world, int(EraChange.x + 0.5), insideEra, k, cell, uv, screen, time);
+            // the front itself is her magic: a thin line of scarlet running out over the ground and everything on it,
+            // glittering texel by texel
+            if (!sky) {
                 float edge = exp(-ahead * ahead / 0.9);
-                float glint = hash12(floor(local.xz * 2.0 + local.y * 1.3) + floor(time * 14.0) * vec2(5.0, 9.0));
-                magic += vec3(1.0, 0.16, 0.24) * edge * (0.05 + 0.6 * step(0.8, glint) * glint);
+                float glitter = hash12(cell.xy + cell.z * 61.0 + floor(time * 14.0) * vec2(5.0, 9.0));
+                magic += vec3(1.0, 0.16, 0.24) * edge * (0.06 + 0.55 * step(0.91, glitter));
             }
         } else {
             inEra = eraLook(world, insideEra, uv, screen, time);
@@ -775,8 +812,9 @@ void main() {
             if (amount <= 0.0 || any(lessThan(position, RemnantLow[i].xyz)) || any(greaterThan(position, RemnantHigh[i].xyz))) {
                 continue;
             }
-            color = remnantLook(color, texture(MagicSampler, uv).rgb, position - RemnantLow[i].xyz, uv, pixel, screen, time, amount, RemnantStyle[i],
-                    RemnantHigh[i].w);
+            vec3 cell = texelCell(position, dir, normal, dist * pixelAngle, pixel, false);
+            color = remnantLook(color, texture(MagicSampler, uv).rgb, position - RemnantLow[i].xyz, RemnantHigh[i].xyz - RemnantLow[i].xyz, cell, uv,
+                    pixel, screen, time, amount, RemnantStyle[i]);
         }
     }
     color = mix(color, wall.rgb, wall.a);

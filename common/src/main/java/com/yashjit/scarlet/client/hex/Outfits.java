@@ -33,13 +33,15 @@ import org.jspecify.annotations.Nullable;
  * <p>Stepping in or out, the change glitches red: the two sets of clothes flicker back and forth, more and more often
  * the new one, while red bars tear across them and red static crawls over them. In an unsteady Hex an outfit jumps
  * into another era's now and then, or slips off for a moment. And while the home a caster's fallen Hex left behind
- * glitches on, their clothes slip through the eras with it.
+ * steps back through the eras, their clothes turn with it.
  */
 public final class Outfits {
 
     /** Outfits in each era's wardrobe. */
     public static final int WARDROBE = 4;
     private static final float CHANGE_TICKS = 20.0F;
+    /** How far round their home each era's sweep comes before a caster's clothes turn with it. */
+    private static final float TURN_AT = 0.5F;
 
     private static final Map<UUID, Crossing> CROSSINGS = new HashMap<>();
     private static @Nullable ClientLevel seenLevel;
@@ -55,9 +57,9 @@ public final class Outfits {
             return null;
         }
         double now = seenLevel.getGameTime() + partialTick;
-        float worn = Remnants.worn(player, now);
-        if (worn > 0.0F) {
-            return slipping(player, slim, now, worn);
+        Remnants.Phase phase = Remnants.wornPhase(player, now);
+        if (phase != null) {
+            return turning(player, slim, now, phase);
         }
         Crossing crossing = CROSSINGS.get(player.getUUID());
         if (crossing == null) {
@@ -84,16 +86,26 @@ public final class Outfits {
     }
 
     /**
-     * Clothes slipping through the eras with the home a fallen Hex left glitching by them: another era's every few
-     * frames, the faster the wilder it glitches, and now and then their own for a moment.
+     * Clothes turning through the eras with the home a fallen Hex left by them, each era's as its sweep comes halfway
+     * round the house, flickering between the two for a moment as they do; their own until the first.
      */
-    private static @Nullable Identifier slipping(Player player, boolean slim, double now, float glitch) {
-        int hold = glitch > 0.7F ? 1 : glitch > 0.4F ? 2 : 3;
-        long beat = Glitch.frame(now) / hold;
-        if (Glitch.hash(beat, player.getId(), 41) < 0.15F + 0.15F * (1.0F - glitch)) {
-            return null;
+    private static @Nullable Identifier turning(Player player, boolean slim, double now, Remnants.Phase phase) {
+        float past = phase.sweep() - TURN_AT;
+        Era era = past >= 0.0F ? phase.after() : phase.before();
+        if (Math.abs(past) < 0.08F && Glitch.hash(Glitch.frame(now), player.getId(), 41) < 0.5F) {
+            era = past >= 0.0F ? phase.before() : phase.after();
         }
-        return texture(player, Era.byIndex((int) (Glitch.hash(beat, player.getId(), 43) * Era.values().length)), slim);
+        return era == null ? null : texture(player, era, slim);
+    }
+
+    /**
+     * Whether someone's clothes are turning to a new era with the home a fallen Hex left by them, between this tick and
+     * the last.
+     */
+    private static boolean turnedWith(Player player, long now) {
+        Remnants.Phase phase = Remnants.wornPhase(player, now);
+        Remnants.Phase before = Remnants.wornPhase(player, now - 1);
+        return phase != null && before != null && phase.sweep() >= TURN_AT && (before.sweep() < TURN_AT || before.index() != phase.index());
     }
 
     private static Identifier texture(Player player, Era era, boolean slim) {
@@ -142,10 +154,10 @@ public final class Outfits {
             }
             float worn = Remnants.worn(player, now);
             if (worn > 0.0F && !minecraft.isPaused() && !ScarletFx.isFirstPersonViewOf(player)) {
-                // slipping through the eras with the home left glitching by them
+                // turning through the eras with the home left by them
                 AABB box = player.getBoundingBox();
-                Glitch.crawl(new Vec3(box.minX, box.minY, box.minZ), new Vec3(box.maxX, box.maxY, box.maxZ), 0.4F + 0.8F * worn);
-                if (ScarletFx.random().nextFloat() < 0.05F + 0.1F * worn) {
+                Glitch.crawl(new Vec3(box.minX, box.minY, box.minZ), new Vec3(box.maxX, box.maxY, box.maxZ), 0.3F + 0.4F * worn);
+                if (turnedWith(player, now)) {
                     SlipFx.body(player, now);
                 }
             }
@@ -187,10 +199,11 @@ public final class Outfits {
             }
             float change = change(crossing, now);
             float intensity = change >= 0.0F ? (float) Math.sin(Math.PI * Math.min(1.0F, change * 1.15F)) : 0.0F;
-            // slipping with the home left glitching by them, the red over them flaring and dying with each slip
-            float worn = Remnants.worn(player, now);
-            if (worn > 0.0F) {
-                intensity = Math.max(intensity, worn * (0.25F + 0.5F * Glitch.hash(Glitch.frame(now), player.getId(), 47)));
+            // turning with the home left by them, the red over them faint, and flaring as their clothes turn
+            Remnants.Phase phase = Remnants.wornPhase(player, now);
+            if (phase != null) {
+                float turn = (phase.sweep() - TURN_AT) / 0.07F;
+                intensity = Math.max(intensity, Remnants.worn(player, now) * (0.15F + 0.6F * (float) Math.exp(-turn * turn)));
             }
             if (intensity > 0.02F) {
                 Vec3 center = player.getPosition(partialTick).add(0.0, player.getBbHeight() * 0.5, 0.0).subtract(camera);

@@ -73,9 +73,12 @@ public final class HexScreen {
 
     // mat4, then the shapes and styles of each Hex, the camera and frame parameters, the ripples and how hard each
     // struck, where each Hex is parted, how far a new era has spread over the one around the camera, the view coming
-    // through a wall, and the boxes and slips of the homes fallen Hexes have left standing
+    // through a wall, the boxes and slips of the homes fallen Hexes have left standing, and where the camera is in the
+    // world's grid of blocks
     private static final int UNIFORM_SIZE = 64 + MAX_HEXES * 16 * 2 + 16 * 2 + MAX_RIPPLES * 16 + MAX_RIPPLES / 4 * 16 + MAX_HEXES * 16 + 16 + 16
-            + MAX_REMNANTS * 16 * 3;
+            + MAX_REMNANTS * 16 * 3 + 16;
+    /** The camera's place in the world's grid of blocks is passed modulo this, which keeps it precise as a float. */
+    private static final double GRID_WRAP = 256.0;
     private static final float ENTER_RATE = 5.0F;
     private static final float LEAVE_RATE = 7.0F;
     /** Seconds the view takes to come through a wall, as the shader has it. */
@@ -361,13 +364,21 @@ public final class HexScreen {
                 }
             }
             for (int i = 0; i < MAX_REMNANTS; i++) {
-                Remnants.Style style = i < remnants.size() ? Remnants.style(remnants.get(i), now) : null;
-                if (style != null) {
-                    builder.putVec4(style.kind(), style.era().ordinal(), style.seed() & 1023, 0.0F);
+                Remnants.Phase phase = i < remnants.size() ? Remnants.phase(remnants.get(i), now) : null;
+                if (phase != null) {
+                    // as it was built, it is seen as it is, as the present is
+                    Era before = phase.before() != null ? phase.before() : Era.PRESENT;
+                    builder.putVec4(before.ordinal(), phase.after().ordinal(), phase.sweep(), phase.start());
                 } else {
-                    builder.putVec4(0.0F, 0.0F, 0.0F, 0.0F);
+                    builder.putVec4(Era.PRESENT.ordinal(), Era.PRESENT.ordinal(), 0.0F, 0.0F);
                 }
             }
+            builder.putVec4(wrapped(cameraPos.x), wrapped(cameraPos.y), wrapped(cameraPos.z), 0.0F);
         }
+    }
+
+    private static float wrapped(double coordinate) {
+        double block = Math.floor(coordinate);
+        return (float) (Math.floorMod((long) block, (long) GRID_WRAP) + (coordinate - block));
     }
 }

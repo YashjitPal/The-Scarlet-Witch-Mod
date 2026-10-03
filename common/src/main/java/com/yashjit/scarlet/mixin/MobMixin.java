@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.mixin;
 
 import com.yashjit.scarlet.hex.HexEjection;
+import com.yashjit.scarlet.hex.HexRipples;
 import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.magic.MindControl;
 import com.yashjit.scarlet.magic.RuneTraps;
@@ -64,8 +65,11 @@ abstract class MobMixin {
     @Inject(method = "aiStep", at = @At("TAIL"))
     private void scarlet$stillInside(CallbackInfo ci) {
         Mob self = (Mob) (Object) this;
-        if (self.tickCount % 20 == 0 && self.level() instanceof ServerLevel level) {
-            Residents.checkStillInside(level, self);
+        if (self.level() instanceof ServerLevel level) {
+            HexRipples.watch(self);
+            if (self.tickCount % 20 == 0) {
+                Residents.checkStillInside(level, self);
+            }
         }
     }
 }

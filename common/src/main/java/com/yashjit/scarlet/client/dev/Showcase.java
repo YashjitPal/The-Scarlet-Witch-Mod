@@ -81,6 +81,9 @@ public final class Showcase {
     /** A server to play the scene on instead of the test world, given by {@code -PshowcaseServer=<address>}. */
     private static final @Nullable String SERVER = System.getProperty("scarlet.showcase.server");
     private static final int SETTLE_TICKS = 60;
+    /** Half a block on into the Hex, for whoever is stepped in through its wall a little at a time. */
+    private static final String STEP_IN = "execute as @a at @s run tp @s ~ ~ ~-0.5";
+    private static final String PIG_IN = "execute as @e[tag=scarlet_walker] at @s run tp @s ~ ~ ~-0.5";
 
     private static State state = State.WAITING_FOR_MENU;
     private static int wait;
@@ -1146,8 +1149,8 @@ public final class Showcase {
                 }
                 s.playerCamera();
             }
-            // the founding from the caster's eyes alone, without the circling view: down onto the floor, and out of the
-            // front door onto the porch
+            // the founding from the caster's eyes alone, without the circling view: down onto the floor, where the Hex
+            // bursts out of them as they stand
             case "stepout" -> s
                     .land()
                     .dispelHexes()
@@ -1163,7 +1166,7 @@ public final class Showcase {
                     .then(minecraft -> com.yashjit.scarlet.config.ScarletClientConfig.get().cinematicFounding = false, 0)
                     .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().anchor()
                     .tap()
-                    .shot("step_rising", 290).shot("step_down", 40).shot("step_out", 30).shot("step_porch", 20)
+                    .shot("step_rising", 290).shot("step_down", 40).shot("step_burst", 12).shot("step_spread", 30)
                     .then(minecraft -> com.yashjit.scarlet.config.ScarletClientConfig.get().cinematicFounding = true, 0)
                     .view(-7, 4, -13, 0, 2, -4).shot("step_after", 4)
                     .playerCamera();
@@ -1286,6 +1289,34 @@ public final class Showcase {
                     .shot("finale_going_d", 60).shot("finale_going_e", 60).shot("finale_going_f", 50)
                     .shot("finale_gone", 60)
                     .playerCamera();
+            // the home a fallen Hex leaves, seen whole from across the street: it steps back through the eras one at a
+            // time, each sweeping round it and up it, then goes a block at a time
+            case "fallen" -> {
+                s.land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("execute as @a run scarlet hex build home")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-40 ~ ~-40 ~40 ~16 ~40 minecraft:air")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().anchor()
+                        .tap().then(minecraft -> {
+                        }, 420)
+                        .command("execute as @a run scarlet hex era 1970s").then(minecraft -> {
+                        }, 200)
+                        // out across the street from its front, looking back at it
+                        .place(0, 1, -22).land()
+                        .view(-16, 9, -26, 0, 4, 0)
+                        .command("execute as @a run scarlet hex dispel")
+                        .shot("fallen_wall", 60).then(minecraft -> {
+                        }, 80);
+                for (char frame = 'a'; frame <= 'z'; frame++) {
+                    s.shot("fallen_" + frame, 8);
+                }
+                s.shot("fallen_going", 100).shot("fallen_gone", 300).playerCamera();
+            }
             case "crossings" -> s
                     .land()
                     .dispelHexes()
@@ -1406,7 +1437,7 @@ public final class Showcase {
                     .tap()
                     .shot("found_a", 14).shot("found_b", 26).shot("found_c", 30).shot("found_d", 60).shot("found_e", 60).shot("found_f", 60)
                     .shot("found_g", 40)
-                    .shot("found_land", 12).shot("found_out", 16).shot("found_porch", 14)
+                    .shot("found_land", 12).shot("found_landed", 10)
                     .shot("found_burst_a", 3).shot("found_burst_b", 5).shot("found_burst_c", 12).shot("found_burst_d", 26)
                     .shot("found_after", 60);
             case "anchor" -> s
@@ -1541,7 +1572,26 @@ public final class Showcase {
                     .command("execute as @a at @s run scarlet hex size 24")
                     .shot("cross_shrink_a", 2).shot("cross_shrink_b", 1).shot("cross_shrink_c", 1).shot("cross_shrink_d", 1).shot("cross_shrink_e", 1)
                     .shot("cross_shrink_f", 1).shot("cross_shrink_g", 1).shot("cross_shrink_h", 1).shot("cross_shrink_i", 1).shot("cross_shrink_j", 1)
-                    .shot("cross_shrink_after", 20);
+                    .shot("cross_shrink_after", 20)
+                    // walking in, seen from outside: the wall flares red where they pass, the red soaking out around them
+                    // as rings run out across it
+                    .command("execute at @e[tag=scarlet_origin] run tp @a ~ ~ ~27 180 0")
+                    .then(minecraft -> {
+                    }, 20)
+                    .anchor().view(6.0, 2.5, 3.5, 0.0, 1.5, -3.0)
+                    // stepped in half a block at a time, as the free camera keeps the keys from the player
+                    .command(STEP_IN).command(STEP_IN).command(STEP_IN).command(STEP_IN).command(STEP_IN).command(STEP_IN)
+                    .command(STEP_IN).command(STEP_IN)
+                    .shot("cross_seen_a", 0).shot("cross_seen_b", 4).shot("cross_seen_c", 5).shot("cross_seen_d", 8)
+                    .shot("cross_seen_after", 20)
+                    // and a creature wandering in beside them
+                    .command("execute at @e[tag=scarlet_origin] run summon minecraft:pig ~3 ~ ~27 {Tags:[\"scarlet_walker\"],NoAI:1b,Rotation:[180f,0f]}")
+                    .then(minecraft -> {
+                    }, 10)
+                    .command(PIG_IN).command(PIG_IN).command(PIG_IN).command(PIG_IN).command(PIG_IN).command(PIG_IN).command(PIG_IN)
+                    .command(PIG_IN)
+                    .shot("cross_pig_a", 0).shot("cross_pig_b", 5).shot("cross_pig_c", 8)
+                    .playerCamera();
             case "bigtown" -> s
                     .land()
                     .dispelHexes()

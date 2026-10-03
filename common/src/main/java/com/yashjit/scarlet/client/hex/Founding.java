@@ -40,11 +40,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.DoorBlock;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 
@@ -65,11 +61,7 @@ public final class Founding {
     /** How high the caster floats over their home's floor, and the floor over the land it was cast on. */
     private static final double HOVER = 1.0;
     private static final double FLOOR = 1.0;
-    /** How far out past the front door the porch is. */
-    private static final double PAST_DOOR = 1.6;
-    /** Farthest out from the middle of the living room its front door is looked for. */
-    private static final int DOOR_REACH = 9;
-    /** How hard a caster walking out of their home is held down onto its floor, a tick's fall. */
+    /** How hard a caster come down in their home is held down onto its floor, a tick's fall. */
     private static final double WALK_PRESS = 0.08;
     /** How near the view starts out, on the caster themselves, before it draws back to take in the whole house. */
     private static final float CLOSE_RADIUS = 5.5F;
@@ -164,13 +156,6 @@ public final class Founding {
     }
 
     /**
-     * How far the caster has drifted out of their front door onto the porch, once down: 0 to 1.
-     */
-    private static float stepOut(HexSnapshot hex, double now) {
-        return Ease.inOutCubic(Ease.clamp01((float) ((now - homeDone(hex) - Hexes.LAND_TICKS) / Hexes.STEP_OUT_TICKS)));
-    }
-
-    /**
      * How far a caster is into floating over their home: rising to 1, holding there while it builds, and back to 0 as
      * they come down on its floor.
      */
@@ -241,22 +226,17 @@ public final class Founding {
 
     /**
      * Floats the caster: up off the land, held over the middle of the rising house with a slow bob, then down onto its
-     * floor once it stands, turning to its front door as it swings open, and drifting out through it onto the porch,
-     * looking out over the street.
+     * floor once it stands, turning to look out of its front, where the Hex bursts out of them as they stand.
      */
     private static void hover(LocalPlayer player, HexSnapshot hex, double now) {
         float rise = rise(hex, now);
         float land = land(hex, now);
-        float out = stepOut(hex, now);
         double bob = Mth.sin((float) now * 0.09F) * 0.07 * rise * (1.0F - land);
         Vec3 center = hex.center();
-        // coming down onto the middle of the block they float over, in line with the front door
+        // coming down onto the middle of the block they float over
         Vec3 middle = new Vec3(Mth.floor(center.x) + 0.5, center.y, Mth.floor(center.z) + 0.5);
         Vec3 over = center.lerp(middle, land);
-        double yaw = Math.toRadians(outYaw);
-        Vec3 way = new Vec3(-Math.sin(yaw), 0.0, Math.cos(yaw));
-        Vec3 toPorch = out > 0.0F ? way.scale(porch(player.level(), middle, way) * out) : Vec3.ZERO;
-        Vec3 goal = new Vec3(over.x, center.y + rise * (FLOOR + HOVER) - land * HOVER + bob, over.z).add(toPorch);
+        Vec3 goal = new Vec3(over.x, center.y + rise * (FLOOR + HOVER) - land * HOVER + bob, over.z);
         // carried across to where their home stood before, cast a little way off it, no faster than flying
         Vec3 step = goal.subtract(player.position()).scale(0.35);
         double across = step.horizontalDistance();
@@ -277,40 +257,6 @@ public final class Founding {
             player.setYRot(player.getYRot() + Mth.wrapDegrees(outYaw - player.getYRot()) * 0.2F);
             player.setXRot(Mth.lerp(0.2F, player.getXRot(), 2.0F));
         }
-    }
-
-    /**
-     * How far out from the middle of the living room the porch is: a little way past the front door, wherever it is on
-     * the way out, as a home made of something that stood there before has its door where it had it. Nothing, if no
-     * open door is straight ahead with a clear way to it and out past it; then they stay in.
-     */
-    private static double porch(Level level, Vec3 middle, Vec3 way) {
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (int d = 1; d <= DOOR_REACH; d++) {
-            pos.set(middle.x + way.x * d, middle.y + FLOOR, middle.z + way.z * d);
-            BlockState state = level.getBlockState(pos);
-            if (state.getBlock() instanceof DoorBlock) {
-                boolean out = state.getValue(DoorBlock.OPEN);
-                for (int past = 1; past <= 2 && out; past++) {
-                    out = walkable(level, BlockPos.containing(middle.x + way.x * (d + past), middle.y + FLOOR, middle.z + way.z * (d + past)));
-                }
-                return out ? d + PAST_DOOR : 0.0;
-            }
-            if (!walkable(level, pos)) {
-                return 0.0;
-            }
-        }
-        return 0.0;
-    }
-
-    /**
-     * Whether someone could walk through a spot: nothing on the floor there they couldn't walk over, like a rug, and
-     * nothing at head height.
-     */
-    private static boolean walkable(Level level, BlockPos feet) {
-        VoxelShape low = level.getBlockState(feet).getCollisionShape(level, feet);
-        BlockPos head = feet.above();
-        return (low.isEmpty() || low.max(Direction.Axis.Y) <= 0.1) && level.getBlockState(head).getCollisionShape(level, head).isEmpty();
     }
 
     /**
@@ -601,19 +547,15 @@ public final class Founding {
             return;
         }
         if (!beams.isEmpty()) {
-            GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
-                Glow.Billboard axes = Glow.billboard(pose);
+            GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
                 for (Beam beam : beams) {
-                    MagicBeam.tint(buffer, pose, axes, beam.from(), beam.to(), beam.presence());
+                    MagicBeam.draw(buffer, pose, beam.from(), beam.to(), now, beam.seed(), beam.presence());
                 }
             });
         }
         List<Tendril> tendrils = List.copyOf(TENDRILS);
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
-            for (Beam beam : beams) {
-                MagicBeam.draw(buffer, pose, axes, beam.from(), beam.to(), now, beam.seed(), beam.presence());
-            }
             for (Tendril tendril : tendrils) {
                 Player caster = level.getPlayerByUUID(tendril.caster());
                 if (caster != null) {
