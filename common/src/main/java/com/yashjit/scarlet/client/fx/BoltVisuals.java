@@ -38,6 +38,9 @@ public final class BoltVisuals {
     /** Nearer the eyes than this it is not drawn at all, and it comes in fully over the next stretch. */
     private static final float NEAR = 0.9F;
     private static final float NEAR_FADE = 1.6F;
+    /** The same for the stream of smoke, which would cover the head from between it and the eyes. */
+    private static final float TRAIL_NEAR = 1.5F;
+    private static final float TRAIL_NEAR_FADE = 2.0F;
     private static final float TAU = (float) (Math.PI * 2);
 
     private BoltVisuals() {
@@ -108,7 +111,7 @@ public final class BoltVisuals {
         int frame = (int) Math.floor(age);
         for (int k = 0; k < rows; k++) {
             float s = (k + 0.5F) / rows;
-            float near = near(ribbon.point(k).distance(eye));
+            float near = Math.clamp((ribbon.point(k).distance(eye) - TRAIL_NEAR) / TRAIL_NEAR_FADE, 0.0F, 1.0F);
             if (near <= 0.0F) {
                 continue;
             }

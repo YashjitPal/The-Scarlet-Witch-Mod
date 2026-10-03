@@ -5,6 +5,7 @@ import com.yashjit.scarlet.client.anim.CastPoses;
 import com.yashjit.scarlet.client.anim.FirstPersonGestures;
 import com.yashjit.scarlet.client.costume.CostumeRendering;
 import com.yashjit.scarlet.client.costume.FirstPersonCostume;
+import com.yashjit.scarlet.client.darkhold.DarkholdBook;
 import com.yashjit.scarlet.client.magic.Hands;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
@@ -50,6 +51,7 @@ abstract class AvatarRendererMixin {
     private void scarlet$costumeOnFirstPersonArm(PoseStack poseStack, SubmitNodeCollector collector, int lightCoords, Identifier skinTexture,
                                                  ModelPart arm, boolean hasSleeve, CallbackInfo ci) {
         FirstPersonCostume.render((AvatarRenderer<?>) (Object) this, poseStack, collector, lightCoords, arm);
+        DarkholdBook.submitCarried(((AvatarRenderer<?>) (Object) this).getModel(), arm, poseStack, collector, lightCoords);
         LocalPlayer player = Minecraft.getInstance().player;
         if (player != null) {
             Hands.recordFirstPerson(arm == ((AvatarRenderer<?>) (Object) this).getModel().rightArm, player.getSkin().model() == PlayerModelType.SLIM,

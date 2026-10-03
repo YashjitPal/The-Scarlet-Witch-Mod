@@ -11,7 +11,7 @@
     "fallback": {
       "type": "minecraft:condition",
       "property": "minecraft:using_item",
-      "on_true": { "type": "minecraft:model", "model": "scarlet:item/darkhold_open" },
+      "on_true": { "type": "minecraft:empty" },
       "on_false": { "type": "minecraft:model", "model": "scarlet:item/darkhold_closed" }
     }
   }

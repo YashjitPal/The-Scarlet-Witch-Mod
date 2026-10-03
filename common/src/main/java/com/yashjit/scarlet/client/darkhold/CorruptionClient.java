@@ -130,23 +130,26 @@ public final class CorruptionClient {
     }
 
     /**
-     * Sickly sparks and black smoke rising off the open pages.
+     * Sickly sparks and black smoke rising off the open pages as the book floats.
      */
     private static void pages(Player player, RandomSource random) {
-        Vec3 look = player.getLookAngle();
-        Vec3 book = ScarletFx.isFirstPersonViewOf(player)
-                ? player.getEyePosition().add(look.scale(0.55)).add(0.0, -0.32, 0.0)
-                : player.position().add(0.0, player.getBbHeight() * 0.62, 0.0).add(new Vec3(look.x, 0.0, look.z).normalize().scale(0.45));
+        if (!DarkholdBook.floating(player)) {
+            return;
+        }
+        Vec3 book = DarkholdBook.position(player);
+        // in your own view a wisp of it would be a wall of black
+        boolean inside = DarkholdBook.seenFromInside(player);
         float density = ScarletFx.density();
-        if (random.nextFloat() < 0.8F * density) {
-            Vec3 at = book.add((random.nextDouble() - 0.5) * 0.3, random.nextDouble() * 0.05, (random.nextDouble() - 0.5) * 0.3);
-            Vec3 rise = new Vec3((random.nextDouble() - 0.5) * 0.01, 0.015 + random.nextDouble() * 0.025, (random.nextDouble() - 0.5) * 0.01);
-            ScarletFx.spark(at, rise, 18 + random.nextInt(14), 0.014F + random.nextFloat() * 0.01F,
+        if (random.nextFloat() < (inside ? 0.45F : 0.6F) * density) {
+            double spread = inside ? 0.7 : 0.3;
+            Vec3 at = book.add((random.nextDouble() - 0.5) * spread, random.nextDouble() * 0.05, (random.nextDouble() - 0.5) * spread);
+            Vec3 rise = new Vec3((random.nextDouble() - 0.5) * 0.01, 0.012 + random.nextDouble() * 0.02, (random.nextDouble() - 0.5) * 0.01);
+            ScarletFx.spark(at, rise, 18 + random.nextInt(14), 0.012F + random.nextFloat() * 0.008F,
                     random.nextFloat() < 0.3F ? 0xFFB3BE : ScarletPalette.SICKLY, ScarletPalette.ABYSS, -0.0006F, 0.97F);
         }
-        if (random.nextFloat() < 0.35F * density) {
-            Vec3 at = book.add((random.nextDouble() - 0.5) * 0.25, 0.02, (random.nextDouble() - 0.5) * 0.25);
-            ScarletFx.smoke(at, new Vec3(0.0, 0.012 + random.nextDouble() * 0.01, 0.0), 26 + random.nextInt(16), 0.07F, 0.55F);
+        if (!inside && random.nextFloat() < 0.14F * density) {
+            Vec3 at = book.add((random.nextDouble() - 0.5) * 0.25, 0.06, (random.nextDouble() - 0.5) * 0.25);
+            ScarletFx.smoke(at, new Vec3(0.0, 0.012 + random.nextDouble() * 0.01, 0.0), 22 + random.nextInt(12), 0.05F, 0.4F);
         }
     }
 

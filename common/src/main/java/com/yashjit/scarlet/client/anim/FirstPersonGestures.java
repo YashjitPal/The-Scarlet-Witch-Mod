@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
  *     <li>A striking arm reaches toward the crosshair.</li>
  *     <li>Holding the shield raises both palms in front of you, straining against it.</li>
  *     <li>Gathering a Shockwave draws both hands in together; it bursts out of them flung wide.</li>
+ *     <li>Reading the Darkhold holds both hands up either side of it as it floats before you.</li>
  *     <li>The empty off hand, which vanilla never shows, rises into view while you cast and sinks away when you
  *     stop.</li>
  * </ul>
@@ -54,6 +55,9 @@ public final class FirstPersonGestures {
     private static final float RAISE_X = -0.85F;
     private static final float RAISE_Y = 0.15F;
     private static final float RAISE_Z = 0.12F;
+    private static final float READ_X = -0.3F;
+    private static final float READ_Y = 0.1F;
+    private static final float READ_Z = 0.22F;
 
     /**
      * Development only: holds both arms at full reach with this swing (x, y, z) instead of the real gesture.
@@ -71,7 +75,7 @@ public final class FirstPersonGestures {
      */
     public static void transform(PoseStack poseStack, HumanoidArm arm) {
         float reach = Math.max(Math.min(extension(arm), 1.2F), Math.max(Math.max(shield(), Math.max(hold(), tear())), Math.max(gather(), fling())));
-        reach = Math.max(reach, Math.max(beam(arm), raise()));
+        reach = Math.max(reach, Math.max(beam(arm), Math.max(raise(), read())));
         if (reach <= 0.0F) {
             return;
         }
@@ -143,6 +147,14 @@ public final class FirstPersonGestures {
             arm.yRot += side * RAISE_Y * raise;
             arm.zRot += side * RAISE_Z * raise;
         }
+        float read = read();
+        if (read > 0.0F) {
+            // weaving slowly, a beat apart, as they hold it up
+            float weave = Mth.sin((float) now() * 0.09F + (right ? 0.0F : 1.7F)) * 0.04F;
+            arm.xRot += (READ_X + weave) * read;
+            arm.yRot += side * READ_Y * read;
+            arm.zRot += side * READ_Z * read;
+        }
         float extension = extension(right ? HumanoidArm.RIGHT : HumanoidArm.LEFT);
         if (extension == 0.0F) {
             return;
@@ -167,7 +179,7 @@ public final class FirstPersonGestures {
             return;
         }
         boolean wanted = debugSwing != null || shield() > 0.02F || hold() > 0.02F || tear() > 0.02F || gather() > 0.02F || fling() > 0.02F
-                || raise() > 0.02F
+                || raise() > 0.02F || read() > 0.02F
                 || offHandEmpty && CrownItem.isWearingCrown(player) && CastGestures.sinceLastStrike(player, now()) < OFF_HAND_LINGER;
         offHandPresence = Ease.damp(offHandPresence, wanted ? 1.0F : 0.0F, wanted ? 10.0F : 4.0F, seconds);
         if (!offHandEmpty || offHandPresence < 0.01F) {
@@ -217,6 +229,14 @@ public final class FirstPersonGestures {
     private static float raise() {
         LocalPlayer player = Minecraft.getInstance().player;
         return player == null || debugSwing != null ? 0.0F : PoseBlends.of(player).raise;
+    }
+
+    /**
+     * Both hands held up either side of the Darkhold floating before you as you read it.
+     */
+    private static float read() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player == null || debugSwing != null ? 0.0F : PoseBlends.of(player).read;
     }
 
     private static float fling() {

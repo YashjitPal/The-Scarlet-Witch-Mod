@@ -947,6 +947,34 @@ public final class Showcase {
                     }, 10)
                     .hold(true).shot("darkhold_shield_clean", 14).hold(false)
                     .select(Spell.CHAOS_BOLT);
+            // the tome itself: carried, then read, rising out of the hand to float open before the reader and turning
+            // its pages, in the first person and from all around, at noon and at midnight, and sinking back into the hand
+            case "tome" -> s
+                    .land()
+                    .command("kill @e[type=minecraft:mannequin]")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with scarlet:darkhold")
+                    .command("item replace entity @a weapon.offhand with minecraft:air")
+                    .command("scarlet corruption @p set 0")
+                    .command("time set noon")
+                    .ensureUnsuited().face(0, 0)
+                    .then(minecraft -> minecraft.gui.hud.getChat().clearMessages(false), 1)
+                    .playerCamera().hideHud(false).shot("tome_carried", 12)
+                    .face(30, 25).shot("tome_carried_down", 4).face(0, 0)
+                    .inventory().shot("tome_inventory", 10).then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    // hiding the HUD hides your hands, and the book is drawn among them
+                    .hold(true).shot("tome_rising", 3).shot("tome_opening", 5).shot("tome_open", 24).shot("tome_turning", 25).hold(false)
+                    .shot("tome_closing", 3).shot("tome_back", 14)
+                    .hideHud(true)
+                    .look(2.6, 30, 10, 1.4).hold(true).shot("tome_front", 30)
+                    .look(2.4, 90, 8, 1.3).shot("tome_side", 6)
+                    .look(2.6, 155, 14, 1.6).shot("tome_behind", 6)
+                    .look(1.5, 15, 28, 1.8).shot("tome_close", 6).hold(false)
+                    .command("time set midnight").then(minecraft -> {
+                    }, 10)
+                    .look(2.6, 30, 10, 1.4).hold(true).shot("tome_night", 30)
+                    .playerCamera().hideHud(false).shot("tome_night_view", 6).hold(false)
+                    .command("time set noon");
             // dreamwalking: choosing where to go, sitting down and rising, the spirit going into a cow by where the player
             // would wake and looking back at the body it left, the body up close, clean and corrupted, and a blow to it
             // snapping the spirit back; then into a piglin in the Nether, and waking with the use key

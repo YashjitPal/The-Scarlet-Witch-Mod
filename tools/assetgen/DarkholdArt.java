@@ -1,32 +1,41 @@
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 /**
- * The Darkhold's art: its inventory icon, the tome held in the hand (closed, and lying open while it is read) and the
+ * The Darkhold's art: its inventory icon, the tome carried in the hand, the tome floating open while it is read, and the
  * veins its corruption sends crawling in at the edges of the view.
  *
- * <p>The book is bound in black-crimson leather with tarnished iron at its corners and spine, held shut by a strap, and
- * carries a horned iron crest on its cover around a stone that glows sickly red. Its pages are old and yellowed, written
- * close in a dark hand around red sigils.
+ * <p>As in the films, it is an ancient grimoire bound in stone and metal more than leather: a slab of weathered dark
+ * stone with a raised, chipped frame, the roots and branches of a great tree carved spreading from a stone set in bronze
+ * that glows sickly red, tiles of garnet mosaic beside it, and a spine of tarnished bronze cut with hieroglyphs. Its
+ * pages are old vellum, written close in a dark hand around red runes that burn as it is read.
  *
  * <p>Run with everything else from {@link AssetGen}, or on its own: {@code java tools/assetgen/DarkholdArt.java}.
  */
 final class DarkholdArt {
 
-    static final int VOID = 0x0B0004;
-    static final int LEATHER_DARK = 0x15060A;
-    static final int LEATHER = 0x23080F;
-    static final int LEATHER_LIGHT = 0x3B1119;
-    static final int IRON_DARK = 0x29232A;
-    static final int IRON = 0x4C434B;
-    static final int IRON_LIGHT = 0x7A6E76;
-    static final int PAPER = 0xB4A88D;
-    static final int PAPER_DARK = 0x887C65;
+    static final int VOID = 0x0B0507;
+    static final int STONE_DEEP = 0x140E10;
+    static final int STONE_DARK = 0x221A1C;
+    static final int STONE = 0x32282B;
+    static final int STONE_LIGHT = 0x4A3B3F;
+    static final int STONE_EDGE = 0x6E5B5E;
+    static final int BRONZE_DARK = 0x2B2017;
+    static final int BRONZE = 0x54402A;
+    static final int BRONZE_LIGHT = 0x8A6E45;
+    static final int LINING_DARK = 0x16050A;
+    static final int LINING = 0x260A11;
+    static final int VELLUM = 0xAE9874;
+    static final int VELLUM_DARK = 0x84705A;
     static final int INK = 0x3A2A24;
+    static final int MOSAIC = 0x7A1626;
     static final int WINE = 0x5C0717;
     static final int SICKLY = 0x9B1B30;
     static final int GLOW = 0xE0143C;
@@ -34,16 +43,70 @@ final class DarkholdArt {
     static final int ABYSS = 0x3A0010;
     static final int DEEP = 0x6A0B20;
 
-    /** The crest on the cover, row by row: I iron, L light iron, D dark iron, W wine, S sickly, G glow, H hot. */
-    private static final String[] CREST = {
-            ".L..L.",
-            ".ILLI.",
-            "IWSSWI",
-            "ISGHSI",
-            "IWGGWI",
-            ".IWWI.",
-            "..II..",
-            "..DD..",
+    /**
+     * The front cover, 10 by 14: {@code T t S s d} stone from the lit raised edges down to the deep cuts, {@code ~} the
+     * weathered field, {@code L B b} bronze, {@code m w} mosaic, {@code r G H} the stone burning from sickly to hot, and
+     * {@code .} chipped away.
+     */
+    private static final String[] FRONT_COVER = {
+            ".TTTTTTTt.",
+            "TTd~~~~~td",
+            "T~Td~~~tsd",
+            "T~~Td~ts~d",
+            "T~~~LBs~~d",
+            "Tm~LHGb~md",
+            "Tw~BGrb~wd",
+            "T~~~Bbd~~d",
+            "T~~~Ttd~~d",
+            "T~~~Ttd~~d",
+            "T~~~Ttd~~d",
+            "T~~TTttd~d",
+            "T~Td~~dtdd",
+            ".dddddddd.",
+    };
+
+    /** The back cover: the frame and one carved ring, its middle dark wine. */
+    private static final String[] BACK_COVER = {
+            ".TTTTTTTt.",
+            "T~~~~~~~~d",
+            "T~~~~~~~~d",
+            "T~~~~~~~~d",
+            "T~~~TTt~~d",
+            "T~~T~~~s~d",
+            "T~~T~ww~sd",
+            "T~~t~ww~sd",
+            "T~~~s~~s~d",
+            "T~~~~ss~~d",
+            "T~~~~~~~~d",
+            "T~~~~~~~~d",
+            "T~~~~~~~~d",
+            ".dddddddd.",
+    };
+
+    /** The spine, 4 by 14: bronze bands, and between them hieroglyphs, some of them red. */
+    private static final String[] SPINE_GLYPHS = {
+            "bLLb",
+            "bBBb",
+            "bdBb",
+            "bBdb",
+            "bLLb",
+            "bBrb",
+            "brBb",
+            "bBrb",
+            "bLLb",
+            "bdBb",
+            "bBdb",
+            "bdBb",
+            "bLLb",
+            "bbbb",
+    };
+
+    /** The raised bronze setting of the stone on the carried tome's cover, 4 by 4. */
+    private static final String[] SETTING = {
+            "bLBb",
+            "LHGb",
+            "BGrb",
+            "bBbb",
     };
 
     private DarkholdArt() {
@@ -56,201 +119,146 @@ final class DarkholdArt {
     static void generate(Path assets, Path preview) throws IOException {
         BufferedImage icon = icon();
         BufferedImage book = bookTexture();
+        BufferedImage open = OpenBook.texture(false);
+        BufferedImage glow = OpenBook.texture(true);
         BufferedImage veins = veins();
         AssetGen.writePng(icon, assets.resolve("textures/item/darkhold.png"));
         AssetGen.writePng(book, assets.resolve("textures/item/darkhold_book.png"));
+        AssetGen.writePng(open, assets.resolve("textures/entity/darkhold.png"));
+        AssetGen.writePng(glow, assets.resolve("textures/entity/darkhold_glow.png"));
         AssetGen.writeText(iconModel(), assets.resolve("models/item/darkhold.json"));
         AssetGen.writeText(closedModel(), assets.resolve("models/item/darkhold_closed.json"));
-        AssetGen.writeText(openModel(), assets.resolve("models/item/darkhold_open.json"));
+        Files.deleteIfExists(assets.resolve("models/item/darkhold_open.json"));
         AssetGen.writeText(itemDefinition(), assets.resolve("items/darkhold.json"));
         AssetGen.writePng(veins, assets.resolve("textures/gui/sprites/hud/darkhold_veins.png"));
         AssetGen.writePng(AssetGen.zoomSheet(List.of(icon, book), 256), preview.resolve("darkhold.png"));
+        AssetGen.writePng(zoom(open, 10), preview.resolve("darkhold_open.png"));
+        AssetGen.writePng(zoom(glow, 10), preview.resolve("darkhold_open_glow.png"));
         AssetGen.writePng(veins, preview.resolve("darkhold_veins.png"));
         System.out.println("Darkhold assets written to " + assets.toAbsolutePath());
+    }
+
+    private static BufferedImage zoom(BufferedImage image, int factor) {
+        BufferedImage zoomed = new BufferedImage(image.getWidth() * factor, image.getHeight() * factor, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = zoomed.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g.drawImage(image, 0, 0, zoomed.getWidth(), zoomed.getHeight(), null);
+        g.dispose();
+        return zoomed;
     }
 
     // ---------------------------------------------------------------- the icon
 
     /**
-     * The tome face on, its spine to the left and its page edges to the right.
+     * The tome face on: its spine to the left, the edges of its pages to the right.
      */
     static BufferedImage icon() {
         Pixels p = new Pixels(16, 16);
         Random random = new Random(1666);
-        for (int y = 1; y <= 14; y++) {
-            for (int x = 4; x <= 13; x++) {
-                p.set(x, y, leather(random, x - 4, y - 1, 10, 14));
-            }
-            p.set(2, y, LEATHER_DARK);
-            p.set(3, y, LEATHER);
-        }
-        // the edges of the pages, between the covers
-        for (int y = 2; y <= 13; y++) {
-            p.set(14, y, y % 2 == 0 ? PAPER : PAPER_DARK);
-        }
-        p.set(14, 1, LEATHER_DARK);
-        p.set(14, 14, LEATHER_DARK);
-        // a groove pressed into the leather all around the cover
-        for (int x = 5; x <= 12; x++) {
-            p.set(x, 2, LEATHER_DARK);
-            p.set(x, 13, LEATHER_DARK);
+        paint(p, 4, 1, FRONT_COVER, random);
+        for (int y = 0; y < SPINE_GLYPHS.length; y++) {
+            p.set(2, 1 + y, color(SPINE_GLYPHS[y].charAt(0), random));
+            p.set(3, 1 + y, color(SPINE_GLYPHS[y].charAt(2), random));
         }
         for (int y = 2; y <= 13; y++) {
-            p.set(5, y, LEATHER_DARK);
-            p.set(12, y, LEATHER_DARK);
+            p.set(14, y, y % 2 == 0 ? VELLUM : VELLUM_DARK);
         }
-        // iron bands across the spine
-        for (int y : new int[] {3, 12}) {
-            p.set(2, y, IRON);
-            p.set(3, y, IRON_LIGHT);
-        }
-        // iron at the corners of the cover, each with a spike
-        corner(p, 4, 1, 1, 1);
-        corner(p, 13, 1, -1, 1);
-        corner(p, 4, 14, 1, -1);
-        corner(p, 13, 14, -1, -1);
-        // the strap holding it shut, across the page edges
-        p.set(13, 7, IRON);
-        p.set(14, 7, IRON_LIGHT);
-        p.set(13, 8, IRON_DARK);
-        p.set(14, 8, IRON);
-        crest(p, 6, 4);
         return p.outlined(VOID);
     }
 
-    private static void corner(Pixels p, int x, int y, int dx, int dy) {
-        p.set(x, y, IRON_LIGHT);
-        p.set(x + dx, y, IRON);
-        p.set(x, y + dy, IRON);
-    }
-
-    private static void crest(Pixels p, int x0, int y0) {
-        for (int row = 0; row < CREST.length; row++) {
-            for (int col = 0; col < CREST[row].length(); col++) {
-                int color = switch (CREST[row].charAt(col)) {
-                    case 'I' -> IRON;
-                    case 'L' -> IRON_LIGHT;
-                    case 'D' -> IRON_DARK;
-                    case 'W' -> WINE;
-                    case 'S' -> SICKLY;
-                    case 'G' -> GLOW;
-                    case 'H' -> HOT;
-                    default -> -1;
-                };
+    /**
+     * Paints a map of pixels at x0, y0; {@code ~} is weathered stone, mottled at random.
+     */
+    private static void paint(Pixels p, int x0, int y0, String[] rows, Random random) {
+        for (int y = 0; y < rows.length; y++) {
+            for (int x = 0; x < rows[y].length(); x++) {
+                int color = color(rows[y].charAt(x), random);
                 if (color >= 0) {
-                    p.set(x0 + col, y0 + row, color);
+                    p.set(x0 + x, y0 + y, color);
                 }
             }
         }
     }
 
-    /**
-     * Old leather, mottled, a little lighter toward the top left where the light falls.
-     */
-    private static int leather(Random random, int x, int y, int width, int height) {
-        double light = 0.5 * (1.0 - (x / (double) width + y / (double) height) / 2.0) + 0.35 * random.nextDouble();
-        return light > 0.62 ? LEATHER_LIGHT : light < 0.22 ? LEATHER_DARK : LEATHER;
+    private static int color(char code, Random random) {
+        return switch (code) {
+            case 'T' -> STONE_EDGE;
+            case 't' -> STONE_LIGHT;
+            case 'S' -> STONE;
+            case 's' -> STONE_DARK;
+            case 'd' -> STONE_DEEP;
+            case '~' -> weathered(random);
+            case 'L' -> BRONZE_LIGHT;
+            case 'B' -> BRONZE;
+            case 'b' -> BRONZE_DARK;
+            case 'm' -> MOSAIC;
+            case 'w' -> WINE;
+            case 'r' -> SICKLY;
+            case 'G' -> GLOW;
+            case 'H' -> HOT;
+            case 'P' -> VELLUM;
+            case 'p' -> VELLUM_DARK;
+            case 'i' -> INK;
+            case 'l' -> LINING;
+            case 'k' -> LINING_DARK;
+            default -> -1;
+        };
     }
 
-    // ---------------------------------------------------------------- the tome in the hand
+    /**
+     * Old stone, mottled and pitted.
+     */
+    private static int weathered(Random random) {
+        float roll = random.nextFloat();
+        return roll < 0.18F ? STONE_DARK : roll > 0.93F ? STONE_LIGHT : STONE;
+    }
 
-    /** Regions of the 32x32 book texture, in pixels: x, y, width, height. */
+    // ---------------------------------------------------------------- the tome carried in the hand
+
+    /** Regions of the 32x32 texture of the tome carried shut, in pixels: x, y, width, height. */
     private static final int[] FRONT = {0, 0, 10, 14};
     private static final int[] BACK = {10, 0, 10, 14};
     private static final int[] SPINE = {20, 0, 4, 14};
     private static final int[] EDGE = {24, 0, 3, 13};
     private static final int[] TOP = {0, 14, 9, 3};
-    private static final int[] IRON_REGION = {10, 14, 4, 4};
-    private static final int[] CREST_REGION = {14, 14, 6, 8};
-    private static final int[] STRAP = {20, 14, 2, 4};
+    private static final int[] CORNER = {10, 14, 4, 4};
+    private static final int[] GEM = {14, 14, 4, 4};
     private static final int[] PLAIN = {22, 14, 4, 4};
-    private static final int[] LEFT_PAGE = {0, 22, 9, 10};
-    private static final int[] RIGHT_PAGE = {9, 22, 9, 10};
 
     static BufferedImage bookTexture() {
         Pixels p = new Pixels(32, 32);
         Random random = new Random(1666);
+        paint(p, FRONT[0], FRONT[1], FRONT_COVER, random);
+        paint(p, BACK[0], BACK[1], BACK_COVER, random);
+        // a chipped corner shows the stone beneath, not a hole
         for (int[] cover : new int[][] {FRONT, BACK}) {
-            for (int y = 0; y < cover[3]; y++) {
-                for (int x = 0; x < cover[2]; x++) {
-                    p.set(cover[0] + x, cover[1] + y, leather(random, x, y, cover[2], cover[3]));
-                }
-            }
-            for (int x = 1; x < cover[2] - 1; x++) {
-                p.set(cover[0] + x, cover[1] + 1, LEATHER_DARK);
-                p.set(cover[0] + x, cover[1] + cover[3] - 2, LEATHER_DARK);
-            }
-            for (int y = 1; y < cover[3] - 1; y++) {
-                p.set(cover[0] + 1, cover[1] + y, LEATHER_DARK);
-                p.set(cover[0] + cover[2] - 2, cover[1] + y, LEATHER_DARK);
+            for (int[] corner : new int[][] {{0, 0}, {cover[2] - 1, 0}, {0, cover[3] - 1}, {cover[2] - 1, cover[3] - 1}}) {
+                p.set(cover[0] + corner[0], cover[1] + corner[1], STONE_DEEP);
             }
         }
-        crest(p, FRONT[0] + 2, FRONT[1] + 3);
-        for (int y = 0; y < SPINE[3]; y++) {
-            for (int x = 0; x < SPINE[2]; x++) {
-                boolean band = y == 2 || y == 3 || y == SPINE[3] - 4 || y == SPINE[3] - 3;
-                p.set(SPINE[0] + x, SPINE[1] + y, band ? (y % 2 == 0 ? IRON_LIGHT : IRON) : x == 0 || x == SPINE[2] - 1 ? LEATHER_DARK : LEATHER);
-            }
-        }
-        // the page edges: one line for each leaf
+        paint(p, SPINE[0], SPINE[1], SPINE_GLYPHS, random);
         for (int y = 0; y < EDGE[3]; y++) {
             for (int x = 0; x < EDGE[2]; x++) {
-                p.set(EDGE[0] + x, EDGE[1] + y, x % 2 == 0 ? PAPER : PAPER_DARK);
+                p.set(EDGE[0] + x, EDGE[1] + y, x % 2 == 0 ? VELLUM : VELLUM_DARK);
             }
         }
         for (int y = 0; y < TOP[3]; y++) {
             for (int x = 0; x < TOP[2]; x++) {
-                p.set(TOP[0] + x, TOP[1] + y, y % 2 == 0 ? PAPER : PAPER_DARK);
+                p.set(TOP[0] + x, TOP[1] + y, y % 2 == 0 ? VELLUM : VELLUM_DARK);
             }
         }
-        for (int y = 0; y < IRON_REGION[3]; y++) {
-            for (int x = 0; x < IRON_REGION[2]; x++) {
-                p.set(IRON_REGION[0] + x, IRON_REGION[1] + y, x + y < 2 ? IRON_LIGHT : x + y > 4 ? IRON_DARK : IRON);
+        for (int y = 0; y < CORNER[3]; y++) {
+            for (int x = 0; x < CORNER[2]; x++) {
+                p.set(CORNER[0] + x, CORNER[1] + y, x + y < 2 ? BRONZE_LIGHT : x + y > 4 ? BRONZE_DARK : BRONZE);
             }
         }
-        crest(p, CREST_REGION[0], CREST_REGION[1]);
-        for (int y = 0; y < CREST_REGION[3]; y++) {
-            for (int x = 0; x < CREST_REGION[2]; x++) {
-                if (!p.inked(CREST_REGION[0] + x, CREST_REGION[1] + y)) {
-                    p.set(CREST_REGION[0] + x, CREST_REGION[1] + y, IRON_DARK);
-                }
-            }
-        }
-        for (int y = 0; y < STRAP[3]; y++) {
-            for (int x = 0; x < STRAP[2]; x++) {
-                p.set(STRAP[0] + x, STRAP[1] + y, y == 1 ? IRON_LIGHT : LEATHER_DARK);
-            }
-        }
+        paint(p, GEM[0], GEM[1], SETTING, random);
         for (int y = 0; y < PLAIN[3]; y++) {
             for (int x = 0; x < PLAIN[2]; x++) {
-                p.set(PLAIN[0] + x, PLAIN[1] + y, (x + y) % 3 == 0 ? LEATHER_LIGHT : LEATHER);
+                p.set(PLAIN[0] + x, PLAIN[1] + y, weathered(random));
             }
         }
-        page(p, LEFT_PAGE, random, false);
-        page(p, RIGHT_PAGE, random, true);
         return p.image();
-    }
-
-    /**
-     * A page written close in a dark hand, darker toward the gutter, with a red sigil on the right-hand page.
-     */
-    private static void page(Pixels p, int[] region, Random random, boolean right) {
-        for (int y = 0; y < region[3]; y++) {
-            for (int x = 0; x < region[2]; x++) {
-                int fromGutter = right ? x : region[2] - 1 - x;
-                int color = fromGutter == 0 ? PAPER_DARK : PAPER;
-                boolean writing = y % 2 == 1 && y < region[3] - 1 && fromGutter >= 1 && fromGutter < region[2] - 1 && random.nextFloat() < 0.7F;
-                p.set(region[0] + x, region[1] + y, writing ? INK : color);
-            }
-        }
-        if (right) {
-            int cx = region[0] + region[2] / 2;
-            int cy = region[1] + region[3] / 2;
-            int[][] sigil = {{0, -3}, {-1, -2}, {1, -2}, {-2, -1}, {2, -1}, {-2, 0}, {0, 0}, {2, 0}, {-2, 1}, {2, 1}, {-1, 2}, {1, 2}, {0, 3}};
-            for (int[] at : sigil) {
-                p.set(cx + at[0], cy + at[1], at[0] == 0 && at[1] == 0 ? GLOW : SICKLY);
-            }
-        }
     }
 
     static String iconModel() {
@@ -265,8 +273,8 @@ final class DarkholdArt {
     }
 
     /**
-     * Standing on its tail, its cover facing south: covers, the block of pages, the spine, iron at the corners, the
-     * raised crest and the strap.
+     * Standing on its tail, its cover facing south: the stone covers, the block of pages, the bronze spine, bronze at
+     * the corners and the raised setting of the stone.
      */
     static String closedModel() {
         List<String> elements = new ArrayList<>();
@@ -276,10 +284,10 @@ final class DarkholdArt {
         elements.add(box(2.5, 1, 5.5, 3.5, 15, 9.5, face("west", SPINE), sides(PLAIN, "north", "south", "up", "down")));
         for (double[] corner : new double[][] {{3, 1}, {11.5, 1}, {3, 13.5}, {11.5, 13.5}}) {
             elements.add(box(corner[0], corner[1], 9.5, corner[0] + 1.5, corner[1] + 1.5, 9.85,
-                    sides(IRON_REGION, "north", "south", "east", "west", "up", "down")));
+                    sides(CORNER, "north", "south", "east", "west", "up", "down")));
         }
-        elements.add(box(5.5, 4, 9.5, 10.5, 11, 9.9, face("south", CREST_REGION), sides(IRON_REGION, "east", "west", "up", "down")));
-        elements.add(box(12.6, 7, 5.3, 13.7, 9, 9.7, sides(STRAP, "east", "north", "south", "up", "down")));
+        // over the stone painted on the cover, columns 3 to 6 and rows 4 to 7 of it
+        elements.add(box(6, 7, 9.5, 10, 11, 9.9, face("south", GEM), sides(CORNER, "east", "west", "up", "down")));
         // in the third person hand, before these: +y points on from the fist, +z along the arm, +x across it; carried
         // upright at the side, the cover facing out
         return model(elements, """
@@ -293,26 +301,8 @@ final class DarkholdArt {
     }
 
     /**
-     * Lying open, its pages up and its spine running north to south down the middle.
+     * Shut in the hand; while it is read it leaves the hand to float open before the reader, drawn by the mod.
      */
-    static String openModel() {
-        List<String> elements = new ArrayList<>();
-        elements.add(box(1, 0, 2, 8, 0.5, 14, sides(PLAIN, "north", "south", "east", "west", "up", "down")));
-        elements.add(box(8, 0, 2, 15, 0.5, 14, sides(PLAIN, "north", "south", "east", "west", "up", "down")));
-        elements.add(box(1.5, 0.5, 2.5, 8, 2, 13.5, face("up", LEFT_PAGE), sides(TOP, "north", "south", "west")));
-        elements.add(box(8, 0.5, 2.5, 14.5, 2.4, 13.5, face("up", RIGHT_PAGE), sides(TOP, "north", "south", "east")));
-        elements.add(box(7.5, -0.4, 2, 8.5, 0.5, 14, sides(SPINE, "north", "south", "east", "west", "down")));
-        // pages up toward the reader's eyes, the book drawn back onto the hands and in between them; tilted toward the
-        // view in the first person
-        return model(elements, """
-                    "thirdperson_righthand": { "rotation": [ 70, 0, 0 ], "translation": [ -1.5, 1.5, 4.5 ], "scale": [ 0.5, 0.5, 0.5 ] },
-                    "thirdperson_lefthand": { "rotation": [ 70, 0, 0 ], "translation": [ 1.5, 1.5, 4.5 ], "scale": [ 0.5, 0.5, 0.5 ] },
-                    "firstperson_righthand": { "rotation": [ 62, 0, 0 ], "translation": [ -7, 8, 0 ], "scale": [ 0.5, 0.5, 0.5 ] },
-                    "firstperson_lefthand": { "rotation": [ 62, 0, 0 ], "translation": [ 7, 8, 0 ], "scale": [ 0.5, 0.5, 0.5 ] },
-                    "ground": { "translation": [ 0, 2, 0 ], "scale": [ 0.45, 0.45, 0.45 ] },
-                    "fixed": { "rotation": [ -90, 0, 0 ], "scale": [ 0.9, 0.9, 0.9 ] }""");
-    }
-
     static String itemDefinition() {
         return """
                 {
@@ -328,7 +318,7 @@ final class DarkholdArt {
                     "fallback": {
                       "type": "minecraft:condition",
                       "property": "minecraft:using_item",
-                      "on_true": { "type": "minecraft:model", "model": "scarlet:item/darkhold_open" },
+                      "on_true": { "type": "minecraft:empty" },
                       "on_false": { "type": "minecraft:model", "model": "scarlet:item/darkhold_closed" }
                     }
                   }
@@ -367,6 +357,203 @@ final class DarkholdArt {
         return String.join(",\n", faces);
     }
 
+    // ---------------------------------------------------------------- the tome floating open
+
+    /**
+     * The 64x32 texture of the tome as it floats open, laid out for the boxes of the mod's model of it (each box's faces
+     * unfolded around its texture offset, as entity models are), and the mask of what burns on it, clear elsewhere: the
+     * stone on its cover, the red of its spine's glyphs and the runes on its pages.
+     */
+    static final class OpenBook {
+
+        /** Covers 7 by 11 and 1 thick, the spine 6 across, page blocks 6 by 10 and 2 thick, and the single leaves. */
+        private static final int LID_W = 7;
+        private static final int LID_H = 11;
+        private static final int PAGE_W = 6;
+        private static final int PAGE_H = 10;
+        private static final int BLOCK = 2;
+
+        private static final String[] FRONT_SMALL = {
+                ".TTTTt.",
+                "TTd~~td",
+                "T~Tdtsd",
+                "T~~LBsd",
+                "TmLHGbd",
+                "TwBGrbd",
+                "T~~Bbdd",
+                "T~~Ttdd",
+                "T~~Ttdd",
+                "T~TTttd",
+                ".ddddd.",
+        };
+
+        private static final String[] BACK_SMALL = {
+                ".TTTTt.",
+                "T~~~~~d",
+                "T~~~~~d",
+                "T~TTt~d",
+                "T~Tws~d",
+                "T~tss~d",
+                "T~~~~~d",
+                "T~~~~~d",
+                "T~~~~~d",
+                "T~~~~~d",
+                ".ddddd.",
+        };
+
+        private static final String[] SPINE_SMALL = {
+                "bLLLLb",
+                "bBdBBb",
+                "bBBdBb",
+                "bLLLLb",
+                "bBrBrb",
+                "bBBrBb",
+                "bBrBrb",
+                "bLLLLb",
+                "bdBBdb",
+                "bBdBBb",
+                "bbbbbb",
+        };
+
+        /** Inside the covers, a lining near black with a cut border. */
+        private static final String[] LINING_MAP = {
+                "kkkkkkk",
+                "kllllkk",
+                "klkkkkk",
+                "klkkkkk",
+                "klkkkkk",
+                "klkkkkk",
+                "klkkkkk",
+                "klkkkkk",
+                "klkkkkk",
+                "kkkkkkk",
+                "kkkkkkk",
+        };
+
+        /** The left page, written close, with red runes among the writing. */
+        private static final String[] LEFT_PAGE = {
+                "PPPPPP",
+                "PiiPiP",
+                "PPPPPP",
+                "PiPiiP",
+                "PPPPPP",
+                "PrPiiP",
+                "PPPPPP",
+                "PiirPP",
+                "PPPPPP",
+                "PiPiiP",
+        };
+
+        /** The right page: a great sigil, an eye in a diamond, burning as it is read, writing above and below it. */
+        private static final String[] RIGHT_PAGE = {
+                "PPPPPP",
+                "PiiiiP",
+                "PPPPPP",
+                "PPrrPP",
+                "PrPPrP",
+                "rPGGPr",
+                "PrPPrP",
+                "PPrrPP",
+                "PPPPPP",
+                "PiiPiP",
+        };
+
+        private static final String[] LEAF_A = {
+                "PPPPPP",
+                "PiPiiP",
+                "PPPPPP",
+                "PiiPrP",
+                "PPPPPP",
+                "PiPiiP",
+                "PPPPPP",
+                "PrPiPP",
+                "PPPPPP",
+                "PiiPiP",
+        };
+
+        private static final String[] LEAF_B = {
+                "PPPPPP",
+                "PiiPiP",
+                "PPPPPP",
+                "PPrrPP",
+                "PrGGrP",
+                "PPrrPP",
+                "PPPPPP",
+                "PiPiiP",
+                "PPPPPP",
+                "PiiPiP",
+        };
+
+        private OpenBook() {
+        }
+
+        /**
+         * @param glow just what burns, bright on black; the rest left clear
+         */
+        static BufferedImage texture(boolean glow) {
+            Pixels p = new Pixels(64, 32);
+            Random random = new Random(1666);
+            // the back cover, whose box sits behind the left pages: inside to the north, outside to the south
+            lid(p, 0, 0, LINING_MAP, BACK_SMALL, random);
+            // the front cover, its box behind the right pages: inside to the north, outside (with the stone) to the south
+            lid(p, 16, 0, LINING_MAP, FRONT_SMALL, random);
+            // the spine, its outside to the north
+            box(p, 32, 0, 6, LID_H, 1, random);
+            paint(p, 33, 1, SPINE_SMALL, random);
+            // the blocks of pages, the left one read on its south face, the right on its north
+            pages(p, 0, 16);
+            paint(p, BLOCK * 2 + PAGE_W, 16 + BLOCK, LEFT_PAGE, random);
+            pages(p, 16, 16);
+            paint(p, 16 + BLOCK, 16 + BLOCK, RIGHT_PAGE, random);
+            // a single leaf turning, a side to each face
+            paint(p, 32, 16, LEAF_A, random);
+            paint(p, 32 + PAGE_W, 16, LEAF_B, random);
+            return glow ? p.glowing() : p.image();
+        }
+
+        /**
+         * A cover's box: its edges stone, its inside and outside painted from the maps given.
+         */
+        private static void lid(Pixels p, int u, int v, String[] inside, String[] outside, Random random) {
+            box(p, u, v, LID_W, LID_H, 1, random);
+            paint(p, u + 1, v + 1, inside, random);
+            paint(p, u + 1 + LID_W + 1, v + 1, outside, random);
+            // a chipped corner shows the stone beneath, not a hole
+            for (int[] corner : new int[][] {{0, 0}, {LID_W - 1, 0}, {0, LID_H - 1}, {LID_W - 1, LID_H - 1}}) {
+                p.set(u + 1 + LID_W + 1 + corner[0], v + 1 + corner[1], STONE_DEEP);
+            }
+        }
+
+        /**
+         * Every face of a box of stone, unfolded around its texture offset.
+         */
+        private static void box(Pixels p, int u, int v, int w, int h, int d, Random random) {
+            for (int y = 0; y < d + h; y++) {
+                for (int x = 0; x < 2 * (w + d); x++) {
+                    if (y < d && (x < d || x >= d + 2 * w)) {
+                        continue;
+                    }
+                    p.set(u + x, v + y, weathered(random));
+                }
+            }
+        }
+
+        /**
+         * A block of pages: vellum edges, a line to each leaf.
+         */
+        private static void pages(Pixels p, int u, int v) {
+            for (int y = 0; y < BLOCK + PAGE_H; y++) {
+                for (int x = 0; x < 2 * (PAGE_W + BLOCK); x++) {
+                    if (y < BLOCK && (x < BLOCK || x >= BLOCK + 2 * PAGE_W)) {
+                        continue;
+                    }
+                    boolean edgeAcross = y < BLOCK;
+                    p.set(u + x, v + y, (edgeAcross ? y : x) % 2 == 0 ? VELLUM : VELLUM_DARK);
+                }
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- the veins
 
     private static final int VEIN_WIDTH = 480;
@@ -396,7 +583,7 @@ final class DarkholdArt {
                 double shade = Math.pow(Math.max(0.0, 1.0 - edge / 0.09), 2.0) * 0.6;
                 float v = vein[y * w + x];
                 double alpha = Math.max(shade, Math.min(1.0, v));
-                int rgb = v > shade ? mix(mix(0x120106, DEEP, core[y * w + x]), ABYSS, 0.15) : VOID;
+                int rgb = v > shade ? mix(mix(0x120106, DEEP, core[y * w + x]), ABYSS, 0.15) : 0x0B0004;
                 int a = (int) Math.round(Math.clamp(alpha, 0.0, 1.0) * 255);
                 image.setRGB(x, y, (a << 24) | rgb);
             }
@@ -521,6 +708,21 @@ final class DarkholdArt {
                     int rgb = color[y * width + x];
                     if (rgb >= 0) {
                         image.setRGB(x, y, 0xFF000000 | rgb);
+                    }
+                }
+            }
+            return image;
+        }
+
+        /** Only what burns, brighter, the rest clear: drawn over it unlit. */
+        BufferedImage glowing() {
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int rgb = color[y * width + x];
+                    int light = rgb == HOT ? 0xFF8C9E : rgb == GLOW ? 0xFF2A4A : rgb == SICKLY ? 0xC21E3A : -1;
+                    if (light >= 0) {
+                        image.setRGB(x, y, 0xFF000000 | light);
                     }
                 }
             }

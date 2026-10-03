@@ -1,7 +1,9 @@
 package com.yashjit.scarlet.client.magic;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.yashjit.scarlet.client.anim.CastPoseState;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
+import com.yashjit.scarlet.client.darkhold.DarkholdBook;
 import com.yashjit.scarlet.client.fx.ArmMagic;
 import com.yashjit.scarlet.entity.DreamBody;
 import net.minecraft.client.Minecraft;
@@ -19,11 +21,12 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
 /**
- * Magic on a player's arms, and where their palms are this frame for effects that leave the hands.
+ * Magic on a player's arms, where their palms are this frame for effects that leave the hands, and the Darkhold floating
+ * before them as they read it.
  */
 public final class MagicLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 
-    static final float PALM_Y = 10.5F / 16.0F;
+    public static final float PALM_Y = 10.5F / 16.0F;
 
     public MagicLayer(RenderLayerParent<AvatarRenderState, PlayerModel> parent, EntityModelSet models) {
         super(parent);
@@ -58,5 +61,9 @@ public final class MagicLayer extends RenderLayer<AvatarRenderState, PlayerModel
             palms[arm.ordinal()] = camera.add(palm.x, palm.y, palm.z);
         }
         Hands.record(entity, palms[HumanoidArm.RIGHT.ordinal()], palms[HumanoidArm.LEFT.ordinal()]);
+        if (entity instanceof Player player) {
+            DarkholdBook.submitFloating(poseStack, collector, light, model, slim, player, ((CastPoseState) state).scarlet$read(), state.ageInTicks,
+                    partialTick);
+        }
     }
 }

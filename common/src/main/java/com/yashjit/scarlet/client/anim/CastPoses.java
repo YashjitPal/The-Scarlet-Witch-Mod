@@ -244,14 +244,14 @@ public final class CastPoses {
     }
 
     /**
-     * Reading the Darkhold: the book held open before the chest in both hands, the head bowed over it, swaying a little
-     * as if it were heavy.
+     * Reading the Darkhold: it floats open before the chest and the hands hold it there from either side without
+     * touching it, weaving slowly a beat apart as they work it, the head bowed over it.
      */
     private static void read(PlayerModel model, float weight, float age) {
-        float sway = Mth.sin(age * 0.07F) * 0.03F;
-        pose(model.rightArm, -0.95F + sway, -0.38F, 0.0F, weight);
-        pose(model.leftArm, -0.95F - sway, 0.38F, 0.0F, weight);
-        model.head.xRot = Ease.lerp(model.head.xRot, Math.max(model.head.xRot, 0.45F), weight);
+        float weave = Mth.sin(age * 0.09F) * 0.05F;
+        pose(model.rightArm, -1.2F + weave, 0.0F, 0.24F, weight);
+        pose(model.leftArm, -1.2F - weave, 0.0F, -0.24F, weight);
+        model.head.xRot = Ease.lerp(model.head.xRot, Math.max(model.head.xRot, 0.38F), weight);
     }
 
     /**
