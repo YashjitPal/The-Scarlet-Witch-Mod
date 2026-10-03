@@ -14,6 +14,7 @@
     "client.AvatarRendererMixin",
     "client.AvatarRenderStateMixin",
     "client.CameraMixin",
+    "client.ChannelMixin",
     "client.ClientClockInstanceMixin",
     "client.ClientLevelMixin",
     "client.ClientClockManagerMixin",

@@ -28,6 +28,8 @@ public final class ScarletClientConfig {
     public boolean reduceCameraShake = false;
     /** While your home rises around you as you found a Hex, the view circles it, coming back to your eyes for the burst. */
     public boolean cinematicFounding = true;
+    /** Inside a Hex in an older era, everything sounds as if through an old television's speaker. */
+    public boolean eraAudio = true;
 
     public static ScarletClientConfig get() {
         return instance;

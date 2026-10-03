@@ -70,6 +70,7 @@ import com.yashjit.scarlet.network.TownGlitchPayload;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.registry.ScarletEntities;
 import com.yashjit.scarlet.client.hex.RadioMusic;
+import com.yashjit.scarlet.client.hex.EraAudio;
 import com.yashjit.scarlet.client.entity.ParkedCarRenderer;
 import com.yashjit.scarlet.decor.RadioSounds;
 import net.minecraft.client.Minecraft;
@@ -175,6 +176,7 @@ public final class ScarletClient {
         TitleCard.tick(minecraft);
         LaughTrack.tick(minecraft);
         RadioMusic.tick(minecraft);
+        EraAudio.tick(minecraft);
         SpellWheel.tick(minecraft);
         CastInput.tick(minecraft);
         ScarletFx.tick(minecraft);
