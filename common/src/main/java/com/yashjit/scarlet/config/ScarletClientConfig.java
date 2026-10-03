@@ -12,8 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Visual and accessibility settings. Stored as JSON so both loaders share one format; a custom-styled settings screen
- * will edit it later.
+ * Visual and accessibility settings. Stored as JSON so both loaders share one format, and edited in game on the mod's
+ * own settings screen.
  */
 public final class ScarletClientConfig {
 

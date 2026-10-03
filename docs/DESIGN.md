@@ -385,6 +385,7 @@ Added light alone washes out to pink against a bright sky. So magic that must ke
 - Per-effect particle budgets, pooling, distance-based detail, culling.
 - **Quality presets:** Low, Medium, High, Ultra.
 - **Accessibility:** reduce flashing, reduce camera shake, reduce screen effects, instant transformations.
+- **Settings screen:** all of these, and the Hex's cinematic founding and era audio, on the mod's own screen, styled like its magic: a dark panel rimmed in scarlet, switches that light up, the quality as four segments, and what each setting does shown as you hover it. The arrow keys, Enter and Space work it too. Every change takes at once and is saved. It opens from a tiara button in the corner of the game's Options screen on both loaders, from the mod list on NeoForge, and from a key (unbound to begin with).
 
 ---
 

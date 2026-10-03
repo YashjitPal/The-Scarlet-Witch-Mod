@@ -35,6 +35,7 @@
     "client.LevelWeatherMixin",
     "client.MinecraftMixin",
     "client.MouseHandlerMixin",
+    "client.OptionsScreenMixin",
     "client.PlayerModelMixin",
     "client.RenderTypeInvoker",
     "client.SpectatorGuiMixin"

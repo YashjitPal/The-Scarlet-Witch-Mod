@@ -19,10 +19,13 @@ public final class ScarletKeyMappings {
     /** The remote for a caster's Hex: its era, episodes, sky, name, and what the next one builds. */
     public static final KeyMapping SHOWRUNNER = new KeyMapping("key.scarlet.showrunner", InputConstants.KEY_H, CATEGORY);
 
+    /** Unbound to begin with: the settings are also a click away in the corner of the game's options. */
+    public static final KeyMapping SETTINGS = new KeyMapping("key.scarlet.settings", InputConstants.UNKNOWN.getValue(), CATEGORY);
+
     private ScarletKeyMappings() {
     }
 
     public static List<KeyMapping> all() {
-        return List.of(SUIT_UP, SPELL_WHEEL, LEVITATE, SHOWRUNNER);
+        return List.of(SUIT_UP, SPELL_WHEEL, LEVITATE, SHOWRUNNER, SETTINGS);
     }
 }

@@ -3,6 +3,7 @@ package com.yashjit.scarlet.client;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.client.anim.CastGestures;
 import com.yashjit.scarlet.client.anim.PoseBlends;
+import com.yashjit.scarlet.client.config.SettingsScreen;
 import com.yashjit.scarlet.client.costume.CostumeLayer;
 import com.yashjit.scarlet.client.costume.CostumeModels;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
@@ -184,6 +185,11 @@ public final class ScarletClient {
         }
         while (ScarletKeyMappings.SHOWRUNNER.consumeClick()) {
             ShowrunnerScreen.open(minecraft);
+        }
+        while (ScarletKeyMappings.SETTINGS.consumeClick()) {
+            if (minecraft.gui.screen() == null) {
+                SettingsScreen.open(minecraft);
+            }
         }
         HexClient.tick(minecraft);
         HexSkyClient.tick(minecraft);

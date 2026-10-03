@@ -3,6 +3,7 @@ package com.yashjit.scarlet.client.dev;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.client.ScarletKeyMappings;
 import com.yashjit.scarlet.client.anim.FirstPersonGestures;
+import com.yashjit.scarlet.client.config.SettingsScreen;
 import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
 import com.yashjit.scarlet.client.hex.HomePlacement;
 import com.yashjit.scarlet.client.hex.ShowrunnerScreen;
@@ -42,6 +43,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -910,6 +912,21 @@ public final class Showcase {
                     .command("kill @e[type=!minecraft:player]")
                     .command("item replace entity @a hotbar.8 with minecraft:air")
                     .select(Spell.CHAOS_BOLT);
+            // the mod's settings: the tiara in the corner of the game's options, the panel it opens, and the keys picking
+            // and changing a setting and stepping the quality, each put back as it was
+            case "settings" -> s
+                    .then(minecraft -> minecraft.gui.setScreen(new OptionsScreen(null, minecraft.options)), 12)
+                    .shot("settings_options", 2)
+                    .then(SettingsScreen::open, 14)
+                    .shot("settings_open", 2)
+                    .key(InputConstants.KEY_DOWN).shot("settings_quality", 4)
+                    .key(InputConstants.KEY_LEFT).shot("settings_quality_medium", 6)
+                    .key(InputConstants.KEY_RIGHT)
+                    .key(InputConstants.KEY_DOWN).key(InputConstants.KEY_RETURN).shot("settings_flashing_on", 8)
+                    .key(InputConstants.KEY_RETURN)
+                    .key(InputConstants.KEY_DOWN).key(InputConstants.KEY_DOWN).key(InputConstants.KEY_DOWN).key(InputConstants.KEY_DOWN)
+                    .shot("settings_hex", 6)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 4);
             // leaving the game with the spirit away: quitting, or the game crashing straight after a save
             case "dreamquit", "dreamcrash" -> s
                     .land()
@@ -2118,6 +2135,17 @@ public final class Showcase {
         Scene tap() {
             return hold(true).then(minecraft -> {
             }, 3).hold(false).then(minecraft -> {
+            }, 2);
+        }
+
+        /**
+         * One press of a key, as the keyboard gives it to whatever screen is open.
+         */
+        Scene key(int key) {
+            return then(minecraft -> {
+                if (minecraft.gui.screen() != null) {
+                    minecraft.gui.screen().keyPressed(new KeyEvent(key, 0, 0));
+                }
             }, 2);
         }
 
