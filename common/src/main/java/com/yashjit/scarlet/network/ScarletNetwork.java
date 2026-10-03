@@ -11,7 +11,7 @@ public final class ScarletNetwork {
     /**
      * Bump whenever a payload's format changes, so mismatched clients and servers refuse to connect.
      */
-    public static final String VERSION = "18";
+    public static final String VERSION = "19";
 
     private ScarletNetwork() {
     }
@@ -43,5 +43,6 @@ public final class ScarletNetwork {
         registry.clientbound(TownUnformPayload.TYPE, TownUnformPayload.STREAM_CODEC);
         registry.clientbound(RemnantBlocksPayload.TYPE, RemnantBlocksPayload.STREAM_CODEC);
         registry.clientbound(ResidentsPayload.TYPE, ResidentsPayload.STREAM_CODEC);
+        registry.clientbound(GesturePayload.TYPE, GesturePayload.STREAM_CODEC);
     }
 }

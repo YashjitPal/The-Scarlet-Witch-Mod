@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.mixin.client;
 
 import com.yashjit.scarlet.client.anim.CastPoses;
+import com.yashjit.scarlet.client.hex.ResidentRenderer;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,5 +15,6 @@ abstract class PlayerModelMixin {
     @Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)V", at = @At("TAIL"))
     private void scarlet$castPose(AvatarRenderState state, CallbackInfo ci) {
         CastPoses.apply((PlayerModel) (Object) this, state);
+        ResidentRenderer.gesture((PlayerModel) (Object) this, state);
     }
 }

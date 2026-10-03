@@ -100,6 +100,8 @@ public final class Residents {
                         if (!isResident(mob)) {
                             rewrite(level, mob);
                         }
+                        // once a townsperson, they have their days to live, ones loaded back in from a save too
+                        Sitcom.attach(mob);
                         inside.add(mob.getId());
                         break;
                     }
@@ -151,6 +153,7 @@ public final class Residents {
 
     private static void turnBack(ServerLevel level, Mob mob) {
         mob.removeTag(RESIDENT);
+        Sitcom.detach(mob);
         level.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.NEUTRAL, 0.7F, 0.6F);
     }
 
@@ -163,6 +166,7 @@ public final class Residents {
         }
         mob.removeTag(RESIDENT);
         mob.addTag(AWAKE);
+        Sitcom.detach(mob);
         if (attacker instanceof LivingEntity living && !(living instanceof Player player && (player.isCreative() || player.isSpectator()))) {
             mob.setTarget(living);
         }

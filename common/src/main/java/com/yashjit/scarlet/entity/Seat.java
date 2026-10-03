@@ -8,8 +8,10 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -19,8 +21,15 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Where someone sits on a couch or a chair: an invisible place to ride, at the height of the cushion, that goes the
  * moment they get up or the seat is gone.
+ *
+ * <p>It has to be saved, as nothing can ride what isn't, but one loaded back in stands whoever was on it up again.
  */
 public class Seat extends Entity {
+
+    /** How far below the cushion the feet of someone drawn as a person go, so their hips rest on it. */
+    private static final double RESIDENT_SITTING_DEPTH = 0.7;
+
+    private boolean loaded;
 
     public Seat(EntityType<? extends Seat> type, Level level) {
         super(type, level);
@@ -59,10 +68,19 @@ public class Seat extends Entity {
     @Override
     public void tick() {
         super.tick();
-        if (level() instanceof ServerLevel && (!isVehicle() || !(level().getBlockState(blockPosition()).getBlock() instanceof SeatBlock))) {
+        if (level() instanceof ServerLevel && (loaded || !isVehicle() || !(level().getBlockState(blockPosition()).getBlock() instanceof SeatBlock))) {
             ejectPassengers();
             discard();
         }
+    }
+
+    @Override
+    protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale) {
+        if (passenger instanceof Player) {
+            return super.getPassengerAttachmentPoint(passenger, dimensions, scale);
+        }
+        // townspeople are drawn as people, whatever mob they really are, so they sit the way a person does
+        return passenger.getVehicleAttachmentPoint(this).subtract(0.0, RESIDENT_SITTING_DEPTH, 0.0);
     }
 
     @Override
@@ -83,6 +101,7 @@ public class Seat extends Entity {
 
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
+        loaded = true;
     }
 
     @Override

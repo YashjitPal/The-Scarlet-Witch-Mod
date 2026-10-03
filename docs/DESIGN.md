@@ -245,6 +245,11 @@ The centerpiece. Inspired by Westview.
 - **Residents:** every hostile mob inside (zombies, skeletons, creepers, spiders and so on) is rewritten into a townsperson in era clothes. Animals stay animals. Bosses resist the hex.
   - They are the same mobs underneath, so nothing is ever lost or duplicated.
   - They follow **sitcom routines**: wander, chat, sit on couches, watch the era TV, wave at players.
+    - They go looking for somewhere to sit, a couch or an armchair, best of all one facing a television, which they switch on if it is off. They sit as long as an episode's scene, a minute or so.
+    - Two with nothing to do stop for a chat: they turn to each other and take turns talking with their hands.
+    - Whoever comes by gets a wave, the hand up high beside the head, from the couch or mid-conversation too. Once a minute for the same person.
+    - They open doors on their way and close them behind them.
+    - Villagers keep the village life they have, which is sitcom enough.
   - They never attack, and creepers never explode.
   - **Attack one and the spell breaks for that mob:** it turns back into what it really is and fights back.
   - A resident that leaves the hex turns back at the wall. When the hex collapses, each one turns back as the inward-moving wall passes it.
@@ -281,7 +286,7 @@ The Hex builds Westview.
 - **Era makeovers:** homes, streets and furniture are built from era blocks that restyle with the era. That's picket-fence pastels in the 1950s, wood paneling and earth tones in the 1970s, bold colors in the 1980s, and beige modern in the 2000s. An era change sweeps through the town with a channel-change flicker.
 - **It exists only while the Hex stands.** Every block the Hex builds remembers what was there before. When the Hex collapses, the inward-moving wall takes the town down with it and leaves the land as it was. Only the caster's home outlasts it for a little while, glitching through the eras before it goes part by part (see the lifecycle above). Breaking a Hex-built block gives nothing, so the town can't be farmed for materials.
 - The caster chooses on the Showrunner remote what their next Hex builds: nothing, just their home, a whole town, or a farmhouse among orchards in blossom with country lanes and a red barn, every tree it covers turned into a fruit tree.
-- *(Proposed:)* villagers inside get era outfits like everyone else.
+- Villagers and wandering traders inside are townspeople too and wear era outfits like everyone else.
 
 ### The Showrunner remote
 

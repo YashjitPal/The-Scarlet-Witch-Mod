@@ -21,7 +21,7 @@ public final class ScarletEntities {
             EntityType.Builder.<ParkedCar>of(ParkedCar::new, MobCategory.MISC).noLootTable().sized(2.2F, 1.4F).clientTrackingRange(10)
                     .updateInterval(40));
     public static final Supplier<EntityType<Seat>> SEAT = register("seat",
-            EntityType.Builder.<Seat>of(Seat::new, MobCategory.MISC).noLootTable().noSave().noSummon().sized(0.0F, 0.0F)
+            EntityType.Builder.<Seat>of(Seat::new, MobCategory.MISC).noLootTable().noSummon().sized(0.0F, 0.0F)
                     .clientTrackingRange(8).updateInterval(20));
 
     private ScarletEntities() {

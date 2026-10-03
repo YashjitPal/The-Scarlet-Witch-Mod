@@ -9,8 +9,10 @@ import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.hex.Era;
 import com.yashjit.scarlet.hex.HexSnapshot;
 import com.yashjit.scarlet.hex.Hexes;
+import com.yashjit.scarlet.network.GesturePayload;
 import com.yashjit.scarlet.network.ResidentsPayload;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,6 +50,8 @@ public final class ResidentsClient {
     private static IntOpenHashSet residents = new IntOpenHashSet();
     /** When each mob began changing between its two selves. */
     private static final Int2DoubleOpenHashMap CHANGED = new Int2DoubleOpenHashMap();
+    /** The gesture each townsperson is making, and when they began it. */
+    private static final Int2ObjectOpenHashMap<Gesturing> GESTURES = new Int2ObjectOpenHashMap<>();
     private static final Map<Integer, PlayerSkin> SKINS = new HashMap<>();
     private static @Nullable ClientLevel seenLevel;
 
@@ -82,6 +86,22 @@ public final class ResidentsClient {
         }
     }
 
+    public static void gesture(GesturePayload payload) {
+        Minecraft minecraft = Minecraft.getInstance();
+        forgetIfLeft(minecraft.level);
+        if (minecraft.level != null) {
+            GESTURES.put(payload.entityId(), new Gesturing(payload.kind(), minecraft.level.getGameTime()));
+        }
+    }
+
+    /**
+     * The gesture a townsperson is making, and how many ticks into it they are; or null.
+     */
+    public static @Nullable Gesturing gesture(Entity entity) {
+        Gesturing gesturing = GESTURES.get(entity.getId());
+        return gesturing != null && seenLevel != null && seenLevel.getGameTime() - gesturing.start() < gesturing.kind().ticks ? gesturing : null;
+    }
+
     public static void tick(Minecraft minecraft) {
         forgetIfLeft(minecraft.level);
         ClientLevel level = minecraft.level;
@@ -90,6 +110,7 @@ public final class ResidentsClient {
         }
         double now = level.getGameTime();
         CHANGED.int2DoubleEntrySet().removeIf(entry -> now - entry.getDoubleValue() > CHANGE_TICKS);
+        GESTURES.values().removeIf(gesturing -> now - gesturing.start() > gesturing.kind().ticks);
         for (int id : CHANGED.keySet()) {
             Entity entity = level.getEntity(id);
             if (entity != null) {
@@ -124,6 +145,7 @@ public final class ResidentsClient {
             seenLevel = level;
             residents = new IntOpenHashSet();
             CHANGED.clear();
+            GESTURES.clear();
         }
     }
 
@@ -248,5 +270,8 @@ public final class ResidentsClient {
     }
 
     private record Draw(Vector3f center, float width, float height, float intensity, int seed) {
+    }
+
+    public record Gesturing(GesturePayload.Kind kind, long start) {
     }
 }

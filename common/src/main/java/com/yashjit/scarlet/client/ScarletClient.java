@@ -50,6 +50,7 @@ import com.yashjit.scarlet.client.render.ScarletRenderTypes;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.network.ChaosImpactPayload;
 import com.yashjit.scarlet.network.EjectPayload;
+import com.yashjit.scarlet.network.GesturePayload;
 import com.yashjit.scarlet.network.HexRipplePayload;
 import com.yashjit.scarlet.network.HexSyncPayload;
 import com.yashjit.scarlet.network.HoldPayload;
@@ -124,6 +125,7 @@ public final class ScarletClient {
         platform.registerClientbound(TownUnformPayload.TYPE, TownFx::onUnform);
         platform.registerClientbound(RemnantBlocksPayload.TYPE, Remnants::receive);
         platform.registerClientbound(ResidentsPayload.TYPE, ResidentsClient::receive);
+        platform.registerClientbound(GesturePayload.TYPE, ResidentsClient::gesture);
         platform.registerHud(Scarlet.id("mind_control"), MindControlFx::render);
         platform.registerHud(Scarlet.id("magic"), MagicHud::render);
         platform.registerHud(Scarlet.id("title_card"), TitleCard::render);

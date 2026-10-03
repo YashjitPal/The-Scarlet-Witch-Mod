@@ -6,6 +6,7 @@
   "mixins": [
     "BlockStateBaseMixin",
     "EntityMixin",
+    "MobGoalsAccessor",
     "MobMixin",
     "PistonBaseBlockMixin",
     "ServerLevelMixin"

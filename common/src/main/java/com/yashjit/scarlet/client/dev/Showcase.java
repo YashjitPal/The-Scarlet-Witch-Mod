@@ -11,6 +11,8 @@ import com.yashjit.scarlet.network.ShowrunnerPayload;
 import com.yashjit.scarlet.client.magic.SpellWheel;
 import com.yashjit.scarlet.client.magic.TelekinesisClient;
 import com.yashjit.scarlet.hex.Hexes;
+import com.yashjit.scarlet.hex.Residents;
+import com.yashjit.scarlet.hex.Sitcom;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.magic.Spell;
 import com.yashjit.scarlet.network.CastPayload;
@@ -39,6 +41,7 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.decoration.Mannequin;
 import net.minecraft.world.level.GameType;
@@ -738,6 +741,52 @@ public final class Showcase {
                             .view(-5, 2.2, 4.5, 0, 0.8, 9).shot("cars_" + era + "_near", 4);
                 }
                 s.view(4, 2.5, 13.5, 0, 0.8, 9).shot("cars_back", 4).playerCamera().inventory().shot("cars_inventory", 15);
+            }
+            // townspeople going about their days in a home: sitting down to the television, chatting, waving to the caster
+            case "routines" -> {
+                s.land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("difficulty easy")
+                        .command("gamerule spawn_mobs false")
+                        .command("execute as @a run scarlet hex build home")
+                        .command("execute as @a run scarlet hex forget")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("item replace entity @a weapon.offhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-30 ~ ~-30 ~30 ~16 ~30 minecraft:air")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().anchor()
+                        .tap().then(minecraft -> {
+                        }, 430)
+                        .command("execute as @a run scarlet hex era 1970s").then(minecraft -> {
+                        }, 120)
+                        // four townspeople in the living room and two out on the lawn, let fall onto the floor
+                        .place(0, 2.5, 0)
+                        .command("execute at @a run summon minecraft:zombie ~1 ~ ~1 {PersistenceRequired:1b}")
+                        .command("execute at @a run summon minecraft:skeleton ~-1 ~ ~2 {PersistenceRequired:1b}")
+                        .command("execute at @a run summon minecraft:zombie ~2 ~ ~-1 {PersistenceRequired:1b}")
+                        .command("execute at @a run summon minecraft:creeper ~-2 ~ ~-1 {PersistenceRequired:1b}")
+                        .command("execute at @a run summon minecraft:zombie ~3 ~ ~-9 {PersistenceRequired:1b}")
+                        .command("execute at @a run summon minecraft:husk ~-3 ~ ~-9 {PersistenceRequired:1b}")
+                        .place(0, 0.1, -12).face(0, 0)
+                        .view(0, 2.3, -2.6, 0, 1.2, 3.5).shot("routines_a", 300).residents("a")
+                        .view(2.6, 1.9, -2.4, -0.5, 0.9, 2.5).shot("routines_a_side", 4)
+                        .view(0, 4, -16, 0, 1.5, -8).shot("routines_lawn_a", 4)
+                        .view(0, 2.3, -2.6, 0, 1.2, 3.5).shot("routines_b", 300).residents("b")
+                        .view(2.6, 1.9, -2.4, -0.5, 0.9, 2.5).shot("routines_b_side", 4)
+                        .view(0, 4, -16, 0, 1.5, -8).shot("routines_lawn_b", 4)
+                        .place(1.5, 0.1, -6).face(180, 0)
+                        .view(0, 2.3, -2.6, 0, 1.2, 3.5).shot("routines_c", 300).residents("c")
+                        // someone new out on the sidewalk, too far from any seat to go in, and the caster walking up
+                        .place(0, 0.1, -40).face(0, 0)
+                        .command("execute at @a run summon minecraft:zombie ~ ~ ~22 {PersistenceRequired:1b}").then(minecraft -> {
+                        }, 30)
+                        .place(0, 0.1, -21.5).face(0, 0)
+                        .view(-2.2, 2.0, -21, 0, 1.5, -18).shot("routines_wave", 14).shot("routines_wave_b", 9).residents("wave")
+                        .command("difficulty peaceful").playerCamera();
             }
             // a home raised on open ground and looked round inside, in three eras: the living room, the kitchen, upstairs
             case "furnished" -> {
@@ -1732,6 +1781,38 @@ public final class Showcase {
                     server.execute(() -> server.getAllLevels().forEach(Hexes::dispelAll));
                 }
             }, 4);
+        }
+
+        /**
+         * Writes down in the log where each townsperson near the player is, what they ride and what they are doing,
+         * measured from the anchor, to read against the shots.
+         */
+        Scene residents(String label) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null || minecraft.player == null) {
+                    return;
+                }
+                java.util.UUID id = minecraft.player.getUUID();
+                Vec3 from = anchor;
+                server.execute(() -> {
+                    var player = server.getPlayerList().getPlayer(id);
+                    if (player == null) {
+                        return;
+                    }
+                    for (Mob mob : player.level().getEntitiesOfClass(Mob.class, player.getBoundingBox().inflate(40), Residents::isResident)) {
+                        Vec3 at = mob.position().subtract(from);
+                        Entity vehicle = mob.getVehicle();
+                        String riding = vehicle == null ? "" : String.format(java.util.Locale.ROOT, " riding %s at y %.2f on %s",
+                                vehicle.getType().getDescriptionId(), vehicle.getY() - from.y,
+                                player.level().getBlockState(vehicle.blockPosition()).getBlock().getDescriptionId());
+                        Scarlet.LOG.info("Showcase [{}]: {} at {} {} {} {}{}{}", label, mob.getType().getDescriptionId(),
+                                String.format(java.util.Locale.ROOT, "%.2f", at.x), String.format(java.util.Locale.ROOT, "%.2f", at.y),
+                                String.format(java.util.Locale.ROOT, "%.2f", at.z), Sitcom.doing(mob), riding,
+                                mob.isBaby() ? " (baby)" : "");
+                    }
+                });
+            }, 0);
         }
 
         /**
