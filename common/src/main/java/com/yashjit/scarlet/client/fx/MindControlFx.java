@@ -66,6 +66,8 @@ public final class MindControlFx {
     private static final double SNAP_TICKS = 12.0;
     private static final double DIVE_TICKS = 14.0;
     private static final double RETURN_TICKS = 10.0;
+    /** How far in front of a player's eyes their face is. */
+    static final float HEAD_OUT = 0.28F;
 
     private static final List<Snap> SNAPS = new ArrayList<>();
     private static @Nullable Hum hum;
@@ -182,7 +184,7 @@ public final class MindControlFx {
             float reach = Ease.outCubic((float) ((now - link.since) / MindControl.SEIZE_TICKS));
             float inside = link.insideAt < 0.0 ? 0.0F : Ease.clamp01((float) ((now - link.insideAt) / 10.0));
             Vec3 head = target.getEyePosition(partialTick);
-            draws.add(new Draw(head.subtract(camera).toVector3f(), size(target), target.getViewYRot(partialTick),
+            draws.add(new Draw(head.subtract(camera).toVector3f(), size(target), faceOut(target), target.getViewYRot(partialTick),
                     Hands.palm(caster, HumanoidArm.RIGHT).subtract(camera).toVector3f(), Hands.palm(caster, HumanoidArm.LEFT).subtract(camera).toVector3f(),
                     caster.getEyePosition(partialTick).subtract(camera).toVector3f(), caster.getViewYRot(partialTick), reach, inside,
                     target == viewer, ScarletFx.isFirstPersonViewOf(caster), entry.getIntKey() * 0.618F, time, CorruptionClient.darkness(caster)));
@@ -192,7 +194,7 @@ public final class MindControlFx {
             if (level.getEntity(entry.getIntKey()) instanceof LivingEntity creature && creature != viewer) {
                 float loyalty = MindControlClient.loyalty(creature, now);
                 if (loyalty > 0.01F) {
-                    embers.add(new Ember(creature.getEyePosition(partialTick).subtract(camera).toVector3f(), size(creature),
+                    embers.add(new Ember(creature.getEyePosition(partialTick).subtract(camera).toVector3f(), size(creature), faceOut(creature),
                             creature.getViewYRot(partialTick), loyalty));
                 }
             }
@@ -252,16 +254,16 @@ public final class MindControlFx {
                 }
                 if (draw.inside() > 0.01F && !draw.ownFirstPerson()) {
                     // the caster's own eyes burn red, their mind elsewhere
-                    eyes(buffer, pose, axes, draw.brow(), 1.0F, draw.casterYaw(), draw.inside(), draw.time());
+                    eyes(buffer, pose, axes, draw.brow(), 1.0F, HEAD_OUT, draw.casterYaw(), draw.inside(), draw.time());
                 }
                 if (!draw.viewedFromInside()) {
                     crown(buffer, pose, axes, draw.head(), draw.size(), draw.reach(), draw.seed(), draw.time());
-                    eyes(buffer, pose, axes, draw.head(), draw.size(), draw.yaw(), draw.reach(), draw.time() + draw.seed());
+                    eyes(buffer, pose, axes, draw.head(), draw.size(), draw.out(), draw.yaw(), draw.reach(), draw.time() + draw.seed());
                 }
             }
             Glow.darken(before);
             for (Ember ember : embers) {
-                eyes(buffer, pose, axes, ember.head(), ember.size(), ember.yaw(), 0.45F * ember.loyalty(), time);
+                eyes(buffer, pose, axes, ember.head(), ember.size(), ember.out(), ember.yaw(), 0.45F * ember.loyalty(), time);
             }
             for (Snap snap : snaps) {
                 float k = (float) ((now - snap.at()) / SNAP_TICKS);
@@ -462,16 +464,17 @@ public final class MindControlFx {
 
     /**
      * Two red points of light where a creature's eyes are, a little out from its face.
+     *
+     * @param out how far in front of where it looks from its face is; see {@link #faceOut}
      */
-    private static void eyes(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Vector3f head, float size, float yaw, float strength,
-                             float time) {
+    static void eyes(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Vector3f head, float size, float out, float yaw, float strength,
+                     float time) {
         if (strength < 0.01F) {
             return;
         }
         float rad = yaw * Mth.DEG_TO_RAD;
         float fx = -Mth.sin(rad);
         float fz = Mth.cos(rad);
-        float out = Math.min(0.3F, 0.25F * size) + 0.03F;
         float apart = 0.11F * size;
         float flicker = 0.85F + 0.15F * Mth.sin(time * 1.3F);
         for (int side = -1; side <= 1; side += 2) {
@@ -493,8 +496,21 @@ public final class MindControlFx {
         return Math.max(first, second);
     }
 
-    private static float size(LivingEntity entity) {
+    static float size(LivingEntity entity) {
         return Math.clamp(entity.getBbWidth() / 0.6F, 0.6F, 2.5F);
+    }
+
+    /**
+     * How far in front of where a creature looks from its face is: just before a head carried on shoulders, further out
+     * for the long heads of beasts on all fours, which reach out past their bodies, and on the front of anything that is
+     * all face, like a slime or a ghast.
+     */
+    static float faceOut(LivingEntity entity) {
+        float width = entity.getBbWidth();
+        if (entity.getBbHeight() >= width * 2.2F) {
+            return Math.min(0.3F, 0.25F * size(entity)) + 0.03F;
+        }
+        return Math.max(Math.min(1.0F, width + 0.03F), width * 0.5F + 0.05F);
     }
 
     // ---------------------------------------------------------------- on the screen
@@ -508,13 +524,14 @@ public final class MindControlFx {
         float strength = ScarletClientConfig.get().reduceFlashing ? 0.55F : 1.0F;
         double moved = MindControlClient.sinceMoved(now);
         if (MindControlClient.inside()) {
-            insideView(graphics, minecraft, now, strength);
-            if (MindControlClient.movedIn() && moved < DIVE_TICKS) {
+            boolean dream = MindControlClient.dreaming();
+            insideView(graphics, minecraft, now, strength, dream);
+            if (!dream && MindControlClient.movedIn() && moved < DIVE_TICKS) {
                 // diving in: a flash of red the new view opens out of, from the middle
                 float k = (float) (moved / DIVE_TICKS);
                 flash(graphics, (1.0F - Ease.outCubic(k)) * 0.75F * strength, k);
             }
-        } else if (!MindControlClient.movedIn() && moved < RETURN_TICKS) {
+        } else if (!MindControlClient.movedIn() && !MindControlClient.wasDreaming() && moved < RETURN_TICKS) {
             float k = (float) (moved / RETURN_TICKS);
             flash(graphics, (1.0F - Ease.outCubic(k)) * 0.55F * strength, k);
         }
@@ -523,13 +540,17 @@ public final class MindControlFx {
         }
     }
 
-    private static void insideView(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, float strength) {
+    /**
+     * @param dream your spirit is in it, dreamwalking: the edges run darker, black-crimson with sickly light
+     */
+    private static void insideView(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, float strength, boolean dream) {
         int width = graphics.guiWidth();
         int height = graphics.guiHeight();
         float beat = heartbeat((float) now);
         float edge = (0.42F + 0.18F * beat) * strength;
-        vignette(graphics, width, height, Math.max(width, height) / 4.0F, edge, ScarletPalette.WINE);
-        vignette(graphics, width, height, Math.max(width, height) / 9.0F, edge * 0.6F, ScarletPalette.SCARLET);
+        int lit = dream ? ScarletPalette.SICKLY : ScarletPalette.SCARLET;
+        vignette(graphics, width, height, Math.max(width, height) / 4.0F, dream ? edge * 1.4F : edge, dream ? ScarletPalette.VOID : ScarletPalette.WINE);
+        vignette(graphics, width, height, Math.max(width, height) / 9.0F, edge * (dream ? 0.3F : 0.6F), lit);
         // wisps curling at the edges of the view
         for (int i = 0; i < 12; i++) {
             float along = (float) ((now * 0.004 + i * 0.0833) % 1.0);
@@ -549,14 +570,14 @@ public final class MindControlFx {
                 x = width - 6.0F + wave * 5.0F;
                 y = (1.0F - along) * height;
             }
-            sprite(graphics, x, y, 70.0F + 30.0F * Mth.sin(i * 2.3F + (float) now * 0.03F), ARGB.color(0.22F * strength, ScarletPalette.SCARLET));
+            sprite(graphics, x, y, 70.0F + 30.0F * Mth.sin(i * 2.3F + (float) now * 0.03F), ARGB.color((dream ? 0.14F : 0.22F) * strength, lit));
         }
         Entity held = MindControlClient.insideOf();
         if (held instanceof LivingEntity living) {
             float shown = Ease.clamp01((float) (MindControlClient.sinceMoved(now) - 6.0) / 10.0F);
             Component name = living.getDisplayName();
             int y = 14;
-            graphics.centeredText(minecraft.font, name, width / 2, y, ARGB.color(0.95F * shown, ScarletPalette.BRIGHT_SCARLET));
+            graphics.centeredText(minecraft.font, name, width / 2, y, ARGB.color(0.95F * shown, dream ? 0xD9425E : ScarletPalette.BRIGHT_SCARLET));
             float health = Math.clamp(living.getHealth() / Math.max(1.0F, living.getMaxHealth()), 0.0F, 1.0F);
             float barWidth = 100.0F;
             float x0 = (width - barWidth) / 2.0F;
@@ -567,7 +588,8 @@ public final class MindControlFx {
             double since = MindControlClient.sinceMoved(now);
             float hint = Math.min(Ease.clamp01((float) (since - 12.0) / 10.0F), Ease.clamp01((float) (110.0 - since) / 20.0F));
             if (hint > 0.02F) {
-                Component text = Component.translatable("hud.scarlet.mind_control.return", minecraft.options.keyUse.getTranslatedKeyMessage());
+                Component text = Component.translatable(dream ? "hud.scarlet.dreamwalk.wake" : "hud.scarlet.mind_control.return",
+                        minecraft.options.keyUse.getTranslatedKeyMessage());
                 graphics.pose().pushMatrix();
                 graphics.pose().translate(width / 2.0F, height - 52.0F);
                 graphics.pose().scale(0.75F);
@@ -624,7 +646,7 @@ public final class MindControlFx {
     /**
      * Darkens the view from all four edges in, over {@code depth} GUI pixels.
      */
-    private static void vignette(GuiGraphicsExtractor graphics, int width, int height, float depth, float alpha, int rgb) {
+    static void vignette(GuiGraphicsExtractor graphics, int width, int height, float depth, float alpha, int rgb) {
         if (alpha < 0.01F) {
             return;
         }
@@ -653,7 +675,7 @@ public final class MindControlFx {
         graphics.pose().popMatrix();
     }
 
-    private static void sprite(GuiGraphicsExtractor graphics, float x, float y, float size, int color) {
+    static void sprite(GuiGraphicsExtractor graphics, float x, float y, float size, int color) {
         graphics.pose().pushMatrix();
         graphics.pose().translate(x, y);
         graphics.pose().scale(size / 16.0F);
@@ -667,7 +689,7 @@ public final class MindControlFx {
      * @param viewedFromInside the view is looking out through the held head itself
      * @param ownFirstPerson   the view is the caster's own eyes
      */
-    private record Draw(Vector3f head, float size, float yaw, Vector3f rightPalm, Vector3f leftPalm, Vector3f brow, float casterYaw, float reach,
+    private record Draw(Vector3f head, float size, float out, float yaw, Vector3f rightPalm, Vector3f leftPalm, Vector3f brow, float casterYaw, float reach,
                         float inside, boolean viewedFromInside, boolean ownFirstPerson, float seed, float time, float darkness) {
     }
 
@@ -682,7 +704,7 @@ public final class MindControlFx {
         }
     }
 
-    private record Ember(Vector3f head, float size, float yaw, float loyalty) {
+    private record Ember(Vector3f head, float size, float out, float yaw, float loyalty) {
     }
 
     private record Snap(Vec3 head, double at, float size) {

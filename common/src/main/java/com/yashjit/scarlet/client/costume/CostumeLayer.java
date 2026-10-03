@@ -2,6 +2,7 @@ package com.yashjit.scarlet.client.costume;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.client.render.ScarletRenderTypes;
+import com.yashjit.scarlet.entity.DreamBody;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.player.PlayerCapeModel;
@@ -13,6 +14,7 @@ import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.util.ARGB;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.PlayerModelType;
 
@@ -37,11 +39,12 @@ public final class CostumeLayer extends RenderLayer<AvatarRenderState, PlayerMod
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector collector, int light, AvatarRenderState state, float yRot, float xRot) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (state.isInvisible || minecraft.level == null || !(minecraft.level.getEntity(state.id) instanceof Player player)) {
+        Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(state.id);
+        if (state.isInvisible || !(entity instanceof Player || entity instanceof DreamBody)) {
             return;
         }
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
-        CostumeView view = CostumeView.of(player, partialTick);
+        CostumeView view = entity instanceof Player player ? CostumeView.of(player, partialTick) : CostumeView.of((DreamBody) entity);
         if (view == null) {
             return;
         }

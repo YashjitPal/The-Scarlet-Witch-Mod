@@ -86,6 +86,8 @@ public final class CastPoses {
         ((CastPoseState) state).scarlet$setControl(control);
         ((CastPoseState) state).scarlet$setBeam(beam, beamRight, raise);
         ((CastPoseState) state).scarlet$setRead(read);
+        double now = avatar.level().getGameTime() + partialTick;
+        ((CastPoseState) state).scarlet$setMeditation(Meditation.sit(avatar, now), Meditation.lift(avatar, now), Meditation.offset(avatar, now));
     }
 
     /**
@@ -126,6 +128,10 @@ public final class CastPoses {
         if (read > 0.001F) {
             read(model, read, age);
         }
+        float sit = pose.scarlet$sit() * weight;
+        if (sit > 0.001F) {
+            meditate(model, sit, pose.scarlet$lift() * weight, age);
+        }
         float tear = pose.scarlet$tear() * weight;
         if (tear > 0.001F) {
             tear(model, tear, pose.scarlet$spread(), age);
@@ -150,6 +156,10 @@ public final class CastPoses {
      */
     public static void rotate(AvatarRenderState state, PoseStack poseStack) {
         CastPoseState pose = (CastPoseState) state;
+        if (pose.scarlet$sit() > 0.001F) {
+            // sat down on the ground, then risen above it
+            poseStack.translate(0.0F, pose.scarlet$meditationOffset(), 0.0F);
+        }
         float found = pose.scarlet$found();
         if (found > 0.001F) {
             // founding a Hex: the whole body arched back from the hips, chest thrown up to the sky, swaying slowly
@@ -242,6 +252,22 @@ public final class CastPoses {
         pose(model.rightArm, -0.95F + sway, -0.38F, 0.0F, weight);
         pose(model.leftArm, -0.95F - sway, 0.38F, 0.0F, weight);
         model.head.xRot = Ease.lerp(model.head.xRot, Math.max(model.head.xRot, 0.45F), weight);
+    }
+
+    /**
+     * Dreamwalking: sat with the legs crossed before the body, the hands held open over the knees, the head level and
+     * still, breathing slowly. Risen into the air, the hands float a little further out.
+     */
+    private static void meditate(PlayerModel model, float sit, float lift, float age) {
+        float breathe = Mth.sin(age * 0.06F);
+        pose(model.rightLeg, -HALF_PI + 0.06F, -0.48F, 0.0F, sit);
+        pose(model.leftLeg, -HALF_PI - 0.06F, 0.48F, 0.0F, sit);
+        float open = 0.16F + 0.12F * lift + breathe * 0.02F;
+        pose(model.rightArm, -0.8F + breathe * 0.03F, -0.12F, open, sit);
+        pose(model.leftArm, -0.8F + breathe * 0.03F, 0.12F, -open, sit);
+        model.head.xRot = Ease.lerp(model.head.xRot, 0.04F, sit);
+        model.head.yRot = Ease.lerp(model.head.yRot, 0.0F, sit);
+        model.body.xRot = Ease.lerp(model.body.xRot, 0.0F, sit);
     }
 
     /**

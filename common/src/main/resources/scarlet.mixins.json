@@ -9,7 +9,11 @@
     "MobGoalsAccessor",
     "MobMixin",
     "PistonBaseBlockMixin",
-    "ServerLevelMixin"
+    "PlayerListMixin",
+    "ServerGamePacketListenerImplMixin",
+    "ServerLevelMixin",
+    "ServerPlayerGameModeInvoker",
+    "ServerPlayerMixin"
   ],
   "client": [
     "client.AvatarRendererMixin",
@@ -32,7 +36,8 @@
     "client.MinecraftMixin",
     "client.MouseHandlerMixin",
     "client.PlayerModelMixin",
-    "client.RenderTypeInvoker"
+    "client.RenderTypeInvoker",
+    "client.SpectatorGuiMixin"
   ],
   "server": [],
   "injectors": {

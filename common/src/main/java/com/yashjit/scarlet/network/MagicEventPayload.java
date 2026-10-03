@@ -32,6 +32,10 @@ public record MagicEventPayload(int entityId, int kind, Vec3 position) implement
     public static final int SLAM = 9;
     /** A Rune Trap cast with nowhere to write it, sputtering out in the hand. */
     public static final int RUNE_FIZZLE = 10;
+    /** A dreamwalker's spirit leaving their body, at the body's feet. */
+    public static final int DREAM_DEPART = 11;
+    /** A dreamwalker's spirit coming back into their body, at its feet. */
+    public static final int DREAM_WAKE = 12;
 
     public static final Type<MagicEventPayload> TYPE = new Type<>(Scarlet.id("magic_event"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MagicEventPayload> STREAM_CODEC = StreamCodec.composite(

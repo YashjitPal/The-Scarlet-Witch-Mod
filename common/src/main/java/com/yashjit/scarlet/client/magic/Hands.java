@@ -9,6 +9,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -33,8 +34,19 @@ public final class Hands {
     private Hands() {
     }
 
-    static void record(Player player, Vec3 right, Vec3 left) {
-        RECORDED.put(player.getId(), new Recorded(right, left, player.level().getGameTime()));
+    static void record(Entity entity, Vec3 right, Vec3 left) {
+        RECORDED.put(entity.getId(), new Recorded(right, left, entity.level().getGameTime()));
+    }
+
+    /**
+     * Where a dreamwalker's body last showed its palms, if it was drawn lately.
+     */
+    public static @Nullable Vec3 drawnPalm(Entity entity, HumanoidArm arm) {
+        Recorded recorded = RECORDED.get(entity.getId());
+        if (recorded == null || entity.level().getGameTime() - recorded.gameTime() > 2) {
+            return null;
+        }
+        return arm == HumanoidArm.RIGHT ? recorded.right() : recorded.left();
     }
 
     public static Vec3 palm(Player player, HumanoidArm arm) {

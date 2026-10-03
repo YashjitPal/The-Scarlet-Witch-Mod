@@ -21,7 +21,9 @@ public enum Spell {
     MIND_CONTROL("mind_control", 6, Input.CHANNEL, 0.4F, 200),
     RUNE_TRAP("rune_trap", 7, Input.TAP, 30.0F, 80),
     /** Cast once to raise it; after that, holding the cast resizes it, and the cost is per tick of resizing. */
-    HEX("hex", 10, Input.CHANNEL, 0.1F, 10);
+    HEX("hex", 10, Input.CHANNEL, 0.1F, 10),
+    /** The Darkhold's. Cast to choose where the spirit goes and again to wake; the cost is per tick of being away. */
+    DREAMWALK("dreamwalk", 6, Input.TOGGLE, 0.08F, 200);
 
     private static final Spell[] VALUES = values();
 
@@ -70,7 +72,15 @@ public enum Spell {
      */
     public boolean available() {
         return this == CHAOS_BOLT || this == CHAOS_SHIELD || this == LEVITATION || this == TELEKINESIS || this == RED_MIST || this == SHOCKWAVE
-                || this == MIND_CONTROL || this == RUNE_TRAP || this == HEX;
+                || this == MIND_CONTROL || this == RUNE_TRAP || this == HEX || this == DREAMWALK;
+    }
+
+    /**
+     * Whether it is one of the Darkhold's spells, which only show on the wheel, and can only be cast, while the book is
+     * carried.
+     */
+    public boolean darkhold() {
+        return this == DREAMWALK;
     }
 
     /**

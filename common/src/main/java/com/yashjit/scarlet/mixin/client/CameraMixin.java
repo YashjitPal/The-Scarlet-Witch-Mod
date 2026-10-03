@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.mixin.client;
 
+import com.yashjit.scarlet.client.fx.DreamFx;
 import com.yashjit.scarlet.client.hex.Founding;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
@@ -11,7 +12,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Lets founding a Hex take the view: circling the caster's home as it rises, and shuddering as the Hex bursts out.
+ * Lets founding a Hex take the view: circling the caster's home as it rises, and shuddering as the Hex bursts out. Sat
+ * down to dreamwalk, the view sinks and rises with the body.
  */
 @Mixin(Camera.class)
 abstract class CameraMixin {
@@ -28,6 +30,9 @@ abstract class CameraMixin {
     @Shadow
     public abstract float yRot();
 
+    @Shadow
+    public abstract Vec3 position();
+
     @Inject(method = "update", at = @At("TAIL"))
     private void scarlet$founding(DeltaTracker deltaTracker, CallbackInfo ci) {
         float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
@@ -39,6 +44,10 @@ abstract class CameraMixin {
         float[] shake = Founding.shake(partialTick);
         if (shake[0] != 0.0F || shake[1] != 0.0F) {
             setRotation(yRot() + shake[0], xRot() + shake[1]);
+        }
+        float drop = DreamFx.eyeDrop(partialTick);
+        if (drop != 0.0F) {
+            setPosition(position().add(0.0, drop, 0.0));
         }
     }
 }

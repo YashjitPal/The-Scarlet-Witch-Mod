@@ -62,4 +62,15 @@ public interface CastPoseState {
     float scarlet$read();
 
     void scarlet$setRead(float read);
+
+    /** Sitting cross-legged to dreamwalk: 0 to 1. */
+    float scarlet$sit();
+
+    /** Risen into the air from it: 0 to 1. */
+    float scarlet$lift();
+
+    /** How far the meditation lowers or raises the whole figure, in blocks. */
+    float scarlet$meditationOffset();
+
+    void scarlet$setMeditation(float sit, float lift, float offset);
 }

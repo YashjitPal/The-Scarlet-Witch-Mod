@@ -166,6 +166,34 @@ public final class MindControl {
     }
 
     /**
+     * A dreamwalker's spirit arriving in a creature: inside it at once, with nothing reaching in first, and steering it
+     * the way Mind Control does for as long as it stays.
+     */
+    public static void possess(ServerPlayer spirit, Mob mob) {
+        dispossess(spirit);
+        Link link = new Link(spirit.getUUID(), (ServerLevel) mob.level());
+        link.targetId = mob.getId();
+        link.since = mob.level().getGameTime();
+        link.inside = true;
+        link.dream = true;
+        link.input = new ControlPayload(0.0F, 0.0F, 0, mob.getYHeadRot(), mob.getXRot());
+        LINKS.put(spirit.getUUID(), link);
+        HELD.put(mob.getId(), link);
+        LOYAL.remove(mob.getUUID());
+    }
+
+    /**
+     * The spirit leaving the creature it was in, which is itself again.
+     */
+    public static void dispossess(ServerPlayer spirit) {
+        Link link = LINKS.get(spirit.getUUID());
+        if (link != null && link.dream) {
+            LINKS.remove(spirit.getUUID());
+            HELD.remove(link.targetId);
+        }
+    }
+
+    /**
      * What a caster has hold of, if anything: for showing whose controls are being steered.
      */
     public static @Nullable LivingEntity held(ServerPlayer caster) {
@@ -178,7 +206,7 @@ public final class MindControl {
      */
     public static void handle(ServerPlayer caster, ControlPayload control) {
         Link link = LINKS.get(caster.getUUID());
-        if (link == null || !link.inside || !Magic.state(caster).channeling(Spell.MIND_CONTROL)) {
+        if (link == null || !link.inside || !Magic.state(caster).channeling(link.dream ? Spell.DREAMWALK : Spell.MIND_CONTROL)) {
             return;
         }
         float pitch = Mth.clamp(control.pitch(), -90.0F, 90.0F);
@@ -209,7 +237,7 @@ public final class MindControl {
      */
     public static void hurt(ServerPlayer caster) {
         Link link = LINKS.get(caster.getUUID());
-        if (link != null && link.inside) {
+        if (link != null && link.inside && !link.dream) {
             Magic.stopChannel(caster, caster.level().getGameTime(), false);
         }
     }
@@ -464,6 +492,8 @@ public final class MindControl {
         long since;
         /** Whether the caster's view has moved in, so they steer it. */
         boolean inside;
+        /** A dreamwalker's spirit, rather than a mind reached into with Mind Control. */
+        boolean dream;
         ControlPayload input = ControlPayload.IDLE;
         long readyAt;
         int struggles;

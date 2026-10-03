@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.platform;
 
 import com.yashjit.scarlet.darkhold.Corruption;
+import com.yashjit.scarlet.darkhold.DreamwalkState;
 import com.yashjit.scarlet.magic.MagicState;
 import com.yashjit.scarlet.player.ScarletPlayerData;
 import net.minecraft.world.entity.player.Player;
@@ -33,4 +34,11 @@ public interface PlayerDataService {
      * Server only, like {@link #set}.
      */
     void setCorruption(Player player, Corruption corruption);
+
+    /**
+     * Server only, and never synced. Kept through death, so the places last stood are remembered.
+     */
+    DreamwalkState dreamwalk(Player player);
+
+    void setDreamwalk(Player player, DreamwalkState state);
 }

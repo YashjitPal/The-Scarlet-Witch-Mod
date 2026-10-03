@@ -9,6 +9,7 @@ import com.yashjit.scarlet.registry.ScarletEntities;
 import com.yashjit.scarlet.registry.ScarletItems;
 import com.yashjit.scarlet.registry.ScarletRecipeSerializers;
 import com.yashjit.scarlet.registry.ScarletSounds;
+import com.yashjit.scarlet.registry.ScarletTickets;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,7 @@ public final class Scarlet {
         ScarletItems.bootstrap();
         ScarletBlocks.bootstrap();
         ScarletEntities.bootstrap();
+        ScarletTickets.bootstrap();
         ScarletRecipeSerializers.bootstrap();
         ScarletCreativeTabs.bootstrap();
         LOG.info("Scarlet is awakening on {}", Services.PLATFORM.getPlatformName());

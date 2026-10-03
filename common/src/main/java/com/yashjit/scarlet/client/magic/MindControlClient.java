@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.client.magic;
 
+import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
 import com.yashjit.scarlet.client.fx.MindControlFx;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.magic.MindControl;
@@ -41,6 +42,10 @@ public final class MindControlClient {
 
     /** What your view has moved into, and where you look from inside it. */
     private static @Nullable Entity inside;
+    /** Whether it is your spirit in there, dreamwalking, rather than a mind you reached into. */
+    private static boolean dreaming;
+    /** Whether the view last came back from a spirit's dreamwalk, which has its own way of coming back. */
+    private static boolean wasDreaming;
     private static float yaw;
     private static float pitch;
     private static boolean attackQueued;
@@ -119,6 +124,7 @@ public final class MindControlClient {
             LINKS.clear();
             LOYAL.clear();
             inside = null;
+            dreaming = false;
             letGo();
         }
         if (level == null || player == null) {
@@ -130,9 +136,10 @@ public final class MindControlClient {
         double now = level.getGameTime();
         LOYAL.int2DoubleEntrySet().removeIf(entry -> now - entry.getDoubleValue() > MindControl.LOYAL_TICKS || level.getEntity(entry.getIntKey()) == null);
         Link own = LINKS.get(player.getId());
-        Entity target = own == null ? null : level.getEntity(own.targetId);
+        Entity target = dreaming ? inside : own == null ? null : level.getEntity(own.targetId);
         if (inside != null) {
-            if (own == null || own.insideAt < 0.0 || target != inside || !inside.isAlive()) {
+            boolean held = dreaming ? DreamwalkClient.away() && !inside.isRemoved() : own != null && own.insideAt >= 0.0 && target == inside;
+            if (!held || !inside.isAlive()) {
                 comeBack(minecraft, now);
             } else {
                 int flags = (pressed.jump() ? ControlPayload.JUMP : 0) | (pressed.shift() ? ControlPayload.SNEAK : 0)
@@ -140,7 +147,7 @@ public final class MindControlClient {
                 attackQueued = false;
                 Services.NETWORK.sendToServer(new ControlPayload(moved.y, moved.x, flags, yaw, pitch));
             }
-        } else if (own != null && own.insideAt >= 0.0 && target != null && target.isAlive()) {
+        } else if (!dreaming && own != null && own.insideAt >= 0.0 && target != null && target.isAlive()) {
             moveIn(minecraft, target, now);
         }
         if (heldBy != NOTHING && !(level.getEntity(heldBy) instanceof Player)) {
@@ -175,11 +182,43 @@ public final class MindControlClient {
 
     private static void comeBack(Minecraft minecraft, double now) {
         inside = null;
+        wasDreaming = dreaming;
+        dreaming = false;
         movedAt = now;
         movedIn = false;
         if (minecraft.player != null) {
             minecraft.setCameraEntity(minecraft.player);
         }
+    }
+
+    /**
+     * Your spirit arriving in a creature, dreamwalking: you look out through it and steer it as if you held its mind.
+     */
+    public static void dreamInto(Minecraft minecraft, Entity creature) {
+        if (minecraft.level != null) {
+            moveIn(minecraft, creature, minecraft.level.getGameTime());
+            dreaming = true;
+        }
+    }
+
+    /**
+     * Your spirit leaving the creature it was in, for your body.
+     */
+    public static void dreamOut(Minecraft minecraft) {
+        if (dreaming && minecraft.level != null) {
+            comeBack(minecraft, minecraft.level.getGameTime());
+        }
+    }
+
+    /**
+     * Whether your view is inside a creature because your spirit is in it, rather than a mind you hold.
+     */
+    public static boolean dreaming() {
+        return dreaming;
+    }
+
+    public static boolean wasDreaming() {
+        return wasDreaming;
     }
 
     private static void letGo() {

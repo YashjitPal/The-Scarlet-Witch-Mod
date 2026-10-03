@@ -93,7 +93,28 @@ final class HudArt {
         icons.put("mind_control", mindControl());
         icons.put("rune_trap", runeTrap());
         icons.put("hex", hex());
+        icons.put("dreamwalk", dreamwalk());
         return icons;
+    }
+
+    /**
+     * A body sat cross-legged, and its spirit stepping up out of it, lighter, trailing a wisp back down to it.
+     */
+    private static BufferedImage dreamwalk() {
+        Canvas c = new Canvas(16);
+        c.disc(4.6, 8.6, 1.4, CRIMSON);
+        c.rect(3.4, 10.1, 5.8, 12.6, CRIMSON);
+        c.segment(1.4, 13.6, 8.2, 13.6, 1.8, WINE);
+        c.disc(7.4, 7.9, 0.5, SCARLET);
+        c.disc(8.7, 6.4, 0.55, SCARLET);
+        c.disc(11.2, 2.6, 1.5, BRIGHT);
+        c.disc(11.0, 2.4, 0.6, CORE);
+        c.rect(10.0, 4.3, 12.4, 7.4, BRIGHT);
+        c.segment(10.0, 4.6, 8.3, 3.4, 0.9, SCARLET);
+        c.segment(12.4, 4.6, 14.1, 3.4, 0.9, SCARLET);
+        c.segment(10.6, 7.6, 9.8, 9.6, 1.0, SCARLET);
+        c.segment(11.8, 7.6, 12.8, 9.4, 1.0, SCARLET);
+        return c.outlined(SHADOW);
     }
 
     /**

@@ -3,6 +3,7 @@ package com.yashjit.scarlet.client.magic;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.fx.ArmMagic;
+import com.yashjit.scarlet.entity.DreamBody;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.player.PlayerModel;
@@ -10,6 +11,7 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.PlayerModelType;
@@ -30,7 +32,8 @@ public final class MagicLayer extends RenderLayer<AvatarRenderState, PlayerModel
     @Override
     public void submit(PoseStack poseStack, SubmitNodeCollector collector, int light, AvatarRenderState state, float yRot, float xRot) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (state.isInvisible || minecraft.level == null || !(minecraft.level.getEntity(state.id) instanceof Player player)) {
+        Entity entity = minecraft.level == null ? null : minecraft.level.getEntity(state.id);
+        if (state.isInvisible || !(entity instanceof Player || entity instanceof DreamBody)) {
             return;
         }
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
@@ -39,10 +42,10 @@ public final class MagicLayer extends RenderLayer<AvatarRenderState, PlayerModel
         float time = (float) (minecraft.level.getGameTime() % 24000L) + partialTick;
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         Vec3[] palms = new Vec3[2];
-        float darkness = CorruptionClient.darkness(player);
+        float darkness = entity instanceof DreamBody body ? CorruptionClient.darkness(body.corruption()) : CorruptionClient.darkness(entity);
         for (HumanoidArm arm : HumanoidArm.values()) {
             boolean right = arm == HumanoidArm.RIGHT;
-            float intensity = MagicVisuals.armIntensity(player, arm, partialTick);
+            float intensity = entity instanceof Player player ? MagicVisuals.armIntensity(player, arm, partialTick) : MagicVisuals.MEDITATING;
             if (intensity > 0.01F) {
                 ArmMagic.submitArm(poseStack, collector, model, right, slim, time, intensity, darkness);
             }
@@ -54,6 +57,6 @@ public final class MagicLayer extends RenderLayer<AvatarRenderState, PlayerModel
             poseStack.popPose();
             palms[arm.ordinal()] = camera.add(palm.x, palm.y, palm.z);
         }
-        Hands.record(player, palms[HumanoidArm.RIGHT.ordinal()], palms[HumanoidArm.LEFT.ordinal()]);
+        Hands.record(entity, palms[HumanoidArm.RIGHT.ordinal()], palms[HumanoidArm.LEFT.ordinal()]);
     }
 }

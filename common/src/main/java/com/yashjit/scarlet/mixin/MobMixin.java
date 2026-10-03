@@ -44,6 +44,16 @@ abstract class MobMixin {
         }
     }
 
+    /**
+     * A creature someone is steering from inside never wanders off out of the world, however far it is from anyone.
+     */
+    @Inject(method = "checkDespawn", at = @At("HEAD"), cancellable = true)
+    private void scarlet$staysWhileSteered(CallbackInfo ci) {
+        if (MindControl.steers((Mob) (Object) this)) {
+            ci.cancel();
+        }
+    }
+
     @Inject(method = "isSunBurnTick", at = @At("HEAD"), cancellable = true)
     private void scarlet$noBurningInTheSitcomSun(CallbackInfoReturnable<Boolean> cir) {
         if (Residents.isResident((Mob) (Object) this)) {

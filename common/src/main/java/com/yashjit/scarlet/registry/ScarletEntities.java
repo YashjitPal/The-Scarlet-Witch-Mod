@@ -2,6 +2,7 @@ package com.yashjit.scarlet.registry;
 
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.entity.ChaosBolt;
+import com.yashjit.scarlet.entity.DreamBody;
 import com.yashjit.scarlet.entity.ParkedCar;
 import com.yashjit.scarlet.entity.Seat;
 import com.yashjit.scarlet.platform.Services;
@@ -11,6 +12,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
 
 public final class ScarletEntities {
@@ -23,11 +25,15 @@ public final class ScarletEntities {
     public static final Supplier<EntityType<Seat>> SEAT = register("seat",
             EntityType.Builder.<Seat>of(Seat::new, MobCategory.MISC).noLootTable().noSummon().sized(0.0F, 0.0F)
                     .clientTrackingRange(8).updateInterval(20));
+    public static final Supplier<EntityType<DreamBody>> DREAM_BODY = register("dream_body",
+            EntityType.Builder.<DreamBody>of(DreamBody::create, MobCategory.MISC).noLootTable().noSummon().sized(0.7F, 1.6F).eyeHeight(1.33F)
+                    .clientTrackingRange(32).updateInterval(20));
 
     private ScarletEntities() {
     }
 
     public static void bootstrap() {
+        Services.REGISTRY.registerAttributes(DREAM_BODY, LivingEntity::createLivingAttributes);
     }
 
     private static <T extends Entity> Supplier<EntityType<T>> register(String name, EntityType.Builder<T> builder) {

@@ -2,6 +2,8 @@ package com.yashjit.scarlet.magic;
 
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.crown.CrownItem;
+import com.yashjit.scarlet.darkhold.Darkhold;
+import com.yashjit.scarlet.darkhold.Dreamwalk;
 import com.yashjit.scarlet.hex.HexEjection;
 import com.yashjit.scarlet.hex.HexPaint;
 import com.yashjit.scarlet.hex.Hexes;
@@ -128,15 +130,23 @@ public final class Magic {
         if (!spell.available()) {
             return Refusal.UNAVAILABLE;
         }
+        if (spell.darkhold() && !Darkhold.carries(player)) {
+            return Refusal.DARKHOLD;
+        }
         MagicState state = state(player);
         if (now < state.readyAt(spell)) {
             return Refusal.COOLDOWN;
+        }
+        if (spell == Spell.DREAMWALK && (!player.onGround() || player.isPassenger() || player.isSwimming() || player.isFallFlying()
+                || state.levitating())) {
+            return Refusal.FOOTING;
         }
         float energy = energy(state, now, maxEnergy(player));
         if (!shrinkingHex(player, spell) && (spell.input() == Spell.Input.TAP ? energy < spell.cost() : energy < MIN_SUSTAIN)) {
             return Refusal.ENERGY;
         }
-        if (spell == Spell.HEX && !Hexes.ownsHex(player) && energy < Hexes.CAST_COST) {
+        if (spell == Spell.HEX && !Hexes.ownsHex(player) && energy < Hexes.CAST_COST
+                || spell == Spell.DREAMWALK && energy < Dreamwalk.START_ENERGY) {
             return Refusal.ENERGY;
         }
         return Refusal.NONE;
@@ -204,8 +214,18 @@ public final class Magic {
 
     public static void select(ServerPlayer player, int index) {
         MagicState state = state(player);
-        if (state.selected() != index && Spell.WHEEL.contains(Spell.byIndex(index))) {
+        Spell spell = Spell.byIndex(index);
+        if (state.selected() != index && Spell.WHEEL.contains(spell) && (!spell.darkhold() || Darkhold.carries(player))) {
             Services.PLAYER_DATA.setMagic(player, state.withSelected(index));
+        }
+    }
+
+    /**
+     * Begins a spell that lasts until it is ended, for spells that decide for themselves when they begin.
+     */
+    public static void channel(ServerPlayer player, Spell spell, long now) {
+        if (!state(player).channeling()) {
+            startChannel(player, spell, now);
         }
     }
 
@@ -248,7 +268,7 @@ public final class Magic {
         }
         Spell spell = Spell.byIndex(state.channel());
         MagicState stopped = state.withChannel(MagicState.NO_CHANNEL, energy(state, now, maxEnergy(player)), now);
-        int cooldown = spell == Spell.MIND_CONTROL ? MindControl.stop(player) : -1;
+        int cooldown = spell == Spell.MIND_CONTROL ? MindControl.stop(player) : spell == Spell.DREAMWALK ? Dreamwalk.stop(player) : -1;
         if (cooldown < 0) {
             cooldown = shattered ? SHATTER_COOLDOWN : spell.cooldown();
         }
@@ -325,6 +345,11 @@ public final class Magic {
         runPending(player, now);
         Telekinesis.tick(player, now);
         MagicState state = state(player);
+        if (player.tickCount % 20 == 0 && state.selectedSpell().darkhold() && !state.channeling() && !Darkhold.carries(player)) {
+            // the book's spells go with the book
+            state = state.withSelected(Spell.WHEEL.getFirst().ordinal());
+            Services.PLAYER_DATA.setMagic(player, state);
+        }
         if (state.channeling()) {
             boolean exhausted = energy(state, now, maxEnergy(player)) <= 0.001F && !shrinkingHex(player, Spell.byIndex(state.channel()));
             if (exhausted || !CrownItem.isWearingCrown(player) || !player.getMainHandItem().isEmpty() || !player.isAlive()) {
@@ -334,6 +359,8 @@ public final class Magic {
             } else if (state.channeling(Spell.TELEKINESIS) && !Telekinesis.hold(player, now)) {
                 stopChannel(player, now, false);
             } else if (state.channeling(Spell.MIND_CONTROL) && !MindControl.hold(player, now)) {
+                stopChannel(player, now, false);
+            } else if (state.channeling(Spell.DREAMWALK) && !Dreamwalk.hold(player, now)) {
                 stopChannel(player, now, false);
             } else if (state.channeling(Spell.HEX) && (EJECTING.contains(player.getUUID()) ? !HexEjection.hold(player)
                     : TEARING.contains(player.getUUID()) ? !Hexes.part(player, !player.isShiftKeyDown())
@@ -481,6 +508,10 @@ public final class Magic {
     }
 
     public enum Refusal {
-        NONE, NO_CROWN, HANDS_FULL, LOCKED, UNAVAILABLE, COOLDOWN, ENERGY
+        NONE, NO_CROWN, HANDS_FULL, LOCKED, UNAVAILABLE, COOLDOWN, ENERGY,
+        /** One of the Darkhold's spells, without the book. */
+        DARKHOLD,
+        /** Dreamwalking anywhere but sat on solid ground. */
+        FOOTING
     }
 }

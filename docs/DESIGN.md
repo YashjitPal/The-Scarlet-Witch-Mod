@@ -187,14 +187,19 @@ They burn steadily while the shield is held and smolder while levitating.
   - **side effects** past halfway (a server option can turn them off): from 50% you hunger faster, from 60% the whispers wake you whenever you try to sleep, and from 70% the dark closes in now and then, with a heartbeat;
   - it **fades** once you stop: a minute after you last read or cast from it, and then all of it in about forty minutes.
 - Admins can see and set it: `/scarlet corruption <player> [set <percent>]`.
-- Dark spells: **Dreamwalking** first. More to be decided.
+- Dark spells: **Dreamwalking** first. More to be decided. The book's spells take their places on the spell wheel, set apart in black-crimson, only while it is carried, and can only be cast while it is.
 
 ### Dreamwalking
 
-- Your **body sits cross-legged in a meditation pose**, hovering slightly off the ground in a slow swirl of scarlet wisps (WandaVision finale / Doctor Strange). Other players can see it.
-- Your **spirit takes over a mob**, even in the **Nether or End** (Minecraft's dimensions stand in for the multiverse).
-- If your **body gets hurt, your spirit snaps back** instantly so you can defend yourself.
-- *(Proposed:)* choose a dimension; you arrive in a mob near the last place you stood there (or near spawn). Drains energy and adds corruption over time. The possessed mob's eyes glow scarlet.
+- **Casting it** (mastery VI, sat on solid ground, 30 energy to begin): every dimension opens up to choose from, each a window into the dark showing what it is made of and where in it your spirit would arrive. That is where you last stood there, else where you would wake from death, else by the world's spawn, else where a portal from the spawn would come out (or the End's landing). Click one or press its number.
+- Your **body sits down cross-legged** and rises a little off the ground over two seconds, hands held open over the knees and eyes burning red, as wisps gather and turn about it and the dark closes in on your view (WandaVision finale / Doctor Strange). A blow while it settles breaks the meditation.
+- Your **spirit goes into the creature nearest where it arrives**, even in the **Nether or End** (Minecraft's dimensions stand in for the multiverse), as long as it is not already held or carried, nor a boss. The view opens out of the dark into its eyes and you steer it as with Mind Control: walk, sprint, jump, fly if it flies, and strike the way it does. Its eyes burn scarlet for everyone who sees it, and embers rise off its head. Its name and health show at the top of your view, which is edged in black-crimson. Should no creature be there, you get up again.
+- Your **body stays behind**, hovering cross-legged in a slow swirl of scarlet wisps over a faint ring of light, sparks drifting off it and its hands, in your skin, clothes, crown and costume. Other players can see it, and hostile creatures that catch sight of it go for it. Its ground is kept loaded and moving while you are away.
+- If your **body gets hurt, your spirit snaps back** into it instantly, in time to defend yourself.
+- **Waking:** press use. It also ends when the creature dies or goes, when your energy runs out (being away drains 1.6 a second), and when you leave the game. However it ends you come back to your body with a flash and get up, and the spell rests ten seconds.
+- **Corruption:** 2% as the spirit leaves, then 0.1% each second away, 6% a minute.
+- The spirit is you as a spectator looking out through the creature, so it is the creature's surroundings your game loads and shows. Nothing can see or hurt it, a spectator's menu for going elsewhere is closed to it, and its travels don't count as having been anywhere for advancements. Your body's place and your game mode are remembered while you are away, so leaving the game, or even the server going down, still brings you back to your body.
+- Servers can turn dreamwalking off.
 
 ---
 

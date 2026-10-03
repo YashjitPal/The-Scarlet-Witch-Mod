@@ -1,6 +1,8 @@
 package com.yashjit.scarlet.mixin.client;
 
+import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
 import com.yashjit.scarlet.client.magic.MindControlClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.ClientInput;
 import net.minecraft.client.player.KeyboardInput;
 import net.minecraft.world.entity.player.Input;
@@ -11,8 +13,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Inside a mind you hold, your keys steer it and your own body stands still. Held yourself, your body moves the way
- * whoever holds you steers it, and your keys only fight them.
+ * Inside a mind you hold, or a creature your spirit is in, your keys steer it and your own body stands still. Held
+ * yourself, your body moves the way whoever holds you steers it, and your keys only fight them. Sat down to dreamwalk,
+ * you sit still.
  */
 @Mixin(KeyboardInput.class)
 abstract class KeyboardInputMixin extends ClientInput {
@@ -26,6 +29,9 @@ abstract class KeyboardInputMixin extends ClientInput {
         } else if (MindControlClient.held()) {
             keyPresses = MindControlClient.puppetKeys(keyPresses);
             moveVector = MindControlClient.puppetMove();
+        } else if (Minecraft.getInstance().player != null && DreamwalkClient.rising(Minecraft.getInstance().player) || DreamwalkClient.away()) {
+            keyPresses = Input.EMPTY;
+            moveVector = Vec2.ZERO;
         }
     }
 }

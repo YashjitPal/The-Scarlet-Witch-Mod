@@ -3,10 +3,14 @@ package com.yashjit.scarlet.client.dev;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.client.ScarletKeyMappings;
 import com.yashjit.scarlet.client.anim.FirstPersonGestures;
+import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
 import com.yashjit.scarlet.client.hex.HomePlacement;
 import com.yashjit.scarlet.client.hex.ShowrunnerScreen;
 import com.yashjit.scarlet.client.magic.MindControlClient;
+import com.yashjit.scarlet.darkhold.Dreamwalk;
+import com.yashjit.scarlet.entity.DreamBody;
 import com.yashjit.scarlet.hex.HexSky;
+import com.yashjit.scarlet.network.DreamPayload;
 import com.yashjit.scarlet.network.ShowrunnerPayload;
 import com.yashjit.scarlet.client.magic.SpellWheel;
 import com.yashjit.scarlet.client.magic.TelekinesisClient;
@@ -39,12 +43,17 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.decoration.Mannequin;
+import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.levelgen.WorldOptions;
@@ -828,6 +837,105 @@ public final class Showcase {
                     }, 10)
                     .hold(true).shot("darkhold_shield_clean", 14).hold(false)
                     .select(Spell.CHAOS_BOLT);
+            // dreamwalking: choosing where to go, sitting down and rising, the spirit going into a cow by where the player
+            // would wake and looking back at the body it left, the body up close, clean and corrupted, and a blow to it
+            // snapping the spirit back; then into a piglin in the Nether, and waking with the use key
+            case "dream" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("difficulty peaceful")
+                    .command("time set noon")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("item replace entity @a weapon.offhand with minecraft:air")
+                    .command("item replace entity @a hotbar.8 with scarlet:darkhold")
+                    .command("scarlet corruption @p set 0")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-12 ~ ~-4 ~12 ~6 ~30 minecraft:air")
+                    .command("execute at @a run spawnpoint @a ~ ~ ~20")
+                    .command("execute at @a run summon minecraft:cow ~ ~ ~20 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    .ensureUnsuited().face(0, 0).playerCamera().select(Spell.DREAMWALK).hideHud(false)
+                    // casting it: the dimensions to choose from
+                    .tap().shot("dream_picker", 12)
+                    .then(minecraft -> {
+                        if (minecraft.gui.screen() != null) {
+                            minecraft.gui.screen().keyPressed(new KeyEvent(InputConstants.KEY_1, 0, 0));
+                        }
+                    }, 0)
+                    // sitting down and rising as the dark closes in, then seen from outside
+                    .shot("dream_rise_a", 10).shot("dream_rise_b", 12)
+                    .look(3.2, 35, 8, 0.9).hideHud(true).shot("dream_rise_outside", 2)
+                    // the spirit leaves, and the view opens out of the dark into the cow's
+                    .dreamLog("departing").then(minecraft -> {
+                    }, 24).dreamLog("away").dreamCamera().hideHud(false).shot("dream_inside_open", 1).shot("dream_inside", 18)
+                    .subjectBody().aimHeldAtSubject().shot("dream_looking_back", 6)
+                    .walk(true).shot("dream_walk", 30).walk(false).dreamLog("walked")
+                    // the cow seen from outside, its eyes burning with the spirit in it
+                    .subjectHeld().look(3.4, 30, 4, 1.0).hideHud(true).shot("dream_possessed", 4)
+                    // the body it left, up close, clean and then corrupted
+                    .subjectBody().look(2.6, 25, 6, 0.8).hideHud(true).shot("dream_body_front", 6)
+                    .look(3.0, 115, 16, 0.8).shot("dream_body_side", 4)
+                    .look(2.2, 180, 4, 0.9).shot("dream_body_back", 4)
+                    .command("scarlet corruption @p set 75").then(minecraft -> {
+                    }, 44).look(2.6, 25, 6, 0.8).shot("dream_body_dark", 4)
+                    .command("scarlet corruption @p set 0")
+                    .dreamCamera().hideHud(false).then(minecraft -> {
+                    }, 30).shot("dream_inside_hud", 2)
+                    // a blow to the body snaps the spirit back into it
+                    .command("damage @e[type=scarlet:dream_body,limit=1] 1")
+                    .shot("dream_woke_a", 1).shot("dream_woke_b", 6).dreamLog("woke")
+                    .look(3.0, 30, 8, 1.0).hideHud(true).shot("dream_standing", 2)
+                    .playerCamera()
+                    // a room in the Nether with a piglin in it, where the spirit remembers standing
+                    .command("execute in minecraft:the_nether run forceload add 0 0").then(minecraft -> {
+                    }, 60)
+                    .command("execute in minecraft:the_nether run fill -4 89 -4 4 89 4 minecraft:netherrack")
+                    .command("execute in minecraft:the_nether run fill -4 90 -4 4 94 4 minecraft:air")
+                    .command("difficulty easy")
+                    .command("execute in minecraft:the_nether run summon minecraft:piglin 0 90 3 "
+                            + "{PersistenceRequired:1b,IsImmuneToZombification:1b,Rotation:[180f,0f]}")
+                    .rememberStanding(Level.NETHER, new BlockPos(0, 90, 0))
+                    .then(minecraft -> {
+                    }, 160)
+                    .face(0, 0).hideHud(false)
+                    .then(minecraft -> Services.NETWORK.sendToServer(DreamPayload.go(Level.NETHER)), 0)
+                    .then(minecraft -> {
+                    }, 110).dreamLog("in the Nether").dreamCamera().shot("dream_nether", 12)
+                    .turnHeld(150.0F).shot("dream_nether_turned", 8)
+                    // waking with the use key
+                    .tap().shot("dream_nether_woke_a", 1).shot("dream_nether_woke_b", 10).dreamLog("home")
+                    .command("difficulty peaceful")
+                    .command("execute in minecraft:the_nether run forceload remove 0 0")
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("item replace entity @a hotbar.8 with minecraft:air")
+                    .select(Spell.CHAOS_BOLT);
+            // leaving the game with the spirit away: quitting, or the game crashing straight after a save
+            case "dreamquit", "dreamcrash" -> s
+                    .land()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("difficulty peaceful")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("item replace entity @a hotbar.8 with scarlet:darkhold")
+                    .command("execute at @a run spawnpoint @a ~ ~ ~12")
+                    .command("execute at @a run summon minecraft:pig ~ ~ ~12 {PersistenceRequired:1b}")
+                    .dreamLog("before")
+                    .then(minecraft -> Services.NETWORK.sendToServer(DreamPayload.go(Level.OVERWORLD)), 70)
+                    .dreamLog("away, leaving")
+                    .then(minecraft -> {
+                        IntegratedServer server = minecraft.getSingleplayerServer();
+                        if (server != null && "dreamcrash".equals(SCENE)) {
+                            server.execute(() -> {
+                                server.saveEverything(false, true, true);
+                                Scarlet.LOG.info("Showcase: saved, crashing with the spirit away");
+                                Runtime.getRuntime().halt(0);
+                            });
+                        }
+                    }, 40);
+            // where the player is on coming back, after leaving or crashing with the spirit away
+            case "dreamcheck" -> s.then(minecraft -> {
+            }, 40).dreamLog("on coming back");
             // a home raised on open ground and looked round inside, in three eras: the living room, the kitchen, upstairs
             case "furnished" -> {
                 s.land()
@@ -1707,6 +1815,111 @@ public final class Showcase {
             return then(minecraft -> {
                 minecraft.setCameraEntity(minecraft.player);
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            }, 2);
+        }
+
+        /**
+         * Looks out through the creature your spirit is in again, after a free camera looked elsewhere.
+         */
+        Scene dreamCamera() {
+            return then(minecraft -> {
+                Entity inside = MindControlClient.insideOf();
+                if (inside != null) {
+                    minecraft.setCameraEntity(inside);
+                    minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+                }
+            }, 2);
+        }
+
+        /**
+         * Makes the dreamwalker's body nearest the view the focus of later camera moves.
+         */
+        Scene subjectBody() {
+            return then(minecraft -> {
+                Entity viewer = minecraft.getCameraEntity();
+                if (minecraft.level == null || viewer == null) {
+                    return;
+                }
+                double best = Double.MAX_VALUE;
+                for (Entity entity : minecraft.level.entitiesForRendering()) {
+                    if (entity instanceof DreamBody && entity.distanceToSqr(viewer) < best) {
+                        best = entity.distanceToSqr(viewer);
+                        subject = entity;
+                    }
+                }
+            }, 0);
+        }
+
+        /**
+         * Makes the creature your spirit or held mind is in the focus of later camera moves.
+         */
+        Scene subjectHeld() {
+            return then(minecraft -> {
+                if (MindControlClient.insideOf() != null) {
+                    subject = MindControlClient.insideOf();
+                }
+            }, 0);
+        }
+
+        /**
+         * Turns the head of what you look out through toward the current subject.
+         */
+        Scene aimHeldAtSubject() {
+            return then(minecraft -> {
+                Entity inside = MindControlClient.insideOf();
+                if (inside == null || subject == null) {
+                    return;
+                }
+                Vec3 to = subject.position().add(0.0, 0.9, 0.0).subtract(inside.getEyePosition());
+                float yaw = (float) Math.toDegrees(Math.atan2(-to.x, to.z));
+                float pitch = (float) Math.toDegrees(-Math.atan2(to.y, Math.hypot(to.x, to.z)));
+                MindControlClient.turn(Mth.wrapDegrees(yaw - MindControlClient.yaw()) / 0.15, (pitch - MindControlClient.pitch()) / 0.15);
+            }, 4);
+        }
+
+        /**
+         * Writes down in the log where the player's spirit is, on both sides, to read against the shots.
+         */
+        Scene dreamLog(String label) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null || minecraft.player == null) {
+                    return;
+                }
+                java.util.UUID id = minecraft.player.getUUID();
+                boolean clientAway = DreamwalkClient.away();
+                Entity inside = MindControlClient.insideOf();
+                String insideName = inside == null ? "nothing" : inside.getType().getDescriptionId();
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(id);
+                    if (player != null) {
+                        Entity camera = player.getCamera();
+                        int bodies = player.level().getEntities(EntityTypeTest.forClass(DreamBody.class), body -> true).size();
+                        Scarlet.LOG.info("Showcase [{}]: away {} (client: away {}, inside {}), in {} as {} at {}, looking out of {} at {}; "
+                                        + "{} bodies here, remembered away: {}", label, Dreamwalk.isAway(player), clientAway, insideName,
+                                player.level().dimension().identifier(), player.gameMode(), player.blockPosition(), camera.getType().getDescriptionId(),
+                                camera.blockPosition(), bodies, Services.PLAYER_DATA.dreamwalk(player).away().isPresent());
+                    }
+                });
+            }, 0);
+        }
+
+        /**
+         * Has the player's spirit remember standing somewhere, as if they had been there.
+         */
+        Scene rememberStanding(ResourceKey<Level> dimension, BlockPos pos) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null || minecraft.player == null) {
+                    return;
+                }
+                java.util.UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(id);
+                    if (player != null) {
+                        Services.PLAYER_DATA.setDreamwalk(player, Services.PLAYER_DATA.dreamwalk(player).stoodAt(dimension, pos));
+                    }
+                });
             }, 2);
         }
 

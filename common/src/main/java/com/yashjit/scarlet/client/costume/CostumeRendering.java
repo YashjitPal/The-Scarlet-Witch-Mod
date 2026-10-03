@@ -2,6 +2,7 @@ package com.yashjit.scarlet.client.costume;
 
 import com.yashjit.scarlet.client.hex.Outfits;
 import com.yashjit.scarlet.crown.CrownItem;
+import com.yashjit.scarlet.entity.DreamBody;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.Avatar;
@@ -18,11 +19,17 @@ public final class CostumeRendering {
      * and crowns stay visible.
      */
     public static void hideCoveredEquipment(Avatar entity, AvatarRenderState state, float partialTick) {
-        if (!(entity instanceof Player player)) {
+        boolean costume;
+        boolean outfit;
+        if (entity instanceof Player player) {
+            costume = CostumeView.of(player, partialTick) != null;
+            outfit = !costume && Outfits.wearing(player, partialTick);
+        } else if (entity instanceof DreamBody body) {
+            costume = CostumeView.of(body) != null;
+            outfit = false;
+        } else {
             return;
         }
-        boolean costume = CostumeView.of(player, partialTick) != null;
-        boolean outfit = !costume && Outfits.wearing(player, partialTick);
         if (!costume && !outfit) {
             return;
         }

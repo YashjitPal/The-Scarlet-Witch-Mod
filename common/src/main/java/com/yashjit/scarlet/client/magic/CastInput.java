@@ -2,12 +2,14 @@ package com.yashjit.scarlet.client.magic;
 
 import com.yashjit.scarlet.client.ScarletKeyMappings;
 import com.yashjit.scarlet.client.anim.CastGestures;
+import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.magic.MagicState;
 import com.yashjit.scarlet.magic.Mastery;
 import com.yashjit.scarlet.magic.Spell;
 import com.yashjit.scarlet.network.CastPayload;
+import com.yashjit.scarlet.network.DreamPayload;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.player.ScarletPlayerData;
 import net.minecraft.client.Minecraft;
@@ -101,7 +103,7 @@ public final class CastInput {
             case COOLDOWN -> {
                 return true;
             }
-            case ENERGY, LOCKED, UNAVAILABLE -> {
+            case ENERGY, LOCKED, UNAVAILABLE, DARKHOLD, FOOTING -> {
                 refuse(player, refusal, spell, now);
                 return true;
             }
@@ -157,6 +159,11 @@ public final class CastInput {
     }
 
     private static void toggle(LocalPlayer player, Spell spell, MagicState state, long now) {
+        if (spell == Spell.DREAMWALK && state.channeling(Spell.DREAMWALK)) {
+            // still sitting down to it: cast again and you get up
+            Services.NETWORK.sendToServer(DreamPayload.WAKING);
+            return;
+        }
         if (!state.levitating() || spell != Spell.LEVITATION) {
             Magic.Refusal refusal = Magic.check(player, spell, now);
             if (refusal != Magic.Refusal.NONE) {
@@ -165,6 +172,10 @@ public final class CastInput {
                 }
                 return;
             }
+        }
+        if (spell == Spell.DREAMWALK) {
+            DreamwalkClient.choose(Minecraft.getInstance());
+            return;
         }
         Services.NETWORK.sendToServer(new CastPayload(true, spell.ordinal()));
     }

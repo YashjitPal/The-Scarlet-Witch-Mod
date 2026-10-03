@@ -4,6 +4,7 @@ import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
+import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
 import com.yashjit.scarlet.client.hex.Ejections;
 import com.yashjit.scarlet.client.hex.HomePlacement;
 import com.yashjit.scarlet.client.platform.ClientPlatform;
@@ -37,7 +38,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class MagicHud {
 
-    static final Identifier GLOW = Scarlet.id("hud/glow");
+    public static final Identifier GLOW = Scarlet.id("hud/glow");
 
     private static final int BAR_WIDTH = 182;
     private static final int BAR_HEIGHT = 3;
@@ -89,7 +90,8 @@ public final class MagicHud {
         lastNanos = nanos;
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        boolean crowned = player != null && CrownItem.isWearingCrown(player) && minecraft.gameMode != null && !player.isSpectator();
+        boolean crowned = player != null && CrownItem.isWearingCrown(player) && minecraft.gameMode != null
+                && (!player.isSpectator() || DreamwalkClient.away());
         shown = Ease.damp(shown, crowned ? 1.0F : 0.0F, 10.0F, seconds);
         if (player == null || minecraft.level == null) {
             return;
@@ -235,12 +237,16 @@ public final class MagicHud {
     private static void caption(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, Spell selected) {
         Component text;
         double since;
-        boolean warning = refusal == Magic.Refusal.LOCKED || refusal == Magic.Refusal.UNAVAILABLE;
+        boolean warning = refusal == Magic.Refusal.LOCKED || refusal == Magic.Refusal.UNAVAILABLE || refusal == Magic.Refusal.DARKHOLD
+                || refusal == Magic.Refusal.FOOTING;
         if (warning && now - refusedAt < CAPTION_TICKS && now - refusedAt < now - selectedAt) {
             since = now - refusedAt;
-            text = refusal == Magic.Refusal.LOCKED
-                    ? Component.translatable("spell.scarlet.locked", Mastery.numeral(refusedSpell.rank()))
-                    : Component.translatable("spell.scarlet.unavailable");
+            text = switch (refusal) {
+                case LOCKED -> Component.translatable("spell.scarlet.locked", Mastery.numeral(refusedSpell.rank()));
+                case DARKHOLD -> Component.translatable("spell.scarlet.darkhold");
+                case FOOTING -> Component.translatable("spell.scarlet.footing");
+                default -> Component.translatable("spell.scarlet.unavailable");
+            };
         } else if (now - selectedAt < CAPTION_TICKS) {
             since = now - selectedAt;
             text = selected.displayName();
@@ -262,7 +268,7 @@ public final class MagicHud {
     /**
      * A filled rectangle at fractional GUI coordinates.
      */
-    static void rect(GuiGraphicsExtractor graphics, float x, float y, float width, float height, int color) {
+    public static void rect(GuiGraphicsExtractor graphics, float x, float y, float width, float height, int color) {
         graphics.pose().pushMatrix();
         graphics.pose().translate(x, y);
         graphics.pose().scale(width, height);
@@ -273,14 +279,14 @@ public final class MagicHud {
     /**
      * A crisp square of {@code size} GUI pixels centered at a fractional position, in the HUD's pixel style.
      */
-    static void bead(GuiGraphicsExtractor graphics, float x, float y, float size, int color) {
+    public static void bead(GuiGraphicsExtractor graphics, float x, float y, float size, int color) {
         rect(graphics, x - size / 2, y - size / 2, size, size, color);
     }
 
     /**
      * Draws a square sprite of {@code size} GUI pixels centered at a fractional position.
      */
-    static void sprite(GuiGraphicsExtractor graphics, Identifier sprite, float x, float y, float size, int color) {
+    public static void sprite(GuiGraphicsExtractor graphics, Identifier sprite, float x, float y, float size, int color) {
         graphics.pose().pushMatrix();
         graphics.pose().translate(x, y);
         graphics.pose().scale(size / 16.0F);

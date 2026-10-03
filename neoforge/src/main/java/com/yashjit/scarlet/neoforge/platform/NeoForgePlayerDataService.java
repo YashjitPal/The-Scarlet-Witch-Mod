@@ -2,6 +2,7 @@ package com.yashjit.scarlet.neoforge.platform;
 
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.darkhold.Corruption;
+import com.yashjit.scarlet.darkhold.DreamwalkState;
 import com.yashjit.scarlet.magic.MagicState;
 import com.yashjit.scarlet.platform.PlayerDataService;
 import com.yashjit.scarlet.player.ScarletPlayerData;
@@ -35,6 +36,12 @@ public final class NeoForgePlayerDataService implements PlayerDataService {
                     .copyOnDeath()
                     .build());
 
+    private static final Supplier<AttachmentType<DreamwalkState>> DREAMWALK = ATTACHMENTS.register("dreamwalk",
+            () -> AttachmentType.builder(() -> DreamwalkState.NONE)
+                    .serialize(DreamwalkState.MAP_CODEC)
+                    .copyOnDeath()
+                    .build());
+
     @Override
     public ScarletPlayerData get(Player player) {
         return player.getData(PLAYER_DATA);
@@ -63,5 +70,15 @@ public final class NeoForgePlayerDataService implements PlayerDataService {
     @Override
     public void setCorruption(Player player, Corruption corruption) {
         player.setData(CORRUPTION, corruption);
+    }
+
+    @Override
+    public DreamwalkState dreamwalk(Player player) {
+        return player.getData(DREAMWALK);
+    }
+
+    @Override
+    public void setDreamwalk(Player player, DreamwalkState state) {
+        player.setData(DREAMWALK, state);
     }
 }

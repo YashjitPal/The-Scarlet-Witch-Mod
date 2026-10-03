@@ -29,6 +29,8 @@ public final class ScarletServerConfig {
      * still darkens magic and whispers.
      */
     public boolean corruptionSideEffects = true;
+    /** Whether the Darkhold's Dreamwalking can be cast at all. */
+    public boolean dreamwalking = true;
 
     public static ScarletServerConfig get() {
         return instance;

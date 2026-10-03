@@ -71,7 +71,13 @@ public final class CorruptionClient {
      * How far a caster's magic is darkened: not at all until a tenth of the way in, fully at nine tenths.
      */
     public static float darkness(@Nullable Entity caster) {
-        float corruption = corruption(caster);
+        return darkness(corruption(caster));
+    }
+
+    /**
+     * The same, for a corruption from 0 to 1.
+     */
+    public static float darkness(float corruption) {
         if (corruption <= 0.1F) {
             return 0.0F;
         }
@@ -152,7 +158,7 @@ public final class CorruptionClient {
         float corruption = corruption(player);
         boolean carrying = Darkhold.carries(player);
         float hold = Math.max(corruption, carrying ? 0.12F : 0.0F);
-        if (hold < 0.12F || player.isSpectator()) {
+        if (hold < 0.12F || player.isSpectator() && !DreamwalkClient.away()) {
             whisperIn = Math.max(whisperIn, 100);
             return;
         }

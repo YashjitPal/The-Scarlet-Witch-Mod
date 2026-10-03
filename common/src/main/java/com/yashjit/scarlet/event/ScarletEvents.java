@@ -2,6 +2,7 @@ package com.yashjit.scarlet.event;
 
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.darkhold.Darkhold;
+import com.yashjit.scarlet.darkhold.Dreamwalk;
 import com.yashjit.scarlet.hex.HexEjection;
 import com.yashjit.scarlet.hex.HexRipples;
 import com.yashjit.scarlet.hex.Hexes;
@@ -46,6 +47,10 @@ public final class ScarletEvents {
         if (!(entity instanceof ServerPlayer player)) {
             return true;
         }
+        if (Dreamwalk.isAway(player)) {
+            // a spirit has nothing to hurt, though the command that kills anyone still kills it
+            return source.is(DamageTypes.GENERIC_KILL);
+        }
         if (source.is(DamageTypes.IN_WALL) && Hexes.isFounding(player)) {
             // carried in through the walls of what their home is made of
             return false;
@@ -56,6 +61,7 @@ public final class ScarletEvents {
         if (amount > 0.0F && !player.isInvulnerableTo(player.level(), source)) {
             Hexes.hurt(player, amount);
             MindControl.hurt(player);
+            Dreamwalk.hurt(player);
         }
         return true;
     }
@@ -76,6 +82,7 @@ public final class ScarletEvents {
             SuitUp.setSuited(player, false);
         }
         Magic.tick(player);
+        Dreamwalk.tick(player);
         Darkhold.tick(player);
         Hexes.syncIfNeeded(player);
         Residents.syncIfNeeded(player);

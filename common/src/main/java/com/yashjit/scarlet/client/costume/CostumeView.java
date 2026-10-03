@@ -4,6 +4,7 @@ import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.crown.CrownStyle;
+import com.yashjit.scarlet.entity.DreamBody;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.player.ScarletPlayerData;
 import com.yashjit.scarlet.player.SuitUp;
@@ -38,6 +39,14 @@ public record CostumeView(CrownStyle style, float progress, float phase, boolean
         // While dismissing after the crown was taken off, keep showing the costume it was.
         CrownStyle style = worn != null ? worn : LAST_STYLE.getOrDefault(player.getId(), CrownStyle.WITCH);
         return new CostumeView(style, progress, phase, data.suited());
+    }
+
+    /**
+     * A dreamwalker's body wears the costume its owner had on, settled.
+     */
+    public static @Nullable CostumeView of(DreamBody body) {
+        CrownStyle worn = CrownItem.wornStyle(body);
+        return body.suited() && worn != null ? new CostumeView(worn, 1.0F, 1.0F, true) : null;
     }
 
     public boolean transforming() {
