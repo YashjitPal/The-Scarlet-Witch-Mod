@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.entity.ChaosBolt;
@@ -27,6 +28,7 @@ public final class BoltFx {
     private static final float IMPACT_TICKS = 11.0F;
     private static final float RELEASE_TICKS = 4.0F;
     private static final float TAIL_TICKS = 3.5F;
+    private static final float PALL_TICKS = 9.0F;
 
     private static final List<Impact> IMPACTS = new ArrayList<>();
     private static final List<Release> RELEASES = new ArrayList<>();
@@ -42,21 +44,29 @@ public final class BoltFx {
         RandomSource random = ScarletFx.random();
         Vec3 at = payload.position();
         Vec3 normal = payload.normal();
-        IMPACTS.add(new Impact(at, normal, payload.direction(), payload.hitEntity(), minecraft.level.getGameTime() + partialTick()));
+        float darkness = CorruptionClient.darkness(minecraft.level.getEntity(payload.caster()));
+        IMPACTS.add(new Impact(at, normal, payload.direction(), payload.hitEntity(), minecraft.level.getGameTime() + partialTick(), darkness));
         float density = ScarletFx.density();
-        for (int i = 0, n = Math.round(40 * density); i < n; i++) {
-            Vec3 direction = normal.scale(0.85).add(randomUnit(random)).normalize();
-            int core = random.nextFloat() < 0.35F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
-            ScarletFx.spark(at, direction.scale(0.14 + random.nextDouble() * 0.32), 7 + random.nextInt(10), 0.026F + random.nextFloat() * 0.03F,
-                    core, ScarletPalette.SCARLET, 0.012F, 0.84F);
+        try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+            for (int i = 0, n = Math.round(40 * density); i < n; i++) {
+                Vec3 direction = normal.scale(0.85).add(randomUnit(random)).normalize();
+                int core = random.nextFloat() < 0.35F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
+                ScarletFx.spark(at, direction.scale(0.14 + random.nextDouble() * 0.32), 7 + random.nextInt(10), 0.026F + random.nextFloat() * 0.03F,
+                        core, ScarletPalette.SCARLET, 0.012F, 0.84F);
+            }
+            for (int i = 0, n = Math.round(12 * density); i < n; i++) {
+                Vec3 direction = normal.scale(0.5).add(randomUnit(random).scale(0.6)).normalize();
+                ScarletFx.spark(at, direction.scale(0.04 + random.nextDouble() * 0.06), 20 + random.nextInt(14), 0.035F,
+                        ScarletPalette.CRIMSON, ScarletPalette.WINE, 0.004F, 0.9F);
+            }
+            for (int i = 0, n = Math.round(14 * density); i < n; i++) {
+                ChaosDust.spawn(at, normal.scale(0.06).add(randomUnit(random).scale(0.08)));
+            }
         }
-        for (int i = 0, n = Math.round(12 * density); i < n; i++) {
-            Vec3 direction = normal.scale(0.5).add(randomUnit(random).scale(0.6)).normalize();
-            ScarletFx.spark(at, direction.scale(0.04 + random.nextDouble() * 0.06), 20 + random.nextInt(14), 0.035F,
-                    ScarletPalette.CRIMSON, ScarletPalette.WINE, 0.004F, 0.9F);
-        }
-        for (int i = 0, n = Math.round(14 * density); i < n; i++) {
-            ChaosDust.spawn(at, normal.scale(0.06).add(randomUnit(random).scale(0.08)));
+        // a corrupted caster's blast leaves a pall of black smoke where it burst
+        for (int i = 0, n = Math.round(9 * darkness * density); i < n; i++) {
+            ScarletFx.smoke(at.add(randomUnit(random).scale(0.25)), normal.scale(0.02).add(randomUnit(random).scale(0.02)), 30 + random.nextInt(20),
+                    0.22F + random.nextFloat() * 0.12F, 0.45F + 0.4F * darkness);
         }
     }
 
@@ -64,8 +74,9 @@ public final class BoltFx {
      * Magic leaving a palm toward {@code forward}.
      *
      * @param nearCamera your own hand in first person: nothing drawn over the view, sparks start a little ahead
+     * @param darkness   how far the caster's corruption darkens it
      */
-    public static void release(Vec3 palm, Vec3 forward, boolean nearCamera) {
+    public static void release(Vec3 palm, Vec3 forward, boolean nearCamera, float darkness) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
             return;
@@ -73,16 +84,19 @@ public final class BoltFx {
         RandomSource random = ScarletFx.random();
         Vec3 from = nearCamera ? palm.add(forward.scale(0.8)) : palm.add(forward.scale(0.15));
         if (!nearCamera) {
-            RELEASES.add(new Release(from, forward, minecraft.level.getGameTime() + partialTick()));
+            RELEASES.add(new Release(from, forward, minecraft.level.getGameTime() + partialTick(), darkness));
         }
         float density = ScarletFx.density();
-        for (int i = 0, n = Math.round(10 * density); i < n; i++) {
-            Vec3 direction = forward.add(randomUnit(random).scale(0.38)).normalize();
-            int core = random.nextFloat() < 0.4F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
-            ScarletFx.spark(from, direction.scale(0.16 + random.nextDouble() * 0.18), 4 + random.nextInt(5), 0.024F, core, ScarletPalette.SCARLET, 0.0F, 0.8F);
-        }
-        for (int i = 0, n = Math.round(6 * density); i < n; i++) {
-            ChaosDust.spawn(from.add(randomUnit(random).scale(0.06)), forward.scale(0.05).add(randomUnit(random).scale(0.04)));
+        try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+            for (int i = 0, n = Math.round(10 * density); i < n; i++) {
+                Vec3 direction = forward.add(randomUnit(random).scale(0.38)).normalize();
+                int core = random.nextFloat() < 0.4F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
+                ScarletFx.spark(from, direction.scale(0.16 + random.nextDouble() * 0.18), 4 + random.nextInt(5), 0.024F, core, ScarletPalette.SCARLET, 0.0F,
+                        0.8F);
+            }
+            for (int i = 0, n = Math.round(6 * density); i < n; i++) {
+                ChaosDust.spawn(from.add(randomUnit(random).scale(0.06)), forward.scale(0.05).add(randomUnit(random).scale(0.04)));
+            }
         }
     }
 
@@ -106,15 +120,22 @@ public final class BoltFx {
                 continue;
             }
             Vec3 velocity = bolt.getDeltaMovement();
-            for (int i = 0, n = Math.round(2 * density); i < n; i++) {
-                Vec3 at = bolt.position().subtract(velocity.scale(random.nextDouble())).add(randomUnit(random).scale(0.15));
-                int core = random.nextFloat() < 0.25F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
-                ScarletFx.spark(at, randomUnit(random).scale(0.035).subtract(velocity.scale(0.03)), 6 + random.nextInt(6), 0.026F,
-                        core, ScarletPalette.SCARLET, 0.0F, 0.88F);
+            float darkness = CorruptionClient.darkness(bolt.getOwner());
+            try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+                for (int i = 0, n = Math.round(2 * density); i < n; i++) {
+                    Vec3 at = bolt.position().subtract(velocity.scale(random.nextDouble())).add(randomUnit(random).scale(0.15));
+                    int core = random.nextFloat() < 0.25F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
+                    ScarletFx.spark(at, randomUnit(random).scale(0.035).subtract(velocity.scale(0.03)), 6 + random.nextInt(6), 0.026F,
+                            core, ScarletPalette.SCARLET, 0.0F, 0.88F);
+                }
+                if (random.nextFloat() < 0.5F * density) {
+                    ChaosDust.spawn(bolt.position().subtract(velocity.scale(random.nextDouble() * 0.8)).add(randomUnit(random).scale(0.12)),
+                            randomUnit(random).scale(0.02));
+                }
             }
-            if (random.nextFloat() < 0.5F * density) {
-                ChaosDust.spawn(bolt.position().subtract(velocity.scale(random.nextDouble() * 0.8)).add(randomUnit(random).scale(0.12)),
-                        randomUnit(random).scale(0.02));
+            if (random.nextFloat() < darkness * density) {
+                ScarletFx.smoke(bolt.position().subtract(velocity.scale(random.nextDouble())), randomUnit(random).scale(0.01), 16 + random.nextInt(10),
+                        0.12F, 0.3F + 0.4F * darkness);
             }
         }
     }
@@ -131,13 +152,34 @@ public final class BoltFx {
         double now = minecraft.level.getGameTime() + partialTick();
         List<Impact> impacts = List.copyOf(IMPACTS);
         List<Release> releases = List.copyOf(RELEASES);
+        if (impacts.stream().anyMatch(impact -> impact.darkness() > 0.01F)) {
+            // a corrupted blast bursts dark as well as bright
+            GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+                Glow.Billboard axes = Glow.billboard(pose);
+                float before = Glow.darkness();
+                for (Impact impact : impacts) {
+                    float t = (float) (now - impact.start());
+                    if (impact.darkness() <= 0.01F || t < 0.0F || t > PALL_TICKS) {
+                        continue;
+                    }
+                    Glow.darken(impact.darkness());
+                    Vector3f at = impact.position().subtract(camera).toVector3f();
+                    float fade = 1.0F - Ease.outCubic(t / PALL_TICKS);
+                    Glow.tintDisc(buffer, pose, axes, at.x, at.y, at.z, 1.7F * (0.6F + 0.4F * Ease.outCubic(t / 3.0F)),
+                            GlowPass.tint(ScarletPalette.VOID, 0.75F * impact.darkness() * fade));
+                }
+                Glow.darken(before);
+            });
+        }
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Impact impact : impacts) {
                 float t = (float) (now - impact.start());
                 if (t < 0.0F || t > IMPACT_TICKS) {
                     continue;
                 }
+                Glow.darken(impact.darkness());
                 Vector3f normal = impact.normal().toVector3f();
                 Vector3f at = impact.position().subtract(camera).toVector3f();
                 if (t < TAIL_TICKS) {
@@ -172,6 +214,7 @@ public final class BoltFx {
                 if (t < 0.0F || t > RELEASE_TICKS) {
                     continue;
                 }
+                Glow.darken(release.darkness());
                 float fade = 1.0F - Ease.outQuad(t / RELEASE_TICKS);
                 Vector3f at = release.position().subtract(camera).toVector3f();
                 Glow.disc(buffer, pose, axes, at.x, at.y, at.z, 0.55F, Glow.withAlpha(ScarletPalette.SCARLET, fade * 0.5F));
@@ -180,6 +223,7 @@ public final class BoltFx {
                 Vector3f[] plane = Glow.planeAxes(release.forward().toVector3f());
                 shockRing(buffer, pose, at, plane[0], plane[1], t / RELEASE_TICKS, 0.12F, 0.6F, 0.12F, ScarletPalette.BRIGHT_SCARLET);
             }
+            Glow.darken(before);
         });
     }
 
@@ -205,9 +249,9 @@ public final class BoltFx {
         return Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
     }
 
-    private record Impact(Vec3 position, Vec3 normal, Vec3 direction, boolean hitEntity, double start) {
+    private record Impact(Vec3 position, Vec3 normal, Vec3 direction, boolean hitEntity, double start, float darkness) {
     }
 
-    private record Release(Vec3 position, Vec3 forward, double start) {
+    private record Release(Vec3 position, Vec3 forward, double start, float darkness) {
     }
 }

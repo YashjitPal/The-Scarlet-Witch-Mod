@@ -3,9 +3,11 @@ package com.yashjit.scarlet.client.magic;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.hex.Ejections;
 import com.yashjit.scarlet.client.hex.HomePlacement;
 import com.yashjit.scarlet.client.platform.ClientPlatform;
+import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.hex.Hex;
 import com.yashjit.scarlet.hex.HexPaint;
@@ -113,7 +115,7 @@ public final class MagicHud {
             lastHint = hint;
         }
         if (shown > 0.01F) {
-            energyBar(graphics, energy / max, energy < state.selectedSpell().cost(), now);
+            energyBar(graphics, energy / max, energy < state.selectedSpell().cost(), now, CorruptionClient.darkness(player));
             caption(graphics, minecraft, now, state.selectedSpell());
             if (hintShown > 0.02F && lastHint != null && !SpellWheel.isOpen()) {
                 hintLine(graphics, minecraft, lastHint, hintShown * shown);
@@ -192,33 +194,41 @@ public final class MagicHud {
         graphics.pose().popMatrix();
     }
 
-    private static void energyBar(GuiGraphicsExtractor graphics, float fraction, boolean low, double now) {
+    /**
+     * @param darkness how far the Darkhold's corruption has darkened your magic, and with it the energy
+     */
+    private static void energyBar(GuiGraphicsExtractor graphics, float fraction, boolean low, double now, float darkness) {
         float shake = refusal == Magic.Refusal.ENERGY ? (float) Math.max(0.0, 1.0 - (now - refusedAt) / 8.0) : 0.0F;
         float x0 = (graphics.guiWidth() - BAR_WIDTH) / 2.0F + shake * (float) Math.sin(now * 3.1) * 1.4F;
         // slides up into place as the crown goes on
         float y0 = graphics.guiHeight() - BAR_TOP + (1.0F - shown) * 6.0F;
         float alpha = shown * (1.0F - 0.3F * idleDim);
         float pulse = low ? 0.5F + 0.5F * (float) Math.sin(now * 0.45) : 0.0F;
+        int core = Glow.mix(ScarletPalette.CORE, ScarletPalette.SICKLY, darkness);
+        int bright = Glow.mix(ScarletPalette.BRIGHT_SCARLET, 0x7A1028, darkness);
+        int scarlet = Glow.mix(ScarletPalette.SCARLET, 0x5E0A1E, darkness);
+        int crimson = Glow.mix(ScarletPalette.CRIMSON, ScarletPalette.ABYSS, darkness);
+        int wine = Glow.mix(ScarletPalette.WINE, ScarletPalette.VOID, darkness);
 
         rect(graphics, x0 - 1, y0 - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, ARGB.color(alpha * 0.75F, ScarletPalette.SHADOW));
-        rect(graphics, x0, y0, BAR_WIDTH, BAR_HEIGHT, ARGB.color(alpha * 0.85F, ScarletPalette.WINE));
+        rect(graphics, x0, y0, BAR_WIDTH, BAR_HEIGHT, ARGB.color(alpha * 0.85F, wine));
         float fill = BAR_WIDTH * Math.clamp(fraction, 0.0F, 1.0F);
         if (fill > 0.0F) {
-            int top = ARGB.srgbLerp(pulse, ScarletPalette.BRIGHT_SCARLET, ScarletPalette.CORE);
-            int middle = ARGB.srgbLerp(pulse, ScarletPalette.SCARLET, ScarletPalette.BRIGHT_SCARLET);
+            int top = ARGB.srgbLerp(pulse, bright, core);
+            int middle = ARGB.srgbLerp(pulse, scarlet, bright);
             rect(graphics, x0, y0, fill, 1, ARGB.color(alpha, top));
             rect(graphics, x0, y0 + 1, fill, 1, ARGB.color(alpha, middle));
-            rect(graphics, x0, y0 + 2, fill, 1, ARGB.color(alpha, ScarletPalette.CRIMSON));
+            rect(graphics, x0, y0 + 2, fill, 1, ARGB.color(alpha, crimson));
             // a soft gleam travels along the energy every couple of seconds
             float gleam = (float) ((now % 50.0) / 50.0) * (BAR_WIDTH + 40.0F) - 20.0F;
             if (gleam > 0.0F && gleam < fill) {
-                sprite(graphics, GLOW, x0 + gleam, y0 + 1.5F, 10.0F, ARGB.color(alpha * 0.35F, ScarletPalette.CORE));
+                sprite(graphics, GLOW, x0 + gleam, y0 + 1.5F, 10.0F, ARGB.color(alpha * 0.35F, core));
             }
-            sprite(graphics, GLOW, x0 + fill, y0 + 1.5F, 12.0F, ARGB.color(alpha * (0.5F + 0.3F * pulse), ScarletPalette.SCARLET));
-            rect(graphics, x0 + fill - 1, y0, 1, BAR_HEIGHT, ARGB.color(alpha, ScarletPalette.CORE));
+            sprite(graphics, GLOW, x0 + fill, y0 + 1.5F, 12.0F, ARGB.color(alpha * (0.5F + 0.3F * pulse), scarlet));
+            rect(graphics, x0 + fill - 1, y0, 1, BAR_HEIGHT, ARGB.color(alpha, core));
         }
         if (shake > 0.0F) {
-            rect(graphics, x0, y0, BAR_WIDTH, BAR_HEIGHT, ARGB.color(shake * 0.35F * alpha, ScarletPalette.CORE));
+            rect(graphics, x0, y0, BAR_WIDTH, BAR_HEIGHT, ARGB.color(shake * 0.35F * alpha, core));
         }
     }
 

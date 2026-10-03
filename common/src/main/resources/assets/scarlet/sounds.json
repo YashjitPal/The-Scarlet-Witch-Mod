@@ -1,0 +1,51 @@
+{
+  "darkhold.whisper": {
+    "subtitle": "subtitles.scarlet.darkhold.whisper",
+    "sounds": [
+      { "name": "minecraft:ambient/nether/soulsand_valley/whisper1", "pitch": 0.82 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/whisper2", "pitch": 0.82 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/whisper3", "pitch": 0.88 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/whisper4", "pitch": 0.88 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/whisper5", "pitch": 0.78 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/whisper6", "pitch": 0.85 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/whisper7", "pitch": 0.8 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/whisper8", "pitch": 0.9 }
+    ]
+  },
+  "darkhold.voices": {
+    "subtitle": "subtitles.scarlet.darkhold.voices",
+    "sounds": [
+      { "name": "minecraft:ambient/nether/soulsand_valley/voices1", "pitch": 0.75 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/voices2", "pitch": 0.75 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/voices3", "pitch": 0.72 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/voices4", "pitch": 0.8 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/voices5", "pitch": 0.78 }
+    ]
+  },
+  "darkhold.page": {
+    "subtitle": "subtitles.scarlet.darkhold.page",
+    "sounds": [
+      { "name": "minecraft:item/book/open_flip1", "pitch": 0.62 },
+      { "name": "minecraft:item/book/open_flip2", "pitch": 0.6 },
+      { "name": "minecraft:item/book/open_flip3", "pitch": 0.66 }
+    ]
+  },
+  "darkhold.heartbeat": {
+    "subtitle": "subtitles.scarlet.darkhold.heartbeat",
+    "sounds": [
+      { "name": "minecraft:mob/warden/heartbeat_1", "pitch": 0.9 },
+      { "name": "minecraft:mob/warden/heartbeat_2", "pitch": 0.9 },
+      { "name": "minecraft:mob/warden/heartbeat_3", "pitch": 0.9 },
+      { "name": "minecraft:mob/warden/heartbeat_4", "pitch": 0.9 }
+    ]
+  },
+  "darkhold.dread": {
+    "subtitle": "subtitles.scarlet.darkhold.dread",
+    "sounds": [
+      { "name": "minecraft:ambient/nether/soulsand_valley/mood1", "pitch": 0.7 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/mood2", "pitch": 0.7 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/mood3", "pitch": 0.65 },
+      { "name": "minecraft:ambient/nether/soulsand_valley/mood4", "pitch": 0.7 }
+    ]
+  }
+}

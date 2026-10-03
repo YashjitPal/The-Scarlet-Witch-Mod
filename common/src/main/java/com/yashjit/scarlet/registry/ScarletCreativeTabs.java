@@ -20,6 +20,7 @@ public final class ScarletCreativeTabs {
                         List<ItemStack> stacks = new ArrayList<>();
                         stacks.add(new ItemStack(ScarletItems.WITCH_TIARA.get()));
                         stacks.add(new ItemStack(ScarletItems.WARLOCK_CROWN.get()));
+                        stacks.add(new ItemStack(ScarletItems.DARKHOLD.get()));
                         for (Supplier<Item> decor : ScarletBlocks.DECOR_ITEMS) {
                             stacks.add(new ItemStack(decor.get()));
                         }

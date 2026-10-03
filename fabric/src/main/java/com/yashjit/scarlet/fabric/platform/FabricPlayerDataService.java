@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.fabric.platform;
 
 import com.yashjit.scarlet.Scarlet;
+import com.yashjit.scarlet.darkhold.Corruption;
 import com.yashjit.scarlet.magic.MagicState;
 import com.yashjit.scarlet.platform.PlayerDataService;
 import com.yashjit.scarlet.player.ScarletPlayerData;
@@ -22,6 +23,13 @@ public final class FabricPlayerDataService implements PlayerDataService {
                     .persistent(MagicState.CODEC)
                     .initializer(() -> MagicState.DEFAULT)
                     .syncWith(MagicState.STREAM_CODEC, AttachmentSyncPredicate.all()));
+
+    private static final AttachmentType<Corruption> CORRUPTION = AttachmentRegistry.create(Scarlet.id("corruption"),
+            builder -> builder
+                    .persistent(Corruption.CODEC)
+                    .initializer(() -> Corruption.NONE)
+                    .syncWith(Corruption.STREAM_CODEC, AttachmentSyncPredicate.all())
+                    .copyOnDeath());
 
     /**
      * Attachment types must exist on both sides before any world loads.
@@ -47,5 +55,15 @@ public final class FabricPlayerDataService implements PlayerDataService {
     @Override
     public void setMagic(Player player, MagicState state) {
         player.setAttached(MAGIC, state);
+    }
+
+    @Override
+    public Corruption corruption(Player player) {
+        return player.getAttachedOrElse(CORRUPTION, Corruption.NONE);
+    }
+
+    @Override
+    public void setCorruption(Player player, Corruption corruption) {
+        player.setAttached(CORRUPTION, corruption);
     }
 }

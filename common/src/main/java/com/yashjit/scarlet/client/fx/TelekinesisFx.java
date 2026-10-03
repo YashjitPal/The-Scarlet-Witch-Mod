@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.PoseBlends;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.magic.TelekinesisClient;
 import com.yashjit.scarlet.client.render.Glow;
@@ -52,6 +53,13 @@ public final class TelekinesisFx {
         if (kind != MagicEventPayload.TORN_OUT && kind != MagicEventPayload.SLAM) {
             return;
         }
+        ClientLevel level = Minecraft.getInstance().level;
+        try (Glow.Darkening ignored = Glow.darkening(level == null ? 0.0F : CorruptionClient.darkness(level.getEntity(payload.entityId())))) {
+            burst(payload, kind);
+        }
+    }
+
+    private static void burst(MagicEventPayload payload, int kind) {
         RandomSource random = ScarletFx.random();
         Vec3 at = payload.position();
         float density = ScarletFx.density();
@@ -89,14 +97,21 @@ public final class TelekinesisFx {
             }
             // sparks shed off it as it is carried
             AABB box = target.getBoundingBox();
-            for (int i = 0, n = count(random, 2.2F * ScarletFx.density()); i < n; i++) {
-                Vec3 at = new Vec3(Mth.lerp(random.nextDouble(), box.minX, box.maxX), Mth.lerp(random.nextDouble(), box.minY, box.maxY),
-                        Mth.lerp(random.nextDouble(), box.minZ, box.maxZ));
-                ScarletFx.spark(at, randomUnit(random).scale(0.02).add(0.0, 0.015, 0.0), 10 + random.nextInt(8), 0.022F,
-                        random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.001F, 0.9F);
+            float darkness = CorruptionClient.darkness(level.getEntity(entry.getIntKey()));
+            try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+                for (int i = 0, n = count(random, 2.2F * ScarletFx.density()); i < n; i++) {
+                    Vec3 at = new Vec3(Mth.lerp(random.nextDouble(), box.minX, box.maxX), Mth.lerp(random.nextDouble(), box.minY, box.maxY),
+                            Mth.lerp(random.nextDouble(), box.minZ, box.maxZ));
+                    ScarletFx.spark(at, randomUnit(random).scale(0.02).add(0.0, 0.015, 0.0), 10 + random.nextInt(8), 0.022F,
+                            random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.001F, 0.9F);
+                }
+                if (random.nextFloat() < 0.4F * ScarletFx.density()) {
+                    ChaosDust.spawn(box.getCenter().add(randomUnit(random).scale(box.getSize() * 0.6)), randomUnit(random).scale(0.01));
+                }
             }
-            if (random.nextFloat() < 0.4F * ScarletFx.density()) {
-                ChaosDust.spawn(box.getCenter().add(randomUnit(random).scale(box.getSize() * 0.6)), randomUnit(random).scale(0.01));
+            if (random.nextFloat() < 0.5F * darkness * ScarletFx.density()) {
+                ScarletFx.smoke(box.getCenter().add(randomUnit(random).scale(box.getSize() * 0.5)), new Vec3(0.0, 0.01, 0.0), 22 + random.nextInt(12),
+                        0.1F, 0.3F + 0.4F * darkness);
             }
         }
         HUMS.int2ObjectEntrySet().removeIf(entry -> {
@@ -135,22 +150,27 @@ public final class TelekinesisFx {
             Vector3f right = Hands.palm(caster, HumanoidArm.RIGHT).subtract(camera).toVector3f();
             Vector3f left = Hands.palm(caster, HumanoidArm.LEFT).subtract(camera).toVector3f();
             draws.add(new Draw(center.subtract(camera).toVector3f(), size, target.getBbWidth(), target.getBbHeight(), right, left, presence,
-                    ScarletFx.isFirstPersonViewOf(caster), caster.getId() * 0.618F));
+                    ScarletFx.isFirstPersonViewOf(caster), caster.getId() * 0.618F, CorruptionClient.darkness(caster)));
         }
         if (draws.isEmpty()) {
             return;
         }
         GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Draw draw : draws) {
+                Glow.darken(draw.darkness());
                 Vector3f c = draw.center();
                 Glow.tintDisc(buffer, pose, axes, c.x, c.y, c.z, draw.size() * 0.95F, GlowPass.tint(ScarletPalette.GLASS, 0.5F * draw.presence()));
             }
+            Glow.darken(before);
         });
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
             float time = (float) (now % 24000.0);
+            float before = Glow.darkness();
             for (Draw draw : draws) {
+                Glow.darken(draw.darkness());
                 aura(buffer, pose, axes, draw, time);
                 for (int hand = 0; hand < 2; hand++) {
                     Vector3f palm = hand == 0 ? draw.rightPalm() : draw.leftPalm();
@@ -159,6 +179,7 @@ public final class TelekinesisFx {
                     }
                 }
             }
+            Glow.darken(before);
         });
     }
 
@@ -238,7 +259,7 @@ public final class TelekinesisFx {
     }
 
     private record Draw(Vector3f center, float size, float width, float height, Vector3f rightPalm, Vector3f leftPalm, float presence, boolean own,
-                        float seed) {
+                        float seed, float darkness) {
     }
 
     /**

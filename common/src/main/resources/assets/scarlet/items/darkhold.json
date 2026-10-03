@@ -1,0 +1,18 @@
+{
+  "model": {
+    "type": "minecraft:select",
+    "property": "minecraft:display_context",
+    "cases": [
+      {
+        "when": "gui",
+        "model": { "type": "minecraft:model", "model": "scarlet:item/darkhold" }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:condition",
+      "property": "minecraft:using_item",
+      "on_true": { "type": "minecraft:model", "model": "scarlet:item/darkhold_open" },
+      "on_false": { "type": "minecraft:model", "model": "scarlet:item/darkhold_closed" }
+    }
+  }
+}

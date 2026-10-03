@@ -48,10 +48,14 @@ public final class GlowPass {
     private GlowPass() {
     }
 
+    /**
+     * Glows to draw, darkened as {@link Glow#darkness()} is now: a corrupted caster's magic keeps its darkness though it
+     * is drawn later.
+     */
     public static void submit(SubmitNodeCollector collector, PoseStack poseStack, SubmitNodeCollector.CustomGeometryRenderer renderer) {
         submit(collector, poseStack, renderer, ScarletRenderTypes.glow(), GLOWS);
         if (Minecraft.getInstance().gameRenderer.useImprovedTransparency()) {
-            MIRROR.deferred.add(new Deferred(poseStack.last().copy(), renderer));
+            MIRROR.deferred.add(new Deferred(poseStack.last().copy(), renderer, Glow.darkness()));
         }
     }
 
@@ -94,10 +98,16 @@ public final class GlowPass {
 
     private static void submit(SubmitNodeCollector collector, PoseStack poseStack, SubmitNodeCollector.CustomGeometryRenderer renderer,
                                RenderType type, Layer layer) {
+        float darkness = Glow.darkness();
         if (Minecraft.getInstance().gameRenderer.useImprovedTransparency()) {
-            collector.submitCustomGeometry(poseStack, type, renderer);
+            boolean tint = layer == TINTS;
+            collector.submitCustomGeometry(poseStack, type, (pose, buffer) -> {
+                try (Glow.Darkening ignored = Glow.drawing(darkness, tint)) {
+                    renderer.render(pose, buffer);
+                }
+            });
         } else {
-            layer.deferred.add(new Deferred(poseStack.last().copy(), renderer));
+            layer.deferred.add(new Deferred(poseStack.last().copy(), renderer, darkness));
         }
     }
 
@@ -166,7 +176,9 @@ public final class GlowPass {
             }
             BufferBuilder builder = new BufferBuilder(BYTES, PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
             for (Deferred entry : deferred) {
-                entry.renderer().render(entry.pose(), builder);
+                try (Glow.Darkening ignored = Glow.drawing(entry.darkness(), this == TINTS)) {
+                    entry.renderer().render(entry.pose(), builder);
+                }
             }
             deferred.clear();
             try (MeshData mesh = builder.build()) {
@@ -208,6 +220,6 @@ public final class GlowPass {
         }
     }
 
-    private record Deferred(PoseStack.Pose pose, SubmitNodeCollector.CustomGeometryRenderer renderer) {
+    private record Deferred(PoseStack.Pose pose, SubmitNodeCollector.CustomGeometryRenderer renderer, float darkness) {
     }
 }

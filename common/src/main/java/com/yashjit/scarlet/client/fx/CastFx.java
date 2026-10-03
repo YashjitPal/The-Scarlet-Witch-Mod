@@ -1,7 +1,9 @@
 package com.yashjit.scarlet.client.fx;
 
 import com.yashjit.scarlet.client.anim.CastGestures;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.magic.Hands;
+import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.magic.Magic;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -36,19 +38,22 @@ public final class CastFx {
             }
             boolean ownFirstPerson = ScarletFx.isFirstPersonViewOf(player);
             double[] released = RELEASED.computeIfAbsent(player.getId(), id -> new double[] {-1.0E9, -1.0E9});
-            for (HumanoidArm arm : HumanoidArm.values()) {
-                double release = CastGestures.releaseTime(player, arm);
-                if (release > released[arm.ordinal()] && now >= release) {
-                    released[arm.ordinal()] = release;
-                    if (now - release < 3.0) {
-                        BoltFx.release(Hands.palm(player, arm), player.getLookAngle(), ownFirstPerson);
+            float darkness = CorruptionClient.darkness(player);
+            try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+                for (HumanoidArm arm : HumanoidArm.values()) {
+                    double release = CastGestures.releaseTime(player, arm);
+                    if (release > released[arm.ordinal()] && now >= release) {
+                        released[arm.ordinal()] = release;
+                        if (now - release < 3.0) {
+                            BoltFx.release(Hands.palm(player, arm), player.getLookAngle(), ownFirstPerson, darkness);
+                        }
                     }
                 }
-            }
-            if (Magic.state(player).levitating()) {
-                handDust(player, 0.6F, ownFirstPerson);
-            } else if (flying(player, minecraft)) {
-                trail(player, ownFirstPerson);
+                if (Magic.state(player).levitating()) {
+                    handDust(player, 0.6F, ownFirstPerson);
+                } else if (flying(player, minecraft)) {
+                    trail(player, ownFirstPerson);
+                }
             }
         }
     }

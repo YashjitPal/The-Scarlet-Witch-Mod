@@ -3,6 +3,7 @@ package com.yashjit.scarlet.client.fx;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.PoseBlends;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
@@ -102,13 +103,15 @@ public final class PaintFx {
             }
             // sparks thrown off the surface where the stream lands
             Vec3 normal = hit.getDirection().getUnitVec3();
-            for (int i = 0, n = Math.round(3 * ScarletFx.density()); i < n; i++) {
-                Vec3 out = normal.scale(0.05 + random.nextDouble() * 0.05).add(randomUnit(random).scale(0.05));
-                ScarletFx.spark(hit.getLocation().add(normal.scale(0.05)), out, 5 + random.nextInt(6), 0.026F + random.nextFloat() * 0.02F,
-                        random.nextFloat() < 0.35F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.004F, 0.86F);
-            }
-            if (random.nextFloat() < 0.3F * ScarletFx.density()) {
-                ChaosDust.spawn(hit.getLocation().add(normal.scale(0.2)), normal.scale(0.02).add(randomUnit(random).scale(0.02)));
+            try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(player))) {
+                for (int i = 0, n = Math.round(3 * ScarletFx.density()); i < n; i++) {
+                    Vec3 out = normal.scale(0.05 + random.nextDouble() * 0.05).add(randomUnit(random).scale(0.05));
+                    ScarletFx.spark(hit.getLocation().add(normal.scale(0.05)), out, 5 + random.nextInt(6), 0.026F + random.nextFloat() * 0.02F,
+                            random.nextFloat() < 0.35F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.004F, 0.86F);
+                }
+                if (random.nextFloat() < 0.3F * ScarletFx.density()) {
+                    ChaosDust.spawn(hit.getLocation().add(normal.scale(0.2)), normal.scale(0.02).add(randomUnit(random).scale(0.02)));
+                }
             }
         }
     }
@@ -144,15 +147,18 @@ public final class PaintFx {
             }
             Vec3 palm = Hands.raisedPalm(player, player.getMainArm(), partialTick);
             streams.add(new Stream(palm.subtract(camera).toVector3f(), hit.getLocation().subtract(camera).toVector3f(), presence,
-                    player.getId() * 0.618F));
+                    player.getId() * 0.618F, CorruptionClient.darkness(player)));
         }
         List<Written> written = List.copyOf(WRITTEN);
         if (!streams.isEmpty()) {
             GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
                 Glow.Billboard axes = Glow.billboard(pose);
+                float before = Glow.darkness();
                 for (Stream stream : streams) {
+                    Glow.darken(stream.darkness());
                     MagicBeam.tint(buffer, pose, axes, stream.from(), stream.to(), stream.presence());
                 }
+                Glow.darken(before);
             });
         }
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
@@ -164,9 +170,12 @@ public final class PaintFx {
                 return;
             }
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Stream stream : streams) {
+                Glow.darken(stream.darkness());
                 MagicBeam.draw(buffer, pose, axes, stream.from(), stream.to(), now, stream.seed(), stream.presence());
             }
+            Glow.darken(before);
         });
     }
 
@@ -180,6 +189,6 @@ public final class PaintFx {
     /**
      * The beam from a caster's hand to their brush, relative to the camera.
      */
-    private record Stream(Vector3f from, Vector3f to, float presence, float seed) {
+    private record Stream(Vector3f from, Vector3f to, float presence, float seed, float darkness) {
     }
 }

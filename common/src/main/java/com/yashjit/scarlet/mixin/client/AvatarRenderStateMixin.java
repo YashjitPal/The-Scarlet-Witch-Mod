@@ -56,6 +56,19 @@ abstract class AvatarRenderStateMixin implements CastPoseState {
     @Unique
     private float scarlet$raise;
 
+    @Unique
+    private float scarlet$read;
+
+    @Override
+    public float scarlet$read() {
+        return scarlet$read;
+    }
+
+    @Override
+    public void scarlet$setRead(float read) {
+        scarlet$read = read;
+    }
+
     @Override
     public float scarlet$beam() {
         return scarlet$beam;

@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.config.ScarletClientConfig;
@@ -14,12 +15,14 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * World-space glowing sparks: simulated on the client tick, drawn every frame with interpolation. The particle budget
+ * World-space glowing sparks, and the black smoke that rises off a corrupted caster's magic: simulated on the client
+ * tick, drawn every frame with interpolation. Each spark keeps the darkness it was spawned with. The particle budget
  * follows the effects quality setting.
  */
 public final class ScarletFx {
 
     private static final List<Spark> SPARKS = new ArrayList<>();
+    private static final List<Spark> SMOKE = new ArrayList<>();
     private static final RandomSource RANDOM = RandomSource.create();
 
     private ScarletFx() {
@@ -64,51 +67,95 @@ public final class ScarletFx {
      */
     public static void spark(Vec3 position, Vec3 velocity, int life, float size, int coreColor, int haloColor, float gravity, float drag) {
         if (SPARKS.size() < budget()) {
-            SPARKS.add(new Spark(position, velocity, life, size, coreColor, haloColor, gravity, drag, RANDOM.nextFloat() * 100.0F));
+            SPARKS.add(new Spark(position, velocity, life, size, coreColor, haloColor, gravity, drag, RANDOM.nextFloat() * 100.0F, Glow.darkness()));
+        }
+    }
+
+    /**
+     * A puff of black smoke that swells as it rises and thins away.
+     *
+     * @param density how dark it is at its thickest, 0 to 1
+     */
+    public static void smoke(Vec3 position, Vec3 velocity, int life, float size, float density) {
+        if (SMOKE.size() < budget() / 4) {
+            SMOKE.add(new Spark(position, velocity, life, size, 0, 0, -0.0015F, 0.9F, density, 0.0F));
         }
     }
 
     public static void tick(Minecraft minecraft) {
         if (minecraft.level == null) {
             SPARKS.clear();
+            SMOKE.clear();
             return;
         }
         if (minecraft.isPaused()) {
             return;
         }
-        Iterator<Spark> iterator = SPARKS.iterator();
-        while (iterator.hasNext()) {
-            if (!iterator.next().tick()) {
-                iterator.remove();
+        for (List<Spark> list : List.of(SPARKS, SMOKE)) {
+            Iterator<Spark> iterator = list.iterator();
+            while (iterator.hasNext()) {
+                if (!iterator.next().tick()) {
+                    iterator.remove();
+                }
             }
         }
     }
 
     public static void submit(SubmitNodeCollector collector, PoseStack poseStack) {
-        if (SPARKS.isEmpty()) {
-            return;
-        }
         Minecraft minecraft = Minecraft.getInstance();
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        submitSmoke(collector, poseStack, camera, partialTick);
+        if (SPARKS.isEmpty()) {
+            return;
+        }
         int count = SPARKS.size();
-        float[] values = new float[count * 5];
+        float[] values = new float[count * 6];
         int[] colors = new int[count * 2];
         for (int i = 0; i < count; i++) {
             Spark spark = SPARKS.get(i);
-            values[i * 5] = (float) (spark.lerpX(partialTick) - camera.x);
-            values[i * 5 + 1] = (float) (spark.lerpY(partialTick) - camera.y);
-            values[i * 5 + 2] = (float) (spark.lerpZ(partialTick) - camera.z);
-            values[i * 5 + 3] = spark.size;
-            values[i * 5 + 4] = spark.alpha(partialTick);
+            values[i * 6] = (float) (spark.lerpX(partialTick) - camera.x);
+            values[i * 6 + 1] = (float) (spark.lerpY(partialTick) - camera.y);
+            values[i * 6 + 2] = (float) (spark.lerpZ(partialTick) - camera.z);
+            values[i * 6 + 3] = spark.size;
+            values[i * 6 + 4] = spark.alpha(partialTick);
+            values[i * 6 + 5] = spark.darkness;
             colors[i * 2] = spark.coreColor;
             colors[i * 2 + 1] = spark.haloColor;
         }
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (int i = 0; i < count; i++) {
-                Glow.spark(buffer, pose, axes, values[i * 5], values[i * 5 + 1], values[i * 5 + 2], values[i * 5 + 3],
-                        colors[i * 2], colors[i * 2 + 1], values[i * 5 + 4]);
+                Glow.darken(values[i * 6 + 5]);
+                Glow.spark(buffer, pose, axes, values[i * 6], values[i * 6 + 1], values[i * 6 + 2], values[i * 6 + 3],
+                        colors[i * 2], colors[i * 2 + 1], values[i * 6 + 4]);
+            }
+            Glow.darken(before);
+        });
+    }
+
+    private static void submitSmoke(SubmitNodeCollector collector, PoseStack poseStack, Vec3 camera, float partialTick) {
+        if (SMOKE.isEmpty()) {
+            return;
+        }
+        int count = SMOKE.size();
+        float[] values = new float[count * 5];
+        for (int i = 0; i < count; i++) {
+            Spark puff = SMOKE.get(i);
+            float t = Math.min(1.0F, (puff.age + partialTick) / puff.life);
+            values[i * 5] = (float) (puff.lerpX(partialTick) - camera.x);
+            values[i * 5 + 1] = (float) (puff.lerpY(partialTick) - camera.y);
+            values[i * 5 + 2] = (float) (puff.lerpZ(partialTick) - camera.z);
+            values[i * 5 + 3] = puff.size * (1.0F + 1.6F * t);
+            // thickens quickly, holds, then thins away as it swells
+            values[i * 5 + 4] = puff.seed * Math.min(1.0F, t * 5.0F) * (1.0F - t * t);
+        }
+        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+            Glow.Billboard axes = Glow.billboard(pose);
+            for (int i = 0; i < count; i++) {
+                Glow.tintDisc(buffer, pose, axes, values[i * 5], values[i * 5 + 1], values[i * 5 + 2], values[i * 5 + 3],
+                        GlowPass.tint(ScarletPalette.VOID, values[i * 5 + 4]));
             }
         });
     }
@@ -124,9 +171,11 @@ public final class ScarletFx {
         final int haloColor;
         final float gravity;
         final float drag;
+        /** For a spark, the phase of its flicker; for smoke, how dark it is. */
         final float seed;
+        final float darkness;
 
-        Spark(Vec3 position, Vec3 velocity, int life, float size, int coreColor, int haloColor, float gravity, float drag, float seed) {
+        Spark(Vec3 position, Vec3 velocity, int life, float size, int coreColor, int haloColor, float gravity, float drag, float seed, float darkness) {
             this.x = this.xo = position.x;
             this.y = this.yo = position.y;
             this.z = this.zo = position.z;
@@ -140,6 +189,7 @@ public final class ScarletFx {
             this.gravity = gravity;
             this.drag = drag;
             this.seed = seed;
+            this.darkness = darkness;
         }
 
         boolean tick() {

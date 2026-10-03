@@ -8,6 +8,7 @@ import com.yashjit.scarlet.registry.ScarletDataComponents;
 import com.yashjit.scarlet.registry.ScarletEntities;
 import com.yashjit.scarlet.registry.ScarletItems;
 import com.yashjit.scarlet.registry.ScarletRecipeSerializers;
+import com.yashjit.scarlet.registry.ScarletSounds;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ public final class Scarlet {
     public static void init() {
         ScarletServerConfig.load();
         ScarletDataComponents.bootstrap();
+        ScarletSounds.bootstrap();
         ScarletItems.bootstrap();
         ScarletBlocks.bootstrap();
         ScarletEntities.bootstrap();

@@ -3,6 +3,7 @@ package com.yashjit.scarlet.registry;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.crown.CrownStyle;
+import com.yashjit.scarlet.darkhold.DarkholdItem;
 import com.yashjit.scarlet.entity.ParkedCarItem;
 import com.yashjit.scarlet.platform.Services;
 import java.util.function.Function;
@@ -20,6 +21,7 @@ public final class ScarletItems {
     public static final Supplier<CrownItem> WITCH_TIARA = crown("witch_tiara", CrownStyle.WITCH);
     public static final Supplier<CrownItem> WARLOCK_CROWN = crown("warlock_crown", CrownStyle.WARLOCK);
     public static final Supplier<ParkedCarItem> PARKED_CAR = register("parked_car", ParkedCarItem::new, () -> new Item.Properties().stacksTo(1));
+    public static final Supplier<DarkholdItem> DARKHOLD = register("darkhold", DarkholdItem::new, DarkholdItem::properties);
 
     private ScarletItems() {
     }

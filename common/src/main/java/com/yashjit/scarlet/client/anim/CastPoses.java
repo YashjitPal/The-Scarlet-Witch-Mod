@@ -58,6 +58,7 @@ public final class CastPoses {
         float control = 0.0F;
         float beam = 0.0F;
         float raise = 0.0F;
+        float read = 0.0F;
         boolean beamRight = true;
         if (avatar instanceof Player player) {
             double now = player.level().getGameTime() + partialTick;
@@ -77,12 +78,14 @@ public final class CastPoses {
             found = Founding.lift(player, now);
             beam = blend.beam;
             raise = blend.raise;
+            read = blend.read;
             beamRight = player.getMainArm() == HumanoidArm.RIGHT;
         }
         ((CastPoseState) state).scarlet$set(right, left, shield, recoil, levitate, lean, burst, gather, hold, tear, spread);
         ((CastPoseState) state).scarlet$setFound(found);
         ((CastPoseState) state).scarlet$setControl(control);
         ((CastPoseState) state).scarlet$setBeam(beam, beamRight, raise);
+        ((CastPoseState) state).scarlet$setRead(read);
     }
 
     /**
@@ -118,6 +121,10 @@ public final class CastPoses {
         float raise = pose.scarlet$raise() * weight;
         if (raise > 0.001F) {
             raise(model, raise, age);
+        }
+        float read = pose.scarlet$read() * weight;
+        if (read > 0.001F) {
+            read(model, read, age);
         }
         float tear = pose.scarlet$tear() * weight;
         if (tear > 0.001F) {
@@ -224,6 +231,17 @@ public final class CastPoses {
         float aimX = -HALF_PI - 0.35F + Math.min(model.head.xRot, BEAM_LOWEST) * 0.6F;
         pose(model.rightArm, aimX + tremble + sway, model.head.yRot - 0.42F, 0.1F, weight);
         pose(model.leftArm, aimX - tremble - sway, model.head.yRot + 0.42F, -0.1F, weight);
+    }
+
+    /**
+     * Reading the Darkhold: the book held open before the chest in both hands, the head bowed over it, swaying a little
+     * as if it were heavy.
+     */
+    private static void read(PlayerModel model, float weight, float age) {
+        float sway = Mth.sin(age * 0.07F) * 0.03F;
+        pose(model.rightArm, -0.95F + sway, -0.38F, 0.0F, weight);
+        pose(model.leftArm, -0.95F - sway, 0.38F, 0.0F, weight);
+        model.head.xRot = Ease.lerp(model.head.xRot, Math.max(model.head.xRot, 0.45F), weight);
     }
 
     /**

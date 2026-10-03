@@ -312,8 +312,9 @@ public final class RuneTraps {
     }
 
     private static void announce(ServerLevel level, Trap trap, int stage) {
+        ServerPlayer owner = level.getServer().getPlayerList().getPlayer(trap.owner);
         RunePayload payload = new RunePayload(trap.id, trap.at, (int) Mth.clamp(level.getGameTime() - trap.inscribedAt, 0, Integer.MAX_VALUE), stage,
-                List.copyOf(trap.bound));
+                List.copyOf(trap.bound), owner != null && owner.level() == level ? owner.getId() : -1);
         for (ServerPlayer player : level.players()) {
             if (player.position().distanceToSqr(trap.at) < SEEN_FROM * SEEN_FROM) {
                 Services.NETWORK.sendToPlayer(player, payload);

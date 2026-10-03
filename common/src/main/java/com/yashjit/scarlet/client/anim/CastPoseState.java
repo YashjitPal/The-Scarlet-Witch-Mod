@@ -57,4 +57,9 @@ public interface CastPoseState {
     float scarlet$raise();
 
     void scarlet$setBeam(float beam, boolean right, float raise);
+
+    /** Reading the Darkhold, held open before the chest in both hands: 0 to 1. */
+    float scarlet$read();
+
+    void scarlet$setRead(float read);
 }

@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.render.Glow;
+import com.yashjit.scarlet.client.render.GlowPass;
 import net.minecraft.util.ARGB;
 import org.joml.Vector3f;
 
@@ -54,6 +55,32 @@ public final class BoltVisuals {
         for (int j = 0; j < ARCS; j++) {
             arc(buffer, pose, axes, seed, bucket, j, age);
         }
+    }
+
+    /**
+     * The dark a corrupted caster's blast carries, for the tint pass: a pall around the head and down the trail. Its
+     * light alone could only brighten what is behind it; this is what makes it read as black against a bright sky.
+     */
+    public static void shadow(VertexConsumer buffer, PoseStack.Pose pose, Vector3f direction, float age, float flown, float darkness) {
+        Glow.Billboard axes = Glow.billboard(pose);
+        Glow.tintDisc(buffer, pose, axes, 0, 0, 0, 0.85F, GlowPass.tint(ScarletPalette.VOID, 0.75F * darkness));
+        float length = Math.min(TRAIL_LENGTH, flown);
+        if (length < 0.05F) {
+            return;
+        }
+        Vector3f[] around = Glow.planeAxes(direction);
+        Vector3f[] points = new Vector3f[TRAIL_POINTS];
+        float[] widths = new float[TRAIL_POINTS];
+        int[] tints = new int[TRAIL_POINTS];
+        for (int i = 0; i < TRAIL_POINTS; i++) {
+            float s = i / (float) (TRAIL_POINTS - 1);
+            float swayA = (float) Math.sin(s * 7.0F - age * 0.9F) * 0.09F * s;
+            float swayB = (float) Math.cos(s * 5.0F - age * 1.1F) * 0.09F * s;
+            points[i] = new Vector3f(direction).mul(-s * length).add(new Vector3f(around[0]).mul(swayA)).add(new Vector3f(around[1]).mul(swayB));
+            widths[i] = 0.9F * (float) Math.pow(1.0F - s, 0.8) + 0.05F;
+            tints[i] = GlowPass.tint(ScarletPalette.VOID, 0.65F * darkness * (float) Math.pow(1.0F - s, 1.2));
+        }
+        Glow.tintRibbon(buffer, pose, axes, points, widths, tints);
     }
 
     /**

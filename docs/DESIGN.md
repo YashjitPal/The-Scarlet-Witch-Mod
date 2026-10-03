@@ -177,11 +177,16 @@ They burn steadily while the shield is held and smolder while levitating.
 
 ## 6. The Darkhold
 
-- **Craftable, late game:** a book with echo shards from Ancient Cities. *(Exact recipe proposed: book in the center, echo shards and crying obsidian around it.)*
-- **Carry it to use its dark spells.** Heavy use slowly **corrupts** you:
-  - darker magic (scarlet shifts toward black-crimson), dark veins at the screen edges, whispers;
-  - side effects at high corruption (to be tuned: hunger drain, darkness pulses, restless sleep);
-  - corruption slowly fades while you are not using it.
+- **Craftable, late game:** a book in the center, crying obsidian on its four sides and echo shards from Ancient Cities at the corners. The recipe unlocks when you pick up an echo shard. One to a stack, epic, and it doesn't burn.
+- **The look:** a heavy tome bound in black-crimson leather, tarnished iron at its corners and on its spine, held shut by a strap, with a horned iron crest on the cover around a stone that glows sickly red. Inside, yellowed pages written close in a dark hand around red sigils. It is carried shut at your side and held open before the chest in both hands while read, head bowed over it; in the first person the open pages fill the lower middle of the view.
+- **Reading it:** hold use. A page turns every three seconds and each takes **4%** of you, so twenty-five pages take all of you. The first page tells you what it offers. The tooltip shows how much it has taken.
+- **Carry it to use its dark spells.** Reading it and casting its spells **corrupt** you, 0 to 100%, kept through death:
+  - **darker magic for everyone who sees it:** from a tenth of the way in, every spell's light shifts from scarlet toward black-crimson with sickly highlights, its glass toward black, and black smoke rises off it and off your hands. Bolts carry a pall of dark with them and burst dark, so a corrupted blast reads as black even against a bright sky. The energy bar darkens with it;
+  - **dark veins** creep in at the edges of your sight, further the deeper it runs, beating with your heart; they flare while you read and as the dark closes in. They soften with *reduce screen effects*;
+  - **whispers** all around you, now and then when you merely carry the book, every few seconds once it has most of you, in many voices near the end;
+  - **side effects** past halfway (a server option can turn them off): from 50% you hunger faster, from 60% the whispers wake you whenever you try to sleep, and from 70% the dark closes in now and then, with a heartbeat;
+  - it **fades** once you stop: a minute after you last read or cast from it, and then all of it in about forty minutes.
+- Admins can see and set it: `/scarlet corruption <player> [set <percent>]`.
 - Dark spells: **Dreamwalking** first. More to be decided.
 
 ### Dreamwalking

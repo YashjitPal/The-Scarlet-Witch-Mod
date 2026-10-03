@@ -5,6 +5,7 @@ import com.yashjit.scarlet.client.anim.CastGestures;
 import com.yashjit.scarlet.client.anim.PoseBlends;
 import com.yashjit.scarlet.client.costume.CostumeLayer;
 import com.yashjit.scarlet.client.costume.CostumeModels;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.dev.Showcase;
 import com.yashjit.scarlet.client.entity.ChaosBoltRenderer;
 import com.yashjit.scarlet.client.fx.BoltFx;
@@ -48,6 +49,7 @@ import com.yashjit.scarlet.client.platform.ClientPlatform;
 import com.yashjit.scarlet.client.platform.ClientServices;
 import com.yashjit.scarlet.client.render.ScarletRenderTypes;
 import com.yashjit.scarlet.config.ScarletClientConfig;
+import com.yashjit.scarlet.darkhold.DarkholdItem;
 import com.yashjit.scarlet.network.ChaosImpactPayload;
 import com.yashjit.scarlet.network.EjectPayload;
 import com.yashjit.scarlet.network.GesturePayload;
@@ -100,6 +102,7 @@ public final class ScarletClient {
         platform.registerEntityRenderer(ScarletEntities.SEAT, NoopRenderer::new);
         platform.registerEntityRenderer(ScarletEntities.PARKED_CAR, ParkedCarRenderer::new);
         RadioSounds.listen(RadioMusic::heard);
+        DarkholdItem.viewerCorruption = () -> CorruptionClient.corruption(Minecraft.getInstance().player);
         platform.registerClientbound(ChaosImpactPayload.TYPE, BoltFx::impact);
         platform.registerClientbound(MagicEventPayload.TYPE, payload -> {
             ShieldFx.onEvent(payload);
@@ -126,6 +129,7 @@ public final class ScarletClient {
         platform.registerClientbound(RemnantBlocksPayload.TYPE, Remnants::receive);
         platform.registerClientbound(ResidentsPayload.TYPE, ResidentsClient::receive);
         platform.registerClientbound(GesturePayload.TYPE, ResidentsClient::gesture);
+        platform.registerHud(Scarlet.id("corruption"), CorruptionClient::render);
         platform.registerHud(Scarlet.id("mind_control"), MindControlFx::render);
         platform.registerHud(Scarlet.id("magic"), MagicHud::render);
         platform.registerHud(Scarlet.id("title_card"), TitleCard::render);
@@ -182,6 +186,7 @@ public final class ScarletClient {
         SpellWheel.tick(minecraft);
         CastInput.tick(minecraft);
         ScarletFx.tick(minecraft);
+        CorruptionClient.tick(minecraft);
         TransformationFx.tick(minecraft);
         CastFx.tick(minecraft);
         BoltFx.tick(minecraft);

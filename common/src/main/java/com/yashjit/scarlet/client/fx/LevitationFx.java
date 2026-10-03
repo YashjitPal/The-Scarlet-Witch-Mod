@@ -6,6 +6,7 @@ import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.CastPoses;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.anim.PoseBlends;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.network.MagicEventPayload;
@@ -53,7 +54,14 @@ public final class LevitationFx {
         }
         double now = minecraft.level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         Vec3 at = payload.position();
-        BURSTS.add(new Burst(at, liftOff, now));
+        float darkness = CorruptionClient.darkness(minecraft.level.getEntity(payload.entityId()));
+        BURSTS.add(new Burst(at, liftOff, now, darkness));
+        try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+            burstSparks(at, liftOff);
+        }
+    }
+
+    private static void burstSparks(Vec3 at, boolean liftOff) {
         RandomSource random = ScarletFx.random();
         float density = ScarletFx.density();
         int sparks = Math.round((liftOff ? 28 : 14) * density);
@@ -91,19 +99,27 @@ public final class LevitationFx {
             }
             Vec3 feet = feet(player, 1.0F);
             float time = player.tickCount;
-            for (int i = 0; i < 2; i++) {
-                if (random.nextFloat() >= density) {
-                    continue;
+            float darkness = CorruptionClient.darkness(player);
+            try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+                for (int i = 0; i < 2; i++) {
+                    if (random.nextFloat() >= density) {
+                        continue;
+                    }
+                    float angle = time * 0.35F + i * (float) Math.PI;
+                    Vec3 out = new Vec3(Mth.cos(angle), 0, Mth.sin(angle));
+                    Vec3 tangent = new Vec3(-Mth.sin(angle), 0, Mth.cos(angle));
+                    ScarletFx.spark(feet.add(out.scale(0.42)).add(0, 0.04 + random.nextDouble() * 0.1, 0),
+                            tangent.scale(0.03).add(0, -0.012, 0), 10 + random.nextInt(7), 0.022F,
+                            random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.002F, 0.9F);
                 }
-                float angle = time * 0.35F + i * (float) Math.PI;
-                Vec3 out = new Vec3(Mth.cos(angle), 0, Mth.sin(angle));
-                Vec3 tangent = new Vec3(-Mth.sin(angle), 0, Mth.cos(angle));
-                ScarletFx.spark(feet.add(out.scale(0.42)).add(0, 0.04 + random.nextDouble() * 0.1, 0),
-                        tangent.scale(0.03).add(0, -0.012, 0), 10 + random.nextInt(7), 0.022F,
-                        random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.002F, 0.9F);
+                if (random.nextFloat() < 0.5F * density) {
+                    ChaosDust.spawn(feet.add(random.nextGaussian() * 0.18, -0.05, random.nextGaussian() * 0.18), new Vec3(0, -0.02, 0));
+                }
             }
-            if (random.nextFloat() < 0.5F * density) {
-                ChaosDust.spawn(feet.add(random.nextGaussian() * 0.18, -0.05, random.nextGaussian() * 0.18), new Vec3(0, -0.02, 0));
+            if (random.nextFloat() < 0.6F * darkness * density) {
+                // black smoke trailing down off the pad
+                ScarletFx.smoke(feet.add(random.nextGaussian() * 0.25, -0.12, random.nextGaussian() * 0.25), new Vec3(0, -0.006, 0),
+                        22 + random.nextInt(12), 0.1F, 0.3F + 0.35F * darkness);
             }
         }
     }
@@ -125,7 +141,7 @@ public final class LevitationFx {
             float levitate = PoseBlends.of(player).levitate;
             if (levitate > 0.01F) {
                 hovers.add(new Hover(feet(player, partialTick).subtract(camera).toVector3f(), levitate, player.tickCount + partialTick,
-                        (player.getId() * 0.618F) % 1.0F * TAU));
+                        (player.getId() * 0.618F) % 1.0F * TAU, CorruptionClient.darkness(player)));
             }
         }
         List<Burst> bursts = List.copyOf(BURSTS);
@@ -133,7 +149,9 @@ public final class LevitationFx {
             return;
         }
         GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+            float before = Glow.darkness();
             for (Hover hover : hovers) {
+                Glow.darken(hover.darkness());
                 Vector3f c = new Vector3f(hover.feet()).add(0, -0.1F, 0);
                 float fade = Ease.outCubic(Ease.clamp01(hover.levitate()));
                 Glow.planeDisc(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, 0.62F, GlowPass.tint(ScarletPalette.GLASS, 0.5F * fade),
@@ -145,21 +163,27 @@ public final class LevitationFx {
                 if (t < 0.0F || t > duration) {
                     continue;
                 }
+                Glow.darken(burst.darkness());
                 float k = t / duration;
                 Vector3f c = burst.position().subtract(camera).toVector3f().add(0, 0.04F, 0);
                 float reach = 0.25F + ((burst.liftOff() ? 2.4F : 1.5F) - 0.25F) * Ease.outCubic(k);
                 Glow.planeDisc(buffer, pose, c.x, c.y, c.z, FLAT_U, FLAT_V, reach, GlowPass.tint(ScarletPalette.GLASS, 0.0F),
                         GlowPass.tint(ScarletPalette.GLASS, 0.55F * (float) Math.pow(1.0F - k, 1.5)), 32);
             }
+            Glow.darken(before);
         });
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Hover hover : hovers) {
+                Glow.darken(hover.darkness());
                 drawHover(buffer, pose, axes, hover);
             }
             for (Burst burst : bursts) {
+                Glow.darken(burst.darkness());
                 drawBurst(buffer, pose, burst, now, camera);
             }
+            Glow.darken(before);
         });
     }
 
@@ -234,9 +258,9 @@ public final class LevitationFx {
         return player.getPosition(partialTick).add(0, bob, 0);
     }
 
-    private record Hover(Vector3f feet, float levitate, float age, float seed) {
+    private record Hover(Vector3f feet, float levitate, float age, float seed, float darkness) {
     }
 
-    private record Burst(Vec3 position, boolean liftOff, double start) {
+    private record Burst(Vec3 position, boolean liftOff, double start, float darkness) {
     }
 }

@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.anim.PoseBlends;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
@@ -89,6 +90,13 @@ public final class ShieldFx {
         Track track = TRACKS.computeIfAbsent(player.getId(), id -> new Track());
         Frame frame = frame(player, partialTick, ownFirstPerson(player));
         track.lastHit = now;
+        float darkness = CorruptionClient.darkness(player);
+        try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+            struck(player, track, frame, hit, payload, now, darkness);
+        }
+    }
+
+    private static void struck(Player player, Track track, Frame frame, boolean hit, MagicEventPayload payload, double now, float darkness) {
         if (hit) {
             Vec3 offset = payload.position().subtract(frame.center());
             float x = (float) offset.dot(frame.right());
@@ -106,7 +114,7 @@ public final class ShieldFx {
             hitSparks(frame, x, y);
         } else {
             track.shattered = true;
-            SHATTERS.add(Shatter.of(frame, now, ownFirstPerson(player), ScarletFx.random()));
+            SHATTERS.add(Shatter.of(frame, now, ownFirstPerson(player), ScarletFx.random(), darkness));
             shatterSparks(frame);
         }
     }
@@ -150,13 +158,15 @@ public final class ShieldFx {
                 track = new Track();
                 TRACKS.put(player.getId(), track);
             }
-            if (shielding && !track.shielding) {
-                raised(minecraft, player, track, now);
-            }
-            track.shielding = shielding;
-            track.ripples.removeIf(ripple -> now - ripple.start() > RIPPLE_TICKS);
-            if (shielding && !track.shattered && !player.isInvisible() && player.distanceToSqr(camera) < 64 * 64) {
-                ambient(player);
+            try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(player))) {
+                if (shielding && !track.shielding) {
+                    raised(minecraft, player, track, now);
+                }
+                track.shielding = shielding;
+                track.ripples.removeIf(ripple -> now - ripple.start() > RIPPLE_TICKS);
+                if (shielding && !track.shattered && !player.isInvisible() && player.distanceToSqr(camera) < 64 * 64) {
+                    ambient(player);
+                }
             }
         }
     }
@@ -281,28 +291,36 @@ public final class ShieldFx {
             Vector3f leftPalm = own ? null : Hands.palm(player, HumanoidArm.LEFT).subtract(camera).toVector3f();
             draws.add(new Draw(frame.center().subtract(camera).toVector3f(), frame.normal().toVector3f(), frame.right().toVector3f(),
                     frame.up().toVector3f(), presence, own, List.copyOf(track.ripples), track.raisedAt, rightPalm, leftPalm,
-                    (player.getId() * 0.618F) % 1.0F * TAU));
+                    (player.getId() * 0.618F) % 1.0F * TAU, CorruptionClient.darkness(player)));
         }
         List<Shatter> shatters = List.copyOf(SHATTERS);
         if (draws.isEmpty() && shatters.isEmpty()) {
             return;
         }
         GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+            float before = Glow.darkness();
             for (Draw draw : draws) {
+                Glow.darken(draw.darkness());
                 tintShield(buffer, pose, draw);
             }
             for (Shatter shatter : shatters) {
+                Glow.darken(shatter.darkness());
                 tintShatter(buffer, pose, shatter, now, camera);
             }
+            Glow.darken(before);
         });
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Draw draw : draws) {
+                Glow.darken(draw.darkness());
                 drawShield(buffer, pose, axes, draw, now);
             }
             for (Shatter shatter : shatters) {
+                Glow.darken(shatter.darkness());
                 drawShatter(buffer, pose, axes, shatter, now, camera);
             }
+            Glow.darken(before);
         });
     }
 
@@ -633,7 +651,7 @@ public final class ShieldFx {
     }
 
     private record Draw(Vector3f center, Vector3f normal, Vector3f right, Vector3f up, float presence, boolean own, List<Ripple> ripples,
-                        double raisedAt, @Nullable Vector3f rightPalm, @Nullable Vector3f leftPalm, float seed) {
+                        double raisedAt, @Nullable Vector3f rightPalm, @Nullable Vector3f leftPalm, float seed, float darkness) {
     }
 
     private record Shard(float x, float y, Vector3f velocity, float angle, float spin, float size) {
@@ -663,9 +681,9 @@ public final class ShieldFx {
         }
     }
 
-    private record Shatter(Vec3 center, Vec3 normal, Vec3 right, Vec3 up, double start, boolean own, Shard[] shards) {
+    private record Shatter(Vec3 center, Vec3 normal, Vec3 right, Vec3 up, double start, boolean own, Shard[] shards, float darkness) {
 
-        static Shatter of(Frame frame, double now, boolean own, RandomSource random) {
+        static Shatter of(Frame frame, double now, boolean own, RandomSource random, float darkness) {
             Shard[] shards = new Shard[SHARDS];
             for (int i = 0; i < SHARDS; i++) {
                 float reach = Magic.SHIELD_RADIUS * 0.9F * (float) Math.sqrt(random.nextFloat());
@@ -678,7 +696,7 @@ public final class ShieldFx {
                 shards[i] = new Shard(x, y, velocity.toVector3f(), random.nextFloat() * TAU, (random.nextFloat() - 0.5F) * 0.5F,
                         CELL * (0.6F + random.nextFloat() * 0.5F));
             }
-            return new Shatter(frame.center(), frame.normal(), frame.right(), frame.up(), now, own, shards);
+            return new Shatter(frame.center(), frame.normal(), frame.right(), frame.up(), now, own, shards, darkness);
         }
     }
 

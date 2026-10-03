@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.platform;
 
+import com.yashjit.scarlet.darkhold.Corruption;
 import com.yashjit.scarlet.magic.MagicState;
 import com.yashjit.scarlet.player.ScarletPlayerData;
 import net.minecraft.world.entity.player.Player;
@@ -22,4 +23,14 @@ public interface PlayerDataService {
      * Server only, like {@link #set}.
      */
     void setMagic(Player player, MagicState state);
+
+    /**
+     * Kept through death: dying is no cure for it.
+     */
+    Corruption corruption(Player player);
+
+    /**
+     * Server only, like {@link #set}.
+     */
+    void setCorruption(Player player, Corruption corruption);
 }

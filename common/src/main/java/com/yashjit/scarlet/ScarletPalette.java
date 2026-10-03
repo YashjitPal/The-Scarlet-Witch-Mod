@@ -14,6 +14,11 @@ public final class ScarletPalette {
     /** The filter of scarlet glass: what of each color passes through it. */
     public static final int GLASS = 0xFF1A26;
 
+    /** What the Darkhold's corruption pulls magic toward: black-crimson, with sickly highlights. */
+    public static final int SICKLY = 0x9B1B30;
+    public static final int ABYSS = 0x3A0010;
+    public static final int VOID = 0x0B0004;
+
     private ScarletPalette() {
     }
 }

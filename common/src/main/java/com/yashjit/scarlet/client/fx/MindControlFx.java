@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.magic.MindControlClient;
 import com.yashjit.scarlet.client.render.Glow;
@@ -149,9 +150,11 @@ public final class MindControlFx {
             // embers rising off a held head
             if (random.nextFloat() < 0.6F * ScarletFx.density()) {
                 Vec3 head = target.getEyePosition().add(random.nextGaussian() * 0.15, 0.1, random.nextGaussian() * 0.15);
-                ScarletFx.spark(head, new Vec3(random.nextGaussian() * 0.01, 0.02 + random.nextDouble() * 0.02, random.nextGaussian() * 0.01),
-                        12 + random.nextInt(10), 0.02F, random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET,
-                        ScarletPalette.SCARLET, -0.0015F, 0.92F);
+                try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(level.getEntity(entry.getIntKey())))) {
+                    ScarletFx.spark(head, new Vec3(random.nextGaussian() * 0.01, 0.02 + random.nextDouble() * 0.02, random.nextGaussian() * 0.01),
+                            12 + random.nextInt(10), 0.02F, random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET,
+                            ScarletPalette.SCARLET, -0.0015F, 0.92F);
+                }
             }
         }
     }
@@ -182,7 +185,7 @@ public final class MindControlFx {
             draws.add(new Draw(head.subtract(camera).toVector3f(), size(target), target.getViewYRot(partialTick),
                     Hands.palm(caster, HumanoidArm.RIGHT).subtract(camera).toVector3f(), Hands.palm(caster, HumanoidArm.LEFT).subtract(camera).toVector3f(),
                     caster.getEyePosition(partialTick).subtract(camera).toVector3f(), caster.getViewYRot(partialTick), reach, inside,
-                    target == viewer, ScarletFx.isFirstPersonViewOf(caster), entry.getIntKey() * 0.618F, time));
+                    target == viewer, ScarletFx.isFirstPersonViewOf(caster), entry.getIntKey() * 0.618F, time, CorruptionClient.darkness(caster)));
         }
         List<Ember> embers = new ArrayList<>();
         for (Int2DoubleMap.Entry entry : MindControlClient.loyal().int2DoubleEntrySet()) {
@@ -200,7 +203,9 @@ public final class MindControlFx {
         }
         GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Draw draw : draws) {
+                Glow.darken(draw.darkness());
                 for (Path tendril : tendrils(draw)) {
                     float[] widths = new float[tendril.count()];
                     int[] tints = new int[tendril.count()];
@@ -225,6 +230,7 @@ public final class MindControlFx {
                     Glow.tintDisc(buffer, pose, axes, c.x, c.y, c.z, 0.6F * draw.size(), GlowPass.tint(ScarletPalette.GLASS, 0.42F * draw.reach()));
                 }
             }
+            Glow.darken(before);
             for (Snap snap : snaps) {
                 float k = (float) ((now - snap.at()) / SNAP_TICKS);
                 Vector3f at = snap.head().subtract(camera).toVector3f();
@@ -234,7 +240,9 @@ public final class MindControlFx {
         });
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Draw draw : draws) {
+                Glow.darken(draw.darkness());
                 for (Path tendril : tendrils(draw)) {
                     drawTendril(buffer, pose, axes, tendril, draw.time());
                 }
@@ -251,6 +259,7 @@ public final class MindControlFx {
                     eyes(buffer, pose, axes, draw.head(), draw.size(), draw.yaw(), draw.reach(), draw.time() + draw.seed());
                 }
             }
+            Glow.darken(before);
             for (Ember ember : embers) {
                 eyes(buffer, pose, axes, ember.head(), ember.size(), ember.yaw(), 0.45F * ember.loyalty(), time);
             }
@@ -659,7 +668,7 @@ public final class MindControlFx {
      * @param ownFirstPerson   the view is the caster's own eyes
      */
     private record Draw(Vector3f head, float size, float yaw, Vector3f rightPalm, Vector3f leftPalm, Vector3f brow, float casterYaw, float reach,
-                        float inside, boolean viewedFromInside, boolean ownFirstPerson, float seed, float time) {
+                        float inside, boolean viewedFromInside, boolean ownFirstPerson, float seed, float time, float darkness) {
     }
 
     /**

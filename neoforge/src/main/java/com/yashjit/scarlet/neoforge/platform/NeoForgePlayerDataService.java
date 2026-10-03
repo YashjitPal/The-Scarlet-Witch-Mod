@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.neoforge.platform;
 
 import com.yashjit.scarlet.Scarlet;
+import com.yashjit.scarlet.darkhold.Corruption;
 import com.yashjit.scarlet.magic.MagicState;
 import com.yashjit.scarlet.platform.PlayerDataService;
 import com.yashjit.scarlet.player.ScarletPlayerData;
@@ -27,6 +28,13 @@ public final class NeoForgePlayerDataService implements PlayerDataService {
                     .sync(MagicState.STREAM_CODEC)
                     .build());
 
+    private static final Supplier<AttachmentType<Corruption>> CORRUPTION = ATTACHMENTS.register("corruption",
+            () -> AttachmentType.builder(() -> Corruption.NONE)
+                    .serialize(Corruption.MAP_CODEC)
+                    .sync(Corruption.STREAM_CODEC)
+                    .copyOnDeath()
+                    .build());
+
     @Override
     public ScarletPlayerData get(Player player) {
         return player.getData(PLAYER_DATA);
@@ -45,5 +53,15 @@ public final class NeoForgePlayerDataService implements PlayerDataService {
     @Override
     public void setMagic(Player player, MagicState state) {
         player.setData(MAGIC, state);
+    }
+
+    @Override
+    public Corruption corruption(Player player) {
+        return player.getData(CORRUPTION);
+    }
+
+    @Override
+    public void setCorruption(Player player, Corruption corruption) {
+        player.setData(CORRUPTION, corruption);
     }
 }

@@ -26,6 +26,8 @@ public final class ScarletClientConfig {
     public boolean instantTransformations = false;
     public boolean reduceFlashing = false;
     public boolean reduceCameraShake = false;
+    /** Softens what is drawn over the whole view, like the Darkhold's veins beating at its edges. */
+    public boolean reduceScreenEffects = false;
     /** While your home rises around you as you found a Hex, the view circles it, coming back to your eyes for the burst. */
     public boolean cinematicFounding = true;
     /** Inside a Hex in an older era, everything sounds as if through an old television's speaker. */

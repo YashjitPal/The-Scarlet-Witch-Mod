@@ -12,8 +12,9 @@ import net.minecraft.world.phys.Vec3;
  *
  * @param normal    the surface it hit, or back along its flight
  * @param direction which way it was flying
+ * @param caster    entity id of whoever cast it, or -1, for how dark their magic has grown
  */
-public record ChaosImpactPayload(Vec3 position, Vec3 normal, Vec3 direction, boolean hitEntity) implements CustomPacketPayload {
+public record ChaosImpactPayload(Vec3 position, Vec3 normal, Vec3 direction, boolean hitEntity, int caster) implements CustomPacketPayload {
 
     public static final Type<ChaosImpactPayload> TYPE = new Type<>(Scarlet.id("chaos_impact"));
     public static final StreamCodec<RegistryFriendlyByteBuf, ChaosImpactPayload> STREAM_CODEC = StreamCodec.composite(
@@ -21,6 +22,7 @@ public record ChaosImpactPayload(Vec3 position, Vec3 normal, Vec3 direction, boo
             Vec3.STREAM_CODEC, ChaosImpactPayload::normal,
             Vec3.STREAM_CODEC, ChaosImpactPayload::direction,
             ByteBufCodecs.BOOL, ChaosImpactPayload::hitEntity,
+            ByteBufCodecs.VAR_INT, ChaosImpactPayload::caster,
             ChaosImpactPayload::new);
 
     @Override

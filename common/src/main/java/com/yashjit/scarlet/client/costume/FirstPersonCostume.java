@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.client.costume;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.fx.ArmMagic;
 import com.yashjit.scarlet.client.hex.Outfits;
 import com.yashjit.scarlet.client.magic.MagicVisuals;
@@ -71,7 +72,8 @@ public final class FirstPersonCostume {
             float time = (float) (minecraft.level.getGameTime() % 24000L) + partialTick;
             poseStack.pushPose();
             arm.translateAndRotate(poseStack);
-            collector.submitCustomGeometry(poseStack, ScarletRenderTypes.glow(), ArmMagic.arm(right, isSlim, time, intensity));
+            collector.submitCustomGeometry(poseStack, ScarletRenderTypes.glow(), ArmMagic.arm(right, isSlim, time, intensity,
+                    CorruptionClient.darkness(player)));
             poseStack.popPose();
         }
     }

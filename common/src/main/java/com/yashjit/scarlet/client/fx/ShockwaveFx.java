@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.magic.Spell;
@@ -63,8 +64,16 @@ public final class ShockwaveFx {
             return;
         }
         FLINGS.put(payload.entityId(), now);
-        WAVES.add(new Wave(payload.position(), now));
-        blastSparks(payload.position());
+        float darkness = CorruptionClient.darkness(level.getEntity(payload.entityId()));
+        WAVES.add(new Wave(payload.position(), now, darkness));
+        try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+            blastSparks(payload.position());
+        }
+        RandomSource random = ScarletFx.random();
+        for (int i = 0, n = Math.round(12 * darkness * ScarletFx.density()); i < n; i++) {
+            ScarletFx.smoke(payload.position().add(randomUnit(random).scale(0.6)).add(0.0, 0.6, 0.0), randomUnit(random).scale(0.04), 30 + random.nextInt(20),
+                    0.3F, 0.4F + 0.4F * darkness);
+        }
     }
 
     /**
@@ -120,11 +129,15 @@ public final class ShockwaveFx {
         WAVES.removeIf(wave -> now - wave.start() > WAVE_TICKS + 5.0);
         for (Int2DoubleMap.Entry entry : GATHERS.int2DoubleEntrySet()) {
             if (level.getEntity(entry.getIntKey()) instanceof Player player && !FLINGS.containsKey(entry.getIntKey())) {
-                gathering(player);
+                try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(player))) {
+                    gathering(player);
+                }
             }
         }
         for (Wave wave : WAVES) {
-            kickUpDust(level, wave, now);
+            try (Glow.Darkening ignored = Glow.darkening(wave.darkness())) {
+                kickUpDust(level, wave, now);
+            }
         }
     }
 
@@ -213,23 +226,31 @@ public final class ShockwaveFx {
             if (level.getEntity(entry.getIntKey()) instanceof Player player && !player.isInvisible()) {
                 float gather = gather(player, now);
                 if (gather > 0.01F) {
-                    knots.add(new Knot(knot(player, partialTick).subtract(camera).toVector3f(), gather, ScarletFx.isFirstPersonViewOf(player)));
+                    knots.add(new Knot(knot(player, partialTick).subtract(camera).toVector3f(), gather, ScarletFx.isFirstPersonViewOf(player),
+                            CorruptionClient.darkness(player)));
                 }
             }
         }
         GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+            float before = Glow.darkness();
             for (Wave wave : waves) {
+                Glow.darken(wave.darkness());
                 tintWave(buffer, pose, wave, now, camera);
             }
+            Glow.darken(before);
         });
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Knot knot : knots) {
+                Glow.darken(knot.darkness());
                 drawKnot(buffer, pose, axes, knot, now);
             }
             for (Wave wave : waves) {
+                Glow.darken(wave.darkness());
                 drawWave(buffer, pose, axes, wave, now, camera);
             }
+            Glow.darken(before);
         });
     }
 
@@ -328,9 +349,9 @@ public final class ShockwaveFx {
         return Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
     }
 
-    private record Wave(Vec3 center, double start) {
+    private record Wave(Vec3 center, double start, float darkness) {
     }
 
-    private record Knot(Vector3f at, float gather, boolean own) {
+    private record Knot(Vector3f at, float gather, boolean own, float darkness) {
     }
 }

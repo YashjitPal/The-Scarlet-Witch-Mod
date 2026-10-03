@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.client.magic;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.fx.ArmMagic;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.EntityModelSet;
@@ -38,11 +39,12 @@ public final class MagicLayer extends RenderLayer<AvatarRenderState, PlayerModel
         float time = (float) (minecraft.level.getGameTime() % 24000L) + partialTick;
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         Vec3[] palms = new Vec3[2];
+        float darkness = CorruptionClient.darkness(player);
         for (HumanoidArm arm : HumanoidArm.values()) {
             boolean right = arm == HumanoidArm.RIGHT;
             float intensity = MagicVisuals.armIntensity(player, arm, partialTick);
             if (intensity > 0.01F) {
-                ArmMagic.submitArm(poseStack, collector, model, right, slim, time, intensity);
+                ArmMagic.submitArm(poseStack, collector, model, right, slim, time, intensity, darkness);
             }
             poseStack.pushPose();
             model.root().translateAndRotate(poseStack);

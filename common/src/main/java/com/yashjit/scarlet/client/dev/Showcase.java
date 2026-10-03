@@ -788,6 +788,46 @@ public final class Showcase {
                         .view(-2.2, 2.0, -21, 0, 1.5, -18).shot("routines_wave", 14).shot("routines_wave_b", 9).residents("wave")
                         .command("difficulty peaceful").playerCamera();
             }
+            // the Darkhold held, read and taking hold: the tome in the hand and opening as it is read, the veins at the
+            // edges of the view as the corruption deepens, and a corrupted caster's magic beside a clean one's
+            // reading the Darkhold in the first person, the open book before the view
+            case "darkread" -> s
+                    .land()
+                    .command("item replace entity @a weapon.mainhand with scarlet:darkhold")
+                    .command("scarlet corruption @p set 0")
+                    .face(0, 0).playerCamera().hideHud(false)
+                    .hold(true).shot("darkread_a", 20).shot("darkread_b", 20).hold(false)
+                    .command("scarlet corruption @p set 0");
+            case "darkhold" -> s
+                    .land()
+                    .command("kill @e[type=minecraft:mannequin]")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with scarlet:darkhold")
+                    .command("item replace entity @a weapon.offhand with minecraft:air")
+                    .command("scarlet corruption @p set 0")
+                    .command("time set noon")
+                    .ensureUnsuited().face(0, 0)
+                    .playerCamera().hideHud(false).shot("darkhold_held", 12)
+                    .inventory().shot("darkhold_inventory", 10).then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    // a page is read every three seconds
+                    .hold(true).shot("darkhold_reading", 24).shot("darkhold_reading_page", 50).hold(false)
+                    .hideHud(true)
+                    .look(2.6, 40, 6, 1.2).shot("darkhold_held_front", 6).look(2.6, 120, 6, 1.2).shot("darkhold_held_side", 4)
+                    .look(2.6, 30, 10, 1.4).hold(true).shot("darkhold_reading_front", 24)
+                    .look(2.4, 90, 8, 1.3).shot("darkhold_reading_side", 6).hold(false)
+                    .playerCamera().hideHud(false)
+                    .command("scarlet corruption @p set 45").then(minecraft -> {
+                    }, 60).shot("darkhold_veins_45", 2)
+                    .command("scarlet corruption @p set 90").then(minecraft -> {
+                    }, 80).shot("darkhold_veins_90", 2)
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .select(Spell.CHAOS_BOLT).hideHud(true)
+                    .look(5.0, 90, 4, 1.3).hold(true).shot("darkhold_bolt_a", 3).shot("darkhold_bolt_b", 2).hold(false).shot("darkhold_bolt_after", 6)
+                    .select(Spell.CHAOS_SHIELD).look(3.4, 35, 6, 1.3).hold(true).shot("darkhold_shield", 14).hold(false)
+                    .command("scarlet corruption @p set 0").then(minecraft -> {
+                    }, 10)
+                    .hold(true).shot("darkhold_shield_clean", 14).hold(false)
+                    .select(Spell.CHAOS_BOLT);
             // a home raised on open ground and looked round inside, in three eras: the living room, the kitchen, upstairs
             case "furnished" -> {
                 s.land()

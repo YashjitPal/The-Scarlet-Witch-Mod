@@ -1,7 +1,9 @@
 package com.yashjit.scarlet.client.entity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.fx.BoltVisuals;
+import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.entity.ChaosBolt;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -34,6 +36,7 @@ public final class ChaosBoltRenderer extends EntityRenderer<ChaosBolt, ChaosBolt
         state.direction.set((float) direction.x, (float) direction.y, (float) direction.z);
         state.age = bolt.tickCount + partialTicks;
         state.seed = bolt.getId();
+        state.darkness = CorruptionClient.darkness(bolt.getOwner());
     }
 
     @Override
@@ -41,7 +44,13 @@ public final class ChaosBoltRenderer extends EntityRenderer<ChaosBolt, ChaosBolt
         Vector3f direction = new Vector3f(state.direction);
         float age = state.age;
         int seed = state.seed;
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> BoltVisuals.blast(buffer, pose, direction, age, age * ChaosBolt.SPEED, seed));
+        float darkness = state.darkness;
+        try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+            if (darkness > 0.01F) {
+                GlowPass.submitTint(collector, poseStack, (pose, buffer) -> BoltVisuals.shadow(buffer, pose, direction, age, age * ChaosBolt.SPEED, darkness));
+            }
+            GlowPass.submit(collector, poseStack, (pose, buffer) -> BoltVisuals.blast(buffer, pose, direction, age, age * ChaosBolt.SPEED, seed));
+        }
         super.submit(state, poseStack, collector, camera);
     }
 
@@ -49,5 +58,6 @@ public final class ChaosBoltRenderer extends EntityRenderer<ChaosBolt, ChaosBolt
         final Vector3f direction = new Vector3f(0, 0, 1);
         float age;
         int seed;
+        float darkness;
     }
 }

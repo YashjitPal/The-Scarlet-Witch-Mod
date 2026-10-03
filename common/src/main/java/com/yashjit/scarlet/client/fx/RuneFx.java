@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.magic.RuneTraps;
@@ -65,19 +66,21 @@ public final class RuneFx {
             if (payload.stage() == RunePayload.FADED) {
                 return;
             }
-            sigil = new Sigil(payload.at(), now - payload.age(), payload.id());
+            sigil = new Sigil(payload.at(), now - payload.age(), payload.id(), CorruptionClient.darkness(level.getEntity(payload.caster())));
             SIGILS.put(payload.id(), sigil);
         }
         sigil.heardAt = now;
-        if (payload.stage() == RunePayload.SPRUNG) {
-            if (sigil.sprungAt < 0.0) {
-                sigil.sprungAt = now;
-                burst(sigil);
+        try (Glow.Darkening ignored = Glow.darkening(sigil.darkness)) {
+            if (payload.stage() == RunePayload.SPRUNG) {
+                if (sigil.sprungAt < 0.0) {
+                    sigil.sprungAt = now;
+                    burst(sigil);
+                }
+                sigil.bound = List.copyOf(payload.bound());
+            } else if (payload.stage() == RunePayload.FADED && sigil.fadedAt < 0.0) {
+                sigil.fadedAt = now;
+                scatter(sigil);
             }
-            sigil.bound = List.copyOf(payload.bound());
-        } else if (payload.stage() == RunePayload.FADED && sigil.fadedAt < 0.0) {
-            sigil.fadedAt = now;
-            scatter(sigil);
         }
     }
 
@@ -115,8 +118,13 @@ public final class RuneFx {
                 float angle = random.nextFloat() * TAU;
                 float r = RuneTraps.RADIUS * (0.8F + random.nextFloat() * 0.17F);
                 Vec3 at = sigil.at.add(Mth.cos(angle) * r, 0.05, Mth.sin(angle) * r);
-                ScarletFx.spark(at, new Vec3(0.0, 0.02 + random.nextDouble() * 0.03, 0.0), 14 + random.nextInt(12), 0.02F,
-                        random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.0008F, 0.93F);
+                try (Glow.Darkening ignored = Glow.darkening(sigil.darkness)) {
+                    ScarletFx.spark(at, new Vec3(0.0, 0.02 + random.nextDouble() * 0.03, 0.0), 14 + random.nextInt(12), 0.02F,
+                            random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.0008F, 0.93F);
+                }
+                if (random.nextFloat() < sigil.darkness * 0.5F) {
+                    ScarletFx.smoke(at, new Vec3(0.0, 0.012, 0.0), 26 + random.nextInt(14), 0.12F, 0.3F + 0.4F * sigil.darkness);
+                }
             }
         }
     }
@@ -174,14 +182,16 @@ public final class RuneFx {
                 }
             }
             Vec3 c = sigil.at.subtract(camera);
-            draws.add(new Draw(new Vector3f((float) c.x, (float) c.y + 0.03F, (float) c.z), written, sprung, fade, sigil.seed, held));
+            draws.add(new Draw(new Vector3f((float) c.x, (float) c.y + 0.03F, (float) c.z), written, sprung, fade, sigil.seed, held, sigil.darkness));
         }
         if (draws.isEmpty()) {
             return;
         }
         float time = (float) (now % 24000.0);
         GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+            float before = Glow.darkness();
             for (Draw draw : draws) {
+                Glow.darken(draw.darkness());
                 Vector3f c = draw.center();
                 float density = (draw.sprung() > 0.0F ? 0.42F : 0.24F) * draw.written() * draw.fade();
                 float r = RuneTraps.RADIUS * radiusScale(draw);
@@ -196,10 +206,13 @@ public final class RuneFx {
                     }
                 }
             }
+            Glow.darken(before);
         });
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (Draw draw : draws) {
+                Glow.darken(draw.darkness());
                 sigil(buffer, pose, draw, time);
                 if (draw.sprung() > 0.0F) {
                     column(buffer, pose, axes, draw);
@@ -208,6 +221,7 @@ public final class RuneFx {
                     }
                 }
             }
+            Glow.darken(before);
         });
     }
 
@@ -437,7 +451,7 @@ public final class RuneFx {
     private record Band(float x, float y, float z, Vector3f u, Vector3f v, float radius) {
     }
 
-    private record Draw(Vector3f center, float written, float sprung, float fade, float seed, List<Held> held) {
+    private record Draw(Vector3f center, float written, float sprung, float fade, float seed, List<Held> held, float darkness) {
     }
 
     private record Held(Vector3f feet, float width, float height) {
@@ -447,15 +461,18 @@ public final class RuneFx {
         final Vec3 at;
         final double inscribedAt;
         final float seed;
+        /** How dark its writer's magic had grown when it was first seen. */
+        final float darkness;
         double sprungAt = -1.0;
         double fadedAt = -1.0;
         double heardAt;
         List<Integer> bound = List.of();
 
-        Sigil(Vec3 at, double inscribedAt, int id) {
+        Sigil(Vec3 at, double inscribedAt, int id, float darkness) {
             this.at = at;
             this.inscribedAt = inscribedAt;
             this.seed = id * 0.731F;
+            this.darkness = darkness;
         }
     }
 }

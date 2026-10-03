@@ -24,6 +24,11 @@ public final class ScarletServerConfig {
     /** Whether Mind Control can take hold of players, and for how many seconds at most. */
     public boolean mindControlPlayers = true;
     public int mindControlPlayerSeconds = 5;
+    /**
+     * Whether a deep corruption from the Darkhold takes its toll: hunger, restless sleep, the dark closing in. Off, it
+     * still darkens magic and whispers.
+     */
+    public boolean corruptionSideEffects = true;
 
     public static ScarletServerConfig get() {
         return instance;

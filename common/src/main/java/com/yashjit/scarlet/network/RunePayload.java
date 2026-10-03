@@ -13,9 +13,10 @@ import net.minecraft.world.phys.Vec3;
  *
  * @param age   ticks since it was inscribed, so a sigil first seen late is drawn as far along as it really is
  * @param stage one of the constants below
- * @param bound the ids of everything it holds, once sprung
+ * @param bound  the ids of everything it holds, once sprung
+ * @param caster entity id of whoever wrote it, or -1 if they are not about, for how dark their magic has grown
  */
-public record RunePayload(int id, Vec3 at, int age, int stage, List<Integer> bound) implements CustomPacketPayload {
+public record RunePayload(int id, Vec3 at, int age, int stage, List<Integer> bound, int caster) implements CustomPacketPayload {
 
     /** Writing itself onto the ground, then lying in wait. */
     public static final int INSCRIBED = 0;
@@ -31,6 +32,7 @@ public record RunePayload(int id, Vec3 at, int age, int stage, List<Integer> bou
             ByteBufCodecs.VAR_INT, RunePayload::age,
             ByteBufCodecs.VAR_INT, RunePayload::stage,
             ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list(64)), RunePayload::bound,
+            ByteBufCodecs.VAR_INT, RunePayload::caster,
             RunePayload::new);
 
     @Override

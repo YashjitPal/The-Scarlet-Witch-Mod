@@ -121,7 +121,9 @@ public class ChaosBolt extends ThrowableProjectile {
     }
 
     private void burst(Vec3 at, Vec3 normal, boolean hitEntity, boolean loud) {
-        Services.NETWORK.sendToTrackingAndSelf(this, new ChaosImpactPayload(at, normal, getDeltaMovement().normalize(), hitEntity));
+        Entity owner = getOwner();
+        Services.NETWORK.sendToTrackingAndSelf(this, new ChaosImpactPayload(at, normal, getDeltaMovement().normalize(), hitEntity,
+                owner != null ? owner.getId() : -1));
         if (loud) {
             float pitch = 1.2F + random.nextFloat() * 0.25F;
             level().playSound(null, at.x, at.y, at.z, SoundEvents.WIND_CHARGE_BURST, SoundSource.PLAYERS, 0.5F, pitch);

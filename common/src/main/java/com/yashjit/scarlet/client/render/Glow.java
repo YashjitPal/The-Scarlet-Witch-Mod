@@ -2,6 +2,7 @@ package com.yashjit.scarlet.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.yashjit.scarlet.ScarletPalette;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix3f;
@@ -13,7 +14,14 @@ import org.joml.Vector3f;
  */
 public final class Glow {
 
+    /** Between the Darkhold's black-crimson and its sickly highlights, for the middle of a darkened glow. */
+    private static final int DEEP = 0x6A0B20;
+
     private static final int SEGMENTS = 8;
+    /** How far the magic being drawn is darkened by the Darkhold, 0 to 1: its caster's corruption. */
+    private static float darkness;
+    /** Whether what is being drawn is a tint, which filters what is behind it, rather than light. */
+    private static boolean tinting;
     private static final float[] COS = new float[SEGMENTS + 1];
     private static final float[] SIN = new float[SEGMENTS + 1];
 
@@ -26,6 +34,83 @@ public final class Glow {
     }
 
     private Glow() {
+    }
+
+    public static float darkness() {
+        return darkness;
+    }
+
+    /**
+     * Darkens the magic drawn, and the sparks spawned, until the scope closes: a corrupted caster's. Glows submitted
+     * meanwhile keep it, though they are drawn later.
+     */
+    public static Darkening darkening(float amount) {
+        Darkening scope = new Darkening(darkness, tinting);
+        darkness = Math.clamp(amount, 0.0F, 1.0F);
+        return scope;
+    }
+
+    /**
+     * Sets the darkness outright, for loops over many things that each have their own; put it back after.
+     */
+    public static void darken(float amount) {
+        darkness = amount;
+    }
+
+    /**
+     * Draws with a darkness, as a tint or as light, until the scope closes.
+     */
+    static Darkening drawing(float amount, boolean tint) {
+        Darkening scope = new Darkening(darkness, tinting);
+        darkness = amount;
+        tinting = tint;
+        return scope;
+    }
+
+    public static final class Darkening implements AutoCloseable {
+        private final float previous;
+        private final boolean wasTinting;
+
+        private Darkening(float previous, boolean wasTinting) {
+            this.previous = previous;
+            this.wasTinting = wasTinting;
+        }
+
+        @Override
+        public void close() {
+            darkness = previous;
+            tinting = wasTinting;
+        }
+    }
+
+    /**
+     * A vertex color as drawn: as it is, or darkened. Light is pulled toward black-crimson, its brightest toward the
+     * Darkhold's sickly highlights; a tint grows denser and closer to black, so it darkens what is behind it.
+     */
+    private static int shade(int argb) {
+        if (darkness <= 0.0F) {
+            return argb;
+        }
+        int alpha = argb >>> 24;
+        int rgb = argb & 0xFFFFFF;
+        if (tinting) {
+            if (alpha == 0) {
+                // the faded edge of a tint, which filters nothing
+                return argb;
+            }
+            // without improved transparency a tint's color is premultiplied by its density
+            boolean premultiplied = !Minecraft.getInstance().gameRenderer.useImprovedTransparency();
+            int black = premultiplied ? scale(ScarletPalette.VOID, alpha / 255.0F) : ScarletPalette.VOID;
+            int denser = Math.min(255, Math.round(alpha + (255 - alpha) * 0.3F * darkness));
+            return (denser << 24) | mix(rgb, black, darkness);
+        }
+        float luma = (0.299F * ((rgb >> 16) & 0xFF) + 0.587F * ((rgb >> 8) & 0xFF) + 0.114F * (rgb & 0xFF)) / 255.0F;
+        int corrupt = luma >= 0.5F ? mix(DEEP, ScarletPalette.SICKLY, (luma - 0.5F) * 2.0F) : mix(ScarletPalette.ABYSS, DEEP, luma * 2.0F);
+        return (alpha << 24) | mix(rgb, corrupt, darkness);
+    }
+
+    private static int scale(int rgb, float amount) {
+        return mix(0x000000, rgb, amount);
     }
 
     /**
@@ -58,7 +143,9 @@ public final class Glow {
         disc(buffer, pose, axes, x, y, z, radius, tint, 0);
     }
 
-    private static void disc(VertexConsumer buffer, PoseStack.Pose pose, Billboard axes, float x, float y, float z, float radius, int argb, int rim) {
+    private static void disc(VertexConsumer buffer, PoseStack.Pose pose, Billboard axes, float x, float y, float z, float radius, int color, int rimColor) {
+        int argb = shade(color);
+        int rim = rimColor == 0 ? 0 : argb & 0x00FFFFFF;
         Vector3f r = axes.right();
         Vector3f u = axes.up();
         for (int i = 0; i < SEGMENTS; i++) {
@@ -112,8 +199,8 @@ public final class Glow {
         for (int i = 0; i < points.length - 1; i++) {
             Vector3f a = points[i];
             Vector3f b = points[i + 1];
-            int ca = colors[i];
-            int cb = colors[i + 1];
+            int ca = shade(colors[i]);
+            int cb = shade(colors[i + 1]);
             int ea = keepEdgeColor ? ca & 0x00FFFFFF : 0;
             int eb = keepEdgeColor ? cb & 0x00FFFFFF : 0;
             for (float sign : new float[] {1.0F, -1.0F}) {
@@ -129,9 +216,10 @@ public final class Glow {
      * A soft ring in the plane spanned by {@code u} and {@code v} (unit vectors), brightest at {@code radius}.
      */
     public static void ring(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float radius,
-                            float thickness, int argb, int segments) {
+                            float thickness, int color, int segments) {
         float inner = Math.max(0.0F, radius - thickness * 0.5F);
         float outer = radius + thickness * 0.5F;
+        int argb = shade(color);
         int clear = argb & 0x00FFFFFF;
         for (int i = 0; i < segments; i++) {
             double a0 = Math.PI * 2 * i / segments;
@@ -150,7 +238,9 @@ public final class Glow {
      * {@code rimColor}.
      */
     public static void planeDisc(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float radius,
-                                 int centerColor, int rimColor, int segments) {
+                                 int center, int rim, int segments) {
+        int centerColor = shade(center);
+        int rimColor = shade(rim);
         for (int i = 0; i < segments; i++) {
             double a0 = Math.PI * 2 * i / segments;
             double a1 = Math.PI * 2 * (i + 1) / segments;
@@ -170,7 +260,9 @@ public final class Glow {
      * to {@code outerColor}.
      */
     public static void annulus(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float inner,
-                               float outer, int innerColor, int outerColor, int segments) {
+                               float outer, int innerShade, int outerShade, int segments) {
+        int innerColor = shade(innerShade);
+        int outerColor = shade(outerShade);
         for (int i = 0; i < segments; i++) {
             double a0 = Math.PI * 2 * i / segments;
             double a1 = Math.PI * 2 * (i + 1) / segments;
@@ -185,7 +277,8 @@ public final class Glow {
      */
     public static void planeLine(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float ax, float ay,
                                  float bx, float by, float width, int argb) {
-        planeLine(buffer, pose, x, y, z, u, v, ax, ay, bx, by, width, argb, argb & 0x00FFFFFF);
+        int lit = shade(argb);
+        planeLine(buffer, pose, x, y, z, u, v, ax, ay, bx, by, width, lit, lit & 0x00FFFFFF);
     }
 
     /**
@@ -193,7 +286,7 @@ public final class Glow {
      */
     public static void tintPlaneLine(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float ax,
                                      float ay, float bx, float by, float width, int tint) {
-        planeLine(buffer, pose, x, y, z, u, v, ax, ay, bx, by, width, tint, 0);
+        planeLine(buffer, pose, x, y, z, u, v, ax, ay, bx, by, width, shade(tint), 0);
     }
 
     private static void planeLine(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, Vector3f u, Vector3f v, float ax, float ay,

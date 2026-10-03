@@ -22,23 +22,29 @@ public final class ArmMagic {
 
     /**
      * One arm of a player seen in the world. Pose stack at the model root, as inside a render layer.
+     *
+     * @param darkness how far the Darkhold's corruption darkens it
      */
     public static void submitArm(PoseStack poseStack, SubmitNodeCollector collector, PlayerModel model, boolean right, boolean slim, float time,
-                                 float intensity) {
+                                 float intensity, float darkness) {
         poseStack.pushPose();
         model.root().translateAndRotate(poseStack);
         (right ? model.rightArm : model.leftArm).translateAndRotate(poseStack);
-        GlowPass.submit(collector, poseStack, arm(right, slim, time, intensity));
+        GlowPass.submit(collector, poseStack, arm(right, slim, time, intensity, darkness));
         poseStack.popPose();
     }
 
     /**
      * Glow geometry for one arm, in the space of its shoulder pivot.
      */
-    public static SubmitNodeCollector.CustomGeometryRenderer arm(boolean right, boolean slim, float time, float intensity) {
+    public static SubmitNodeCollector.CustomGeometryRenderer arm(boolean right, boolean slim, float time, float intensity, float darkness) {
         float axisX = (right ? -1.0F : 1.0F) * (slim ? 0.5F : 1.0F) / 16.0F;
         float t = time + (right ? 0.0F : 37.0F);
-        return (pose, buffer) -> emit(buffer, pose, axisX, t, intensity);
+        return (pose, buffer) -> {
+            try (Glow.Darkening ignored = Glow.darkening(darkness)) {
+                emit(buffer, pose, axisX, t, intensity);
+            }
+        };
     }
 
     private static void emit(VertexConsumer buffer, PoseStack.Pose pose, float axisX, float time, float intensity) {

@@ -2,6 +2,8 @@ package com.yashjit.scarlet.client.fx;
 
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.costume.CostumeView;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
+import com.yashjit.scarlet.client.render.Glow;
 import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import net.minecraft.client.Minecraft;
@@ -40,20 +42,22 @@ public final class TransformationFx {
                 LAST_PHASE.remove(player.getId());
                 continue;
             }
-            if (view.transforming()) {
-                if (view.suited()) {
-                    rise(player, view);
-                    boolean ownFirstPerson = player == minecraft.player && minecraft.options.getCameraType().isFirstPerson();
-                    CastFx.handDust(player, 1.2F, ownFirstPerson);
-                } else {
-                    burnAway(player, view);
-                }
-            } else if (view.suited()) {
-                fingertips(player);
-            }
             float last = LAST_PHASE.getOrDefault(player.getId(), 1.0F);
-            if (view.suited() && last < CROWN_FLARE_PHASE && view.phase() >= CROWN_FLARE_PHASE) {
-                crownFlare(player);
+            try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(player))) {
+                if (view.transforming()) {
+                    if (view.suited()) {
+                        rise(player, view);
+                        boolean ownFirstPerson = player == minecraft.player && minecraft.options.getCameraType().isFirstPerson();
+                        CastFx.handDust(player, 1.2F, ownFirstPerson);
+                    } else {
+                        burnAway(player, view);
+                    }
+                } else if (view.suited()) {
+                    fingertips(player);
+                }
+                if (view.suited() && last < CROWN_FLARE_PHASE && view.phase() >= CROWN_FLARE_PHASE) {
+                    crownFlare(player);
+                }
             }
             LAST_PHASE.put(player.getId(), view.phase());
         }

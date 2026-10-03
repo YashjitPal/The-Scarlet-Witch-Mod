@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.event;
 
 import com.yashjit.scarlet.crown.CrownItem;
+import com.yashjit.scarlet.darkhold.Darkhold;
 import com.yashjit.scarlet.hex.HexEjection;
 import com.yashjit.scarlet.hex.HexRipples;
 import com.yashjit.scarlet.hex.Hexes;
@@ -75,6 +76,7 @@ public final class ScarletEvents {
             SuitUp.setSuited(player, false);
         }
         Magic.tick(player);
+        Darkhold.tick(player);
         Hexes.syncIfNeeded(player);
         Residents.syncIfNeeded(player);
         HexRipples.watch(player);

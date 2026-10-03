@@ -9,6 +9,7 @@ import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.magic.MagicState;
 import com.yashjit.scarlet.magic.Spell;
+import com.yashjit.scarlet.registry.ScarletItems;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -41,6 +42,8 @@ public final class PoseBlends {
         boolean raising = Founding.raising(player, player.level().getGameTime()) != null;
         boolean controlling = state.channeling(Spell.MIND_CONTROL);
         boolean levitating = state.levitating();
+        boolean reading = player.isUsingItem() && player.getUseItem().is(ScarletItems.DARKHOLD.get());
+        blend.read = Ease.damp(blend.read, reading ? 1.0F : 0.0F, reading ? 9.0F : 7.0F, seconds);
         blend.shield = Ease.damp(blend.shield, shielding ? 1.0F : 0.0F, shielding ? 14.0F : 9.0F, seconds);
         blend.hold = Ease.damp(blend.hold, holding ? 1.0F : 0.0F, holding ? 12.0F : 7.0F, seconds);
         blend.beam = Ease.damp(blend.beam, painting ? 1.0F : 0.0F, painting ? 14.0F : 7.0F, seconds);
@@ -82,6 +85,8 @@ public final class PoseBlends {
         public float spread;
         public float levitate;
         public float lean;
+        /** Reading the Darkhold. */
+        public float read;
         long lastNanos;
     }
 }

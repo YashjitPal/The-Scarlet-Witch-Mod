@@ -2,7 +2,9 @@ package com.yashjit.scarlet.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.FloatArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.yashjit.scarlet.darkhold.Darkhold;
 import com.yashjit.scarlet.hex.Era;
 import com.yashjit.scarlet.hex.Hex;
 import com.yashjit.scarlet.hex.HexBuild;
@@ -13,6 +15,7 @@ import java.util.Arrays;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -20,7 +23,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /scarlet hex era|build|name|episodes|dispel|forget}: the Hex's controls as commands, for casters and server
- * operators.
+ * operators. {@code /scarlet corruption <player> [set <percent>]} tells or sets how far the Darkhold has taken someone,
+ * for operators.
  *
  * <ul>
  *     <li>{@code era <era>} moves your Hex to another era, beginning its next episode. Operators can change the Hex
@@ -67,7 +71,27 @@ public final class ScarletCommands {
                                         .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                                         .executes(context -> dispelAll(context.getSource()))))
                         .then(Commands.literal("forget")
-                                .executes(context -> forget(context.getSource())))));
+                                .executes(context -> forget(context.getSource()))))
+                .then(Commands.literal("corruption")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> corruption(context.getSource(), EntityArgument.getPlayer(context, "player")))
+                                .then(Commands.literal("set")
+                                        .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
+                                                .executes(context -> setCorruption(context.getSource(), EntityArgument.getPlayer(context, "player"),
+                                                        IntegerArgumentType.getInteger(context, "percent"))))))));
+    }
+
+    private static int corruption(CommandSourceStack source, ServerPlayer player) {
+        int percent = Math.round(Darkhold.corruption(player, player.level().getGameTime()) * 100);
+        source.sendSuccess(() -> Component.translatable("command.scarlet.corruption", player.getDisplayName(), percent), false);
+        return percent;
+    }
+
+    private static int setCorruption(CommandSourceStack source, ServerPlayer player, int percent) {
+        Darkhold.set(player, percent / 100.0F);
+        source.sendSuccess(() -> Component.translatable("command.scarlet.corruption.set", player.getDisplayName(), percent), true);
+        return 1;
     }
 
     private static int era(CommandSourceStack source, String name) {

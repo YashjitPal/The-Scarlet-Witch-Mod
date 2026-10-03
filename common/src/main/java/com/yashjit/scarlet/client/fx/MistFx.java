@@ -3,6 +3,7 @@ package com.yashjit.scarlet.client.fx;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
+import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.magic.Spell;
@@ -52,6 +53,12 @@ public final class MistFx {
         if (level == null) {
             return;
         }
+        try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(level.getEntity(payload.entityId())))) {
+            misted(minecraft, level, payload, kind);
+        }
+    }
+
+    private static void misted(Minecraft minecraft, ClientLevel level, MagicEventPayload payload, int kind) {
         double now = level.getGameTime();
         Track track = TRACKS.computeIfAbsent(payload.entityId(), id -> new Track());
         float height = level.getEntity(payload.entityId()) instanceof Player player ? player.getBbHeight() : 1.8F;
@@ -98,7 +105,9 @@ public final class MistFx {
             if (!track.arrived && now - track.outAt <= Spell.RED_MIST.windUp() && level.getEntity(entry.getIntKey()) instanceof Player player) {
                 // coming apart: the fog winds up around the body, thickening
                 float k = (float) (now - track.outAt) / Spell.RED_MIST.windUp();
-                swirl(player.position(), player.getBbHeight(), 0.6F + 0.8F * k);
+                try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(player))) {
+                    swirl(player.position(), player.getBbHeight(), 0.6F + 0.8F * k);
+                }
             }
         }
     }
@@ -180,7 +189,7 @@ public final class MistFx {
 
     private static void puff(Vec3 at, Vec3 velocity, int life, float size, float alpha) {
         if (PUFFS.size() < MAX_PUFFS) {
-            PUFFS.add(new Puff(at, velocity, life, size, alpha, ScarletFx.random().nextFloat()));
+            PUFFS.add(new Puff(at, velocity, life, size, alpha, ScarletFx.random().nextFloat(), Glow.darkness()));
         }
     }
 
@@ -192,31 +201,38 @@ public final class MistFx {
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         int count = PUFFS.size();
-        float[] values = new float[count * 6];
+        float[] values = new float[count * 7];
         for (int i = 0; i < count; i++) {
             Puff puff = PUFFS.get(i);
             float t = (puff.age + partialTick) / puff.life;
-            values[i * 6] = (float) (Mth.lerp(partialTick, puff.xo, puff.x) - camera.x);
-            values[i * 6 + 1] = (float) (Mth.lerp(partialTick, puff.yo, puff.y) - camera.y);
-            values[i * 6 + 2] = (float) (Mth.lerp(partialTick, puff.zo, puff.z) - camera.z);
-            values[i * 6 + 3] = puff.size * (0.6F + 1.2F * Ease.outCubic(t));
-            values[i * 6 + 4] = puff.alpha * Ease.clamp01(t * 6.0F) * (1.0F - t) * (1.0F - t);
-            values[i * 6 + 5] = puff.shade;
+            values[i * 7] = (float) (Mth.lerp(partialTick, puff.xo, puff.x) - camera.x);
+            values[i * 7 + 1] = (float) (Mth.lerp(partialTick, puff.yo, puff.y) - camera.y);
+            values[i * 7 + 2] = (float) (Mth.lerp(partialTick, puff.zo, puff.z) - camera.z);
+            values[i * 7 + 3] = puff.size * (0.6F + 1.2F * Ease.outCubic(t));
+            values[i * 7 + 4] = puff.alpha * Ease.clamp01(t * 6.0F) * (1.0F - t) * (1.0F - t);
+            values[i * 7 + 5] = puff.shade;
+            values[i * 7 + 6] = puff.darkness;
         }
         GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (int i = 0; i < count; i++) {
-                Glow.tintDisc(buffer, pose, axes, values[i * 6], values[i * 6 + 1], values[i * 6 + 2], values[i * 6 + 3],
-                        GlowPass.tint(ScarletPalette.GLASS, 0.55F * values[i * 6 + 4]));
+                Glow.darken(values[i * 7 + 6]);
+                Glow.tintDisc(buffer, pose, axes, values[i * 7], values[i * 7 + 1], values[i * 7 + 2], values[i * 7 + 3],
+                        GlowPass.tint(ScarletPalette.GLASS, 0.55F * values[i * 7 + 4]));
             }
+            Glow.darken(before);
         });
         GlowPass.submit(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
+            float before = Glow.darkness();
             for (int i = 0; i < count; i++) {
-                int color = Glow.mix(ScarletPalette.WINE, ScarletPalette.CRIMSON, values[i * 6 + 5]);
-                Glow.disc(buffer, pose, axes, values[i * 6], values[i * 6 + 1], values[i * 6 + 2], values[i * 6 + 3],
-                        Glow.withAlpha(color, 0.28F * values[i * 6 + 4]));
+                Glow.darken(values[i * 7 + 6]);
+                int color = Glow.mix(ScarletPalette.WINE, ScarletPalette.CRIMSON, values[i * 7 + 5]);
+                Glow.disc(buffer, pose, axes, values[i * 7], values[i * 7 + 1], values[i * 7 + 2], values[i * 7 + 3],
+                        Glow.withAlpha(color, 0.28F * values[i * 7 + 4]));
             }
+            Glow.darken(before);
         });
     }
 
@@ -260,8 +276,9 @@ public final class MistFx {
         final float size;
         final float alpha;
         final float shade;
+        final float darkness;
 
-        Puff(Vec3 at, Vec3 velocity, int life, float size, float alpha, float shade) {
+        Puff(Vec3 at, Vec3 velocity, int life, float size, float alpha, float shade, float darkness) {
             this.x = this.xo = at.x;
             this.y = this.yo = at.y;
             this.z = this.zo = at.z;
@@ -272,6 +289,7 @@ public final class MistFx {
             this.size = size;
             this.alpha = alpha;
             this.shade = shade;
+            this.darkness = darkness;
         }
 
         boolean tick() {
