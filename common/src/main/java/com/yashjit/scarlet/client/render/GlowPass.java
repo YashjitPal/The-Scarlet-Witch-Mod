@@ -6,10 +6,12 @@ import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexSorting;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.device.GpuDevice;
+import com.mojang.renderpearl.api.pipeline.IndexType;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
@@ -26,24 +28,30 @@ import org.joml.Matrix4f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Magic that lives in the world: glows, and the tints beneath them.
+ * Magic that lives in the world: its pixels, glows, and the tints beneath them.
  *
  * <p>With improved transparency they are ordinary translucent geometry, composited in depth order with water and
  * clouds. Without it, vanilla draws water, clouds and weather after every translucent entity and blends them over
  * whatever is already there, which would dim magic standing in front of them. So in that mode it is held back and
- * drawn last, after the weather, depth tested against the scene but never writing depth: tints first, then the glows
- * over them. Either way the glows can be drawn again on their own, for a Hex to keep them in color.
+ * drawn last, after the weather, depth tested against the scene but never writing depth: tints first, then the pixels,
+ * farthest first, then the glows over them. Either way the pixels and glows can be drawn again on their own, for a Hex
+ * to keep them in color.
  */
 public final class GlowPass {
 
     private static final ByteBufferBuilder BYTES = new ByteBufferBuilder(1 << 18);
-    private static final Layer TINTS = new Layer("Scarlet tints", ScarletRenderTypes.TINT_PIPELINE);
-    private static final Layer GLOWS = new Layer("Scarlet glows", ScarletRenderTypes.GLOW_PIPELINE);
-    /** With improved transparency the glows are drawn by vanilla; a copy is kept to draw again on their own. */
-    private static final Layer MIRROR = new Layer("Scarlet magic", ScarletRenderTypes.GLOW_PIPELINE);
+    private static final ByteBufferBuilder INDEX_BYTES = new ByteBufferBuilder(1 << 16);
+    private static final Layer TINTS = new Layer("Scarlet tints", ScarletRenderTypes.TINT_PIPELINE, false);
+    private static final Layer PIXELS = new Layer("Scarlet pixels", ScarletRenderTypes.PIXEL_PIPELINE, true);
+    private static final Layer GLOWS = new Layer("Scarlet glows", ScarletRenderTypes.GLOW_PIPELINE, false);
+    /** With improved transparency the pixels and glows are drawn by vanilla; copies are kept to draw again on their own. */
+    private static final Layer PIXEL_MIRROR = new Layer("Scarlet magic pixels", ScarletRenderTypes.PIXEL_PIPELINE, true);
+    private static final Layer MIRROR = new Layer("Scarlet magic", ScarletRenderTypes.GLOW_PIPELINE, false);
     private static final ProjectionMatrixBuffer MAGIC_PROJECTION = new ProjectionMatrixBuffer("Scarlet magic projection");
     /** How many glow indices the classic pass drew this frame, still uploaded to draw again. */
     private static int drawnGlows;
+    /** And how many pixel indices. */
+    private static int drawnPixels;
 
     private GlowPass() {
     }
@@ -60,35 +68,64 @@ public final class GlowPass {
     }
 
     /**
-     * Draws this frame's glows again, alone, depth tested against the finished world: the magic's own light, kept
-     * apart so a Hex can drain the world around it to black and white while the magic stays scarlet.
+     * Pixels to draw, darkened as {@link Glow#darkness()} is now. Drawn with {@link Pixels}.
+     */
+    public static void submitPixels(SubmitNodeCollector collector, PoseStack poseStack, SubmitNodeCollector.CustomGeometryRenderer renderer) {
+        submit(collector, poseStack, renderer, ScarletRenderTypes.pixel(), PIXELS);
+        if (Minecraft.getInstance().gameRenderer.useImprovedTransparency()) {
+            PIXEL_MIRROR.deferred.add(new Deferred(poseStack.last().copy(), renderer, Glow.darkness()));
+        }
+    }
+
+    /**
+     * Draws this frame's pixels and glows again, alone, depth tested against the finished world: the magic's own color,
+     * kept apart so a Hex can drain the world around it to black and white while the magic stays scarlet. Drawn over
+     * nothing, the pixels leave their colors premultiplied by how much they cover, which is what they lay over the
+     * world.
      *
      * @param color where to draw them, already cleared
      */
     public static void drawMagic(GpuTextureView color, GpuTextureView depth, Matrix4f projection, Matrix4f view) {
-        Layer layer = GLOWS;
-        int count = drawnGlows;
+        Layer glows = GLOWS;
+        Layer pixels = PIXELS;
+        int glowCount = drawnGlows;
+        int pixelCount = drawnPixels;
         if (Minecraft.getInstance().gameRenderer.useImprovedTransparency()) {
-            layer = MIRROR;
-            count = MIRROR.prepare();
+            glows = MIRROR;
+            pixels = PIXEL_MIRROR;
+            glowCount = MIRROR.prepare();
+            pixelCount = PIXEL_MIRROR.prepare();
         }
-        if (count == 0 || layer.vertexBuffer == null) {
+        boolean drawGlows = glowCount > 0 && glows.vertexBuffer != null;
+        boolean drawPixels = pixelCount > 0 && pixels.vertexBuffer != null && pixels.indexBuffer != null;
+        if (!drawGlows && !drawPixels) {
             return;
         }
         // buffers can only be written before the pass opens
         RenderSystem.AutoStorageIndexBuffer indices = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
-        indices.requestIndexCount(count);
+        indices.requestIndexCount(Math.max(glowCount, 1));
         GpuBufferSlice projectionSlice = MAGIC_PROJECTION.getBuffer(projection);
         GpuBufferSlice transform = RenderSystem.getDynamicUniforms().writeTransform(view);
         try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Scarlet magic", color, Optional.empty(),
                 depth, OptionalDouble.empty())) {
-            pass.setPipeline(RenderSystem.getCompiledPipeline(ScarletRenderTypes.GLOW_PIPELINE));
-            RenderSystem.bindDefaultUniforms(pass);
-            pass.setUniform("Projection", projectionSlice);
-            pass.setUniform("DynamicTransforms", transform);
-            pass.setIndexBuffer(indices.getBuffer(), indices.type());
-            pass.setVertexBuffer(0, layer.vertexBuffer.slice());
-            pass.drawIndexed(count, 1, 0, 0, 0);
+            if (drawGlows) {
+                pass.setPipeline(RenderSystem.getCompiledPipeline(ScarletRenderTypes.GLOW_PIPELINE));
+                RenderSystem.bindDefaultUniforms(pass);
+                pass.setUniform("Projection", projectionSlice);
+                pass.setUniform("DynamicTransforms", transform);
+                pass.setIndexBuffer(indices.getBuffer(), indices.type());
+                pass.setVertexBuffer(0, glows.vertexBuffer.slice());
+                pass.drawIndexed(glowCount, 1, 0, 0, 0);
+            }
+            if (drawPixels) {
+                pass.setPipeline(RenderSystem.getCompiledPipeline(ScarletRenderTypes.PIXEL_PIPELINE));
+                RenderSystem.bindDefaultUniforms(pass);
+                pass.setUniform("Projection", projectionSlice);
+                pass.setUniform("DynamicTransforms", transform);
+                pass.setIndexBuffer(pixels.indexBuffer, pixels.indexType);
+                pass.setVertexBuffer(0, pixels.vertexBuffer.slice());
+                pass.drawIndexed(pixelCount, 1, 0, 0, 0);
+            }
         }
     }
 
@@ -134,6 +171,7 @@ public final class GlowPass {
      */
     public static void endFrame() {
         MIRROR.deferred.clear();
+        PIXEL_MIRROR.deferred.clear();
     }
 
     /**
@@ -141,7 +179,9 @@ public final class GlowPass {
      */
     public static void prepare() {
         drawnGlows = 0;
+        drawnPixels = 0;
         int tints = TINTS.prepare();
+        PIXELS.prepare();
         int glows = GLOWS.prepare();
         if (tints > 0 || glows > 0) {
             RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).requestIndexCount(Math.max(tints, glows));
@@ -153,6 +193,8 @@ public final class GlowPass {
      */
     public static void draw(RenderPass renderPass) {
         TINTS.draw(renderPass);
+        drawnPixels = PIXELS.indexCount;
+        PIXELS.draw(renderPass);
         drawnGlows = GLOWS.indexCount;
         GLOWS.draw(renderPass);
     }
@@ -161,12 +203,17 @@ public final class GlowPass {
         final List<Deferred> deferred = new ArrayList<>();
         final String name;
         final RenderPipeline pipeline;
+        /** Whether its quads are drawn farthest first, as anything blended over what is behind it must be. */
+        final boolean sorted;
         @Nullable GpuBuffer vertexBuffer;
+        @Nullable GpuBuffer indexBuffer;
+        IndexType indexType = IndexType.INT;
         int indexCount;
 
-        Layer(String name, RenderPipeline pipeline) {
+        Layer(String name, RenderPipeline pipeline, boolean sorted) {
             this.name = name;
             this.pipeline = pipeline;
+            this.sorted = sorted;
         }
 
         int prepare() {
@@ -185,6 +232,16 @@ public final class GlowPass {
                 if (mesh == null) {
                     return 0;
                 }
+                if (sorted) {
+                    // the camera is at the origin of the space the quads are drawn in
+                    mesh.sortQuads(INDEX_BYTES, VertexSorting.DISTANCE_TO_ORIGIN);
+                    ByteBuffer indices = mesh.indexBuffer();
+                    if (indices == null) {
+                        return 0;
+                    }
+                    indexType = mesh.drawState().indexType();
+                    uploadIndices(indices);
+                }
                 upload(mesh.vertexBuffer());
                 indexCount = mesh.drawState().indexCount();
             }
@@ -192,15 +249,19 @@ public final class GlowPass {
         }
 
         void draw(RenderPass renderPass) {
-            if (indexCount == 0 || vertexBuffer == null) {
+            if (indexCount == 0 || vertexBuffer == null || sorted && indexBuffer == null) {
                 return;
             }
-            RenderSystem.AutoStorageIndexBuffer indices = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
             renderPass.pushDebugGroup(() -> name);
             renderPass.setPipeline(RenderSystem.getCompiledPipeline(pipeline));
             RenderSystem.bindDefaultUniforms(renderPass);
             renderPass.setUniform("DynamicTransforms", RenderSystem.getDynamicUniforms().writeTransform(RenderSystem.getModelViewMatrixCopy()));
-            renderPass.setIndexBuffer(indices.getBuffer(), indices.type());
+            if (sorted) {
+                renderPass.setIndexBuffer(indexBuffer, indexType);
+            } else {
+                RenderSystem.AutoStorageIndexBuffer indices = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
+                renderPass.setIndexBuffer(indices.getBuffer(), indices.type());
+            }
             renderPass.setVertexBuffer(0, vertexBuffer.slice());
             renderPass.drawIndexed(indexCount, 1, 0, 0, 0);
             renderPass.popDebugGroup();
@@ -217,6 +278,18 @@ public final class GlowPass {
                         vertices.remaining() * 2L);
             }
             device.createCommandEncoder().writeToBuffer(vertexBuffer.slice(), vertices);
+        }
+
+        private void uploadIndices(ByteBuffer indices) {
+            GpuDevice device = RenderSystem.getDevice();
+            if (indexBuffer == null || indexBuffer.size() < indices.remaining()) {
+                if (indexBuffer != null) {
+                    indexBuffer.close();
+                }
+                indexBuffer = device.createBuffer(() -> name + " indices", GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST,
+                        indices.remaining() * 2L);
+            }
+            device.createCommandEncoder().writeToBuffer(indexBuffer.slice(), indices);
         }
     }
 

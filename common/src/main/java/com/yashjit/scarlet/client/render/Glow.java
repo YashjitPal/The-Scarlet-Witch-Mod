@@ -114,6 +114,13 @@ public final class Glow {
     }
 
     /**
+     * A color as drawn now, darkened as the magic being drawn is.
+     */
+    static int shaded(int argb) {
+        return shade(argb);
+    }
+
+    /**
      * Camera-facing axes expressed in the local space of {@code pose}, so discs drawn inside a model part's transform
      * still face the camera and keep their intended world size.
      */

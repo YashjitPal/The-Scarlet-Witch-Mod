@@ -256,7 +256,17 @@ public final class Showcase {
         return c;
     }
 
+    /**
+     * The steps of a scene, or of several one after another, given as {@code a,b,c}.
+     */
     private static List<Step> scene(String name) {
+        if (name.contains(",")) {
+            List<Step> steps = new ArrayList<>();
+            for (String part : name.split(",")) {
+                steps.addAll(scene(part.strip()));
+            }
+            return steps;
+        }
         Scene s = new Scene();
         s.command("time set noon").command("weather clear").camera(CameraType.THIRD_PERSON_FRONT).hideHud(true);
         switch (name) {
@@ -479,6 +489,58 @@ public final class Showcase {
                     .shot("hex_warning_a", 20).shot("hex_warning_b", 30)
                     .shot("hex_collapse_a", 55).shot("hex_collapse_b", 15).shot("hex_collapse_c", 15).shot("hex_gone", 30)
                     .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]");
+            // the chaos blast up close: in flight side on, three-quarters on and head on, as its caster sees it, bursting on a
+            // wall and on a creature, the burn it leaves, and at night
+            case "chaos" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("time set noon")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-7 ~ ~1 ~7 ~7 ~24 minecraft:air")
+                    .command("execute at @a run fill ~-5 ~ ~16 ~5 ~5 ~16 minecraft:smooth_stone")
+                    .ensureUnsuited().face(0, 0).select(Spell.CHAOS_BOLT).anchor()
+                    .view(-5.0, 1.6, 4.5, 0.0, 1.4, 4.5)
+                    .hold(true).shot("chaos_side_a", 2).shot("chaos_side_b", 1).shot("chaos_side_c", 1).hold(false).then(minecraft -> {
+                    }, 30)
+                    .view(-2.2, 2.3, -2.6, 0.0, 1.3, 7.0)
+                    .hold(true).shot("chaos_three_quarter_a", 3).shot("chaos_three_quarter_b", 2).hold(false).then(minecraft -> {
+                    }, 30)
+                    // over the shoulder, as you usually see yourself: it leaves from the hand, never from behind
+                    .playerCamera().camera(CameraType.THIRD_PERSON_BACK).hideHud(true)
+                    .hold(true).shot("chaos_behind_a", 1).shot("chaos_behind_b", 1).shot("chaos_behind_c", 1).shot("chaos_behind_d", 1).hold(false)
+                    .then(minecraft -> {
+                    }, 30)
+                    .view(0.6, 1.5, 10.0, 0.0, 1.4, 0.0)
+                    .hold(true).shot("chaos_head_on_a", 3).shot("chaos_head_on_b", 1).shot("chaos_head_on_c", 1).hold(false).then(minecraft -> {
+                    }, 30)
+                    // bursting on the wall and burning it
+                    .view(-3.2, 2.2, 12.0, 0.0, 1.4, 16.0)
+                    .hold(true).then(minecraft -> {
+                    }, 1).hold(false)
+                    .shot("chaos_wall_a", 9).shot("chaos_wall_b", 1).shot("chaos_wall_c", 2).shot("chaos_wall_d", 3).shot("chaos_wall_e", 5)
+                    .shot("chaos_wall_burn", 15).then(minecraft -> {
+                    }, 30)
+                    // and on a creature
+                    .command("execute at @a run summon minecraft:pig ~ ~ ~7 {NoAI:1b,Invulnerable:1b}")
+                    .view(-3.0, 1.8, 4.5, 0.0, 0.8, 7.0)
+                    .hold(true).then(minecraft -> {
+                    }, 1).hold(false)
+                    .shot("chaos_creature_a", 4).shot("chaos_creature_b", 1).shot("chaos_creature_c", 2).shot("chaos_creature_d", 3)
+                    .command("kill @e[type=minecraft:pig]")
+                    // as its caster sees it
+                    .playerCamera().hideHud(true)
+                    .hold(true).shot("chaos_cast_a", 2).shot("chaos_cast_b", 1).shot("chaos_cast_c", 2).hold(false).then(minecraft -> {
+                    }, 30)
+                    // at night
+                    .command("time set midnight")
+                    .view(-5.0, 1.6, 4.5, 0.0, 1.4, 4.5)
+                    .hold(true).shot("chaos_night_a", 2).shot("chaos_night_b", 2).hold(false).then(minecraft -> {
+                    }, 30)
+                    .command("time set noon")
+                    .command("execute at @a run fill ~-5 ~ ~16 ~5 ~5 ~16 minecraft:air");
             // the Hex's wall: spreading, standing seen from far off, up close and edge-on, struck by a bolt, seen faintly from
             // inside, and flaring with static as the era changes
             case "wall" -> s

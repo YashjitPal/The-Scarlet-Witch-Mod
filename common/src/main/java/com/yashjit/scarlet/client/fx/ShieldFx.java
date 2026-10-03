@@ -9,6 +9,8 @@ import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.magic.Spell;
 import com.yashjit.scarlet.network.MagicEventPayload;
@@ -32,14 +34,17 @@ import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The Chaos Shield as everyone sees it: a disc of scarlet energy held out before the caster.
+ * The Chaos Shield as everyone sees it: a disc of churning red energy held out before the caster, drawn pixel by pixel
+ * on its own plane.
  *
  * <ul>
- *     <li>A faint membrane brightening toward a burning rim, with motes circling it.</li>
- *     <li>A honeycomb lattice that shimmers in slow waves and rings out from every blow it takes.</li>
- *     <li>Wisps spiraling across it, and ribbons of energy feeding it from both palms.</li>
- *     <li>It flares open from the hands when raised and folds away when lowered; when it breaks it bursts into
- *     tumbling shards.</li>
+ *     <li>Three arms of energy swirl in toward the middle through a thin red haze, outlined darker so the churn reads,
+ *     and you see through it between them.</li>
+ *     <li>Its rim burns, light running around it, and tongues of it lick outward and flicker like fire.</li>
+ *     <li>Every blow sends a ring of light out across it from a white-hot sparkle where it landed.</li>
+ *     <li>Strands of energy feed it from both palms, beads of light running along them.</li>
+ *     <li>It whirls in fast as it is raised and dithers away as it is lowered; when it breaks it bursts into tumbling
+ *     chunks of itself that burn out as they fly.</li>
  * </ul>
  *
  * <p>Your own shield sits further out and fainter in first person, framing the view instead of covering it.
@@ -48,7 +53,6 @@ public final class ShieldFx {
 
     private static final float FIRST_PERSON_DISTANCE = 1.5F;
     private static final float FIRST_PERSON_ALPHA = 0.55F;
-    private static final float FIRST_PERSON_TINT = 0.45F;
     private static final float CELL = 0.15F;
     private static final float RIPPLE_TICKS = 14.0F;
     private static final float RECOIL_TICKS = 7.0F;
@@ -57,18 +61,7 @@ public final class ShieldFx {
     private static final int MAX_RIPPLES = 6;
     private static final int SHARDS = 22;
     private static final float TAU = (float) (Math.PI * 2);
-    private static final float SQRT3 = (float) Math.sqrt(3.0);
     private static final Vec3 UP = new Vec3(0, 1, 0);
-    private static final float[] HEX_X = new float[7];
-    private static final float[] HEX_Y = new float[7];
-
-    static {
-        for (int k = 0; k < 7; k++) {
-            double angle = Math.toRadians(30 + 60 * k);
-            HEX_X[k] = (float) Math.cos(angle) * CELL;
-            HEX_Y[k] = (float) Math.sin(angle) * CELL;
-        }
-    }
 
     private static final Int2ObjectMap<Track> TRACKS = new Int2ObjectOpenHashMap<>();
     private static final List<Shatter> SHATTERS = new ArrayList<>();
@@ -297,293 +290,267 @@ public final class ShieldFx {
         if (draws.isEmpty() && shatters.isEmpty()) {
             return;
         }
-        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             float before = Glow.darkness();
             for (Draw draw : draws) {
                 Glow.darken(draw.darkness());
-                tintShield(buffer, pose, draw);
+                drawShield(buffer, pose, draw, now);
             }
             for (Shatter shatter : shatters) {
                 Glow.darken(shatter.darkness());
-                tintShatter(buffer, pose, shatter, now, camera);
+                drawShatter(buffer, pose, shatter, now, camera);
             }
             Glow.darken(before);
         });
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
-            float before = Glow.darkness();
-            for (Draw draw : draws) {
-                Glow.darken(draw.darkness());
-                drawShield(buffer, pose, axes, draw, now);
-            }
-            for (Shatter shatter : shatters) {
-                Glow.darken(shatter.darkness());
-                drawShatter(buffer, pose, axes, shatter, now, camera);
-            }
-            Glow.darken(before);
-        });
-    }
-
-    /**
-     * Red glass under the light: deepest at the rim, fading out just past it.
-     */
-    private static void tintShield(VertexConsumer buffer, PoseStack.Pose pose, Draw draw) {
-        float presence = Ease.clamp01(draw.presence());
-        float radius = radius(presence);
-        float fade = Ease.outCubic(presence) * (draw.own() ? FIRST_PERSON_TINT : 1.0F);
-        Vector3f c = draw.center();
-        Vector3f u = draw.right();
-        Vector3f v = draw.up();
-        Glow.planeDisc(buffer, pose, c.x, c.y, c.z, u, v, radius * 0.8F, GlowPass.tint(ScarletPalette.GLASS, 0.3F * fade),
-                GlowPass.tint(ScarletPalette.GLASS, 0.5F * fade), 36);
-        Glow.annulus(buffer, pose, c.x, c.y, c.z, u, v, radius * 0.8F, radius, GlowPass.tint(ScarletPalette.GLASS, 0.5F * fade),
-                GlowPass.tint(ScarletPalette.GLASS, 0.72F * fade), 36);
-        Glow.annulus(buffer, pose, c.x, c.y, c.z, u, v, radius, radius * 1.05F, GlowPass.tint(ScarletPalette.GLASS, 0.72F * fade),
-                GlowPass.tint(ScarletPalette.GLASS, 0.0F), 36);
-    }
-
-    private static void tintShatter(VertexConsumer buffer, PoseStack.Pose pose, Shatter shatter, double now, Vec3 camera) {
-        float t = (float) (now - shatter.start());
-        if (t < 0.0F || t > SHATTER_TICKS) {
-            return;
-        }
-        float fade = (float) Math.pow(1.0F - t / SHATTER_TICKS, 1.3) * (shatter.own() ? FIRST_PERSON_TINT : 1.0F);
-        for (Shard shard : shatter.shards()) {
-            ShardPose at = ShardPose.of(shatter, shard, t, camera);
-            Glow.planeDisc(buffer, pose, at.x(), at.y(), at.z(), at.u(), at.v(), at.size(), GlowPass.tint(ScarletPalette.GLASS, 0.6F * fade),
-                    GlowPass.tint(ScarletPalette.GLASS, 0.4F * fade), 6);
-        }
     }
 
     private static float radius(float presence) {
         return Magic.SHIELD_RADIUS * (0.3F + 0.7F * Ease.outBack(presence));
     }
 
-    private static void drawShield(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Draw draw, double now) {
-        float time = (float) (now % 24000.0);
+    private static void drawShield(VertexConsumer buffer, PoseStack.Pose pose, Draw draw, double now) {
         float presence = Ease.clamp01(draw.presence());
-        float radius = radius(presence);
-        float fade = Ease.outCubic(presence) * (draw.own() ? FIRST_PERSON_ALPHA : 1.0F);
+        Shade shade = new Shade(radius(presence), Ease.outCubic(presence), draw.own(), (int) Math.floor(now), (int) (draw.seed() * 1000.0F),
+                draw.ripples(), now);
+        float formed = (float) (now - draw.raisedAt());
+        shade.forming = formed >= 0.0F && formed < FORM_TICKS ? 1.0F - formed / FORM_TICKS : 0.0F;
+        // it whirls in fast as it forms, then settles into a slow churn
+        shade.spin = shade.frame * 0.05F + shade.forming * shade.forming * 2.0F + draw.seed();
+        for (Ripple ripple : draw.ripples()) {
+            float age = (float) (now - ripple.start());
+            if (age >= 0.0F && age < 4.0F) {
+                shade.flare = Math.max(shade.flare, 1.0F - age / 4.0F);
+            }
+        }
         Vector3f c = draw.center();
         Vector3f u = draw.right();
         Vector3f v = draw.up();
-        Vector3f n = draw.normal();
-
-        Glow.planeDisc(buffer, pose, c.x, c.y, c.z, u, v, radius * 0.8F, Glow.withAlpha(ScarletPalette.SCARLET, 0.02F * fade),
-                Glow.withAlpha(ScarletPalette.SCARLET, 0.05F * fade), 36);
-        Glow.annulus(buffer, pose, c.x, c.y, c.z, u, v, radius * 0.8F, radius, Glow.withAlpha(ScarletPalette.SCARLET, 0.05F * fade),
-                Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.14F * fade), 36);
-        lattice(buffer, pose, c, u, v, radius, fade, time, draw.ripples(), now);
-        wisps(buffer, pose, axes, c, u, v, n, radius, fade, time, draw.seed());
-
-        float pulse = 0.85F + 0.15F * Mth.sin(time * 0.35F);
-        Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, radius, 0.4F, Glow.withAlpha(ScarletPalette.SCARLET, 0.16F * fade), 44);
-        Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, radius, 0.085F, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.75F * fade * pulse), 44);
-        Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, radius * 0.962F, 0.022F, Glow.withAlpha(ScarletPalette.CORE, 0.32F * fade), 44);
-        for (int i = 0; i < 6; i++) {
-            float angle = time * (0.07F + 0.015F * (i % 3)) * (i % 2 == 0 ? 1.0F : -1.0F) + i * TAU / 6.0F + draw.seed();
-            float reach = radius * (1.0F + 0.015F * Mth.sin(time * 0.3F + i));
-            float x = Mth.cos(angle) * reach;
-            float y = Mth.sin(angle) * reach;
-            Glow.spark(buffer, pose, axes, c.x + u.x * x + v.x * y, c.y + u.y * x + v.y * y, c.z + u.z * x + v.z * y, 0.032F,
-                    ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, fade * 0.9F);
-        }
-
-        float formed = (float) (now - draw.raisedAt());
-        if (formed >= 0.0F && formed < FORM_TICKS) {
-            float k = formed / FORM_TICKS;
-            float flash = (float) Math.pow(1.0F - k, 1.5);
-            Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, radius * (0.5F + 0.8F * Ease.outCubic(k)), 0.25F * (1.0F - k) + 0.04F,
-                    Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.8F * flash * fade), 44);
-            if (!draw.own()) {
-                Glow.disc(buffer, pose, axes, c.x, c.y, c.z, 0.9F, Glow.withAlpha(ScarletPalette.SCARLET, 0.3F * flash));
-                Glow.disc(buffer, pose, axes, c.x, c.y, c.z, 0.35F, Glow.withAlpha(ScarletPalette.CORE, 0.5F * flash));
+        int reach = (int) Math.ceil(shade.radius / Pixels.SIZE) + 6;
+        for (int i = -reach; i < reach; i++) {
+            for (int j = -reach; j < reach; j++) {
+                int color = shade.pixel(i, j);
+                if (color != 0) {
+                    Pixels.cell(buffer, pose, c, u, v, i, j, Pixels.SIZE, color);
+                }
             }
         }
-
-        for (Ripple ripple : draw.ripples()) {
-            float age = (float) (now - ripple.start());
-            if (age < 0.0F || age > RIPPLE_TICKS) {
-                continue;
-            }
-            float k = age / RIPPLE_TICKS;
-            float x = ripple.x();
-            float y = ripple.y();
-            float px = c.x + u.x * x + v.x * y + n.x * 0.01F;
-            float py = c.y + u.y * x + v.y * y + n.y * 0.01F;
-            float pz = c.z + u.z * x + v.z * y + n.z * 0.01F;
-            Glow.ring(buffer, pose, px, py, pz, u, v, 0.05F + 0.5F * Ease.outCubic(k), 0.12F * (1.0F - k) + 0.02F,
-                    Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, (float) Math.pow(1.0F - k, 1.5) * 0.85F * fade), 24);
-            if (age < 3.0F) {
-                float flash = 1.0F - age / 3.0F;
-                Glow.disc(buffer, pose, axes, px, py, pz, 0.35F * (0.6F + 0.4F * flash), Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.7F * flash * fade));
-                Glow.disc(buffer, pose, axes, px, py, pz, 0.14F, Glow.withAlpha(ScarletPalette.CORE, flash * fade));
-            }
-        }
-
         if (draw.rightPalm() != null) {
-            link(buffer, pose, axes, draw.rightPalm(), c, u, v, n, radius, fade, time, 1.0F);
+            link(buffer, pose, draw.rightPalm(), c, u, v, shade.radius, shade.fade, shade.frame, 1.0F);
         }
         if (draw.leftPalm() != null) {
-            link(buffer, pose, axes, draw.leftPalm(), c, u, v, n, radius, fade, time, -1.0F);
+            link(buffer, pose, draw.leftPalm(), c, u, v, shade.radius, shade.fade, shade.frame, -1.0F);
         }
     }
 
     /**
-     * The honeycomb: each cell draws three of its six edges so every shared edge is drawn once.
+     * The color of each pixel of a shield this frame.
      */
-    private static void lattice(VertexConsumer buffer, PoseStack.Pose pose, Vector3f c, Vector3f u, Vector3f v, float radius, float fade,
-                                float time, List<Ripple> ripples, double now) {
-        float rowStep = CELL * 1.5F;
-        float columnStep = CELL * SQRT3;
-        float reach = radius + CELL;
-        int rows = (int) Math.ceil(reach / rowStep);
-        for (int r = -rows; r <= rows; r++) {
-            float cy = r * rowStep;
-            int qMin = (int) Math.floor(-reach / columnStep - r * 0.5F);
-            int qMax = (int) Math.ceil(reach / columnStep - r * 0.5F);
-            for (int q = qMin; q <= qMax; q++) {
-                float cx = columnStep * (q + r * 0.5F);
-                if (cx * cx + cy * cy > reach * reach) {
+    private static final class Shade {
+        final float radius;
+        final float fade;
+        final boolean own;
+        final int frame;
+        final int seed;
+        final List<Ripple> ripples;
+        final double now;
+        float forming;
+        float spin;
+        float flare;
+
+        Shade(float radius, float fade, boolean own, int frame, int seed, List<Ripple> ripples, double now) {
+            this.radius = radius;
+            this.fade = fade;
+            this.own = own;
+            this.frame = frame;
+            this.seed = seed;
+            this.ripples = ripples;
+            this.now = now;
+        }
+
+        int pixel(int i, int j) {
+            // coming and going, the whole of it dithers in and out
+            if (!Pixels.shows(fade * 1.15F, i, j)) {
+                return 0;
+            }
+            float p = Pixels.SIZE;
+            float x = (i + 0.5F) * p;
+            float y = (j + 0.5F) * p;
+            float r = (float) Math.sqrt(x * x + y * y);
+            float cos = r > 1.0E-4F ? x / r : 1.0F;
+            float sin = r > 1.0E-4F ? y / r : 0.0F;
+            float t = frame;
+            float alpha = own ? FIRST_PERSON_ALPHA : 1.0F;
+            // the rim wavers, and tongues of it lick outward and flicker like fire
+            float edge = radius * (1.0F + 0.07F * (Pixels.noise(cos * 1.8F + t * 0.05F, sin * 1.8F - t * 0.04F, seed) - 0.5F));
+            float licking = Math.max(0.0F, Pixels.noise(cos * 4.2F + t * 0.23F, sin * 4.2F - t * 0.19F, seed + 5) - 0.52F) / 0.48F;
+            float tongue = licking * 5.0F * p * fade;
+            if (r >= edge) {
+                if (r < edge + tongue) {
+                    // rooted bright in the rim, burning down the ramp to its tip
+                    float along = (r - edge) / tongue;
+                    return Pixels.ramp(along < 0.34F ? Pixels.PINK : along < 0.67F ? Pixels.BRIGHT : Pixels.SCARLET, alpha);
+                }
+                return r < edge + p ? Pixels.ramp(Pixels.CRIMSON, alpha) : 0;
+            }
+            int struck = ripple(i, j, x, y);
+            if (struck >= 0) {
+                return Pixels.ramp(struck, alpha);
+            }
+            if (edge - r < 2.0F * p) {
+                // the burning rim, with light running around it
+                float run = 0.5F + 0.5F * Mth.cos((float) Math.atan2(y, x) * 5.0F - t * 0.35F + seed);
+                return Pixels.ramp(run > 0.8F || flare > 0.5F || forming > 0.5F ? Pixels.PINK : Pixels.BRIGHT, alpha);
+            }
+            float k = r / edge;
+            float theta = (float) Math.atan2(y, x);
+            float churn = Pixels.churn(x * 2.4F + t * 0.07F, y * 2.4F - t * 0.06F, seed + 9);
+            float arm = 0.5F + 0.5F * Mth.cos(theta * 3.0F - (float) Math.log(k + 0.08F) * 2.4F - spin * 3.0F + (churn - 0.5F) * 2.6F);
+            arm = arm * arm * arm;
+            float membrane = smoothstep(0.4F, 1.0F, k);
+            float level = 0.1F + 0.42F * membrane + 0.7F * arm * (0.5F + 0.5F * churn) + 0.3F * flare + 0.35F * forming;
+            if (own) {
+                level *= 0.8F;
+            }
+            if (level >= 0.85F) {
+                return Pixels.ramp(level >= 1.15F ? Pixels.HOT : Pixels.PINK, alpha);
+            }
+            if (level >= 0.66F) {
+                return Pixels.ramp(Pixels.BRIGHT, alpha);
+            }
+            // the arms outlined darker, so their churn reads against the haze
+            if (arm > 0.1F && arm < 0.2F && level >= 0.3F) {
+                return Pixels.ramp(Pixels.CRIMSON, 0.75F * alpha);
+            }
+            if (level >= 0.5F) {
+                return Pixels.ramp(Pixels.SCARLET, 0.75F * alpha);
+            }
+            if (level >= 0.36F) {
+                return Pixels.ramp(Pixels.SCARLET, 0.5F * alpha);
+            }
+            if (level >= 0.2F && Pixels.shows((level - 0.2F) / 0.16F, i, j)) {
+                return Pixels.ramp(Pixels.SCARLET, 0.25F * alpha);
+            }
+            return 0;
+        }
+
+        /**
+         * The step of the ramp a blow lights this pixel to, or -1: a white-hot sparkle where it landed, then a ring of
+         * light running out from there, cooling as it goes.
+         */
+        int ripple(int i, int j, float x, float y) {
+            int lit = -1;
+            float p = Pixels.SIZE;
+            for (Ripple ripple : ripples) {
+                float age = (float) (now - ripple.start());
+                if (age < 0.0F || age > RIPPLE_TICKS) {
                     continue;
                 }
-                float phase = hash(q, r) * TAU;
-                for (int k = 0; k < 3; k++) {
-                    float ax = cx + HEX_X[k];
-                    float ay = cy + HEX_Y[k];
-                    float bx = cx + HEX_X[k + 1];
-                    float by = cy + HEX_Y[k + 1];
-                    float mx = (ax + bx) * 0.5F;
-                    float my = (ay + by) * 0.5F;
-                    float d = (float) Math.sqrt(mx * mx + my * my);
-                    float edge = 1.0F - smoothstep(radius * 0.78F, radius * 0.97F, d);
-                    if (edge <= 0.0F) {
-                        continue;
+                if (age < 3.0F) {
+                    int di = Math.abs(i - (int) Math.floor(ripple.x() / p));
+                    int dj = Math.abs(j - (int) Math.floor(ripple.y() / p));
+                    int arm = Math.round(4.0F * (1.0F - age / 3.0F));
+                    if (di <= 1 && dj <= 1 || di == 0 && dj <= arm || dj == 0 && di <= arm) {
+                        return Pixels.HOT;
                     }
-                    float rim = d / radius;
-                    float fresnel = 0.25F + 0.75F * rim * rim;
-                    float wave = 0.55F + 0.45F * Mth.sin(d * 6.5F - time * 0.25F + phase * 0.3F);
-                    float flicker = 0.8F + 0.2F * Mth.sin(time * 0.5F + phase);
-                    float ripple = 0.0F;
-                    for (Ripple hit : ripples) {
-                        float age = (float) (now - hit.start());
-                        if (age < 0.0F || age > RIPPLE_TICKS) {
-                            continue;
-                        }
-                        float front = 0.05F + 1.7F * Ease.outCubic(age / RIPPLE_TICKS);
-                        float dx = mx - hit.x();
-                        float dy = my - hit.y();
-                        float band = ((float) Math.sqrt(dx * dx + dy * dy) - front) / 0.13F;
-                        float envelope = 1.0F - age / RIPPLE_TICKS;
-                        ripple += envelope * envelope * (float) Math.exp(-band * band);
-                    }
-                    ripple = Math.min(1.0F, ripple);
-                    float alpha = fade * edge * (0.17F * fresnel * wave * flicker + 0.9F * ripple);
-                    if (alpha < 0.004F) {
-                        continue;
-                    }
-                    // a small gap at every corner, so the cells read as tiles
-                    float ix = (bx - ax) * 0.08F;
-                    float iy = (by - ay) * 0.08F;
-                    int color = Glow.mix(ScarletPalette.BRIGHT_SCARLET, ScarletPalette.CORE, ripple * 0.7F);
-                    Glow.planeLine(buffer, pose, c.x, c.y, c.z, u, v, ax + ix, ay + iy, bx - ix, by - iy, 0.035F, Glow.withAlpha(color, alpha));
+                }
+                float front = 0.05F + 1.7F * Ease.outCubic(age / RIPPLE_TICKS);
+                float dx = x - ripple.x();
+                float dy = y - ripple.y();
+                float off = Math.abs((float) Math.sqrt(dx * dx + dy * dy) - front);
+                if (off < p * (age < 6.0F ? 1.0F : 0.55F)) {
+                    int step = age < 5.0F ? Pixels.PINK : age < 10.0F ? Pixels.BRIGHT : Pixels.SCARLET;
+                    lit = lit < 0 ? step : Math.min(lit, step);
                 }
             }
-        }
-    }
-
-    private static void wisps(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Vector3f c, Vector3f u, Vector3f v, Vector3f n,
-                              float radius, float fade, float time, float seed) {
-        int arms = 5;
-        int count = 11;
-        for (int i = 0; i < arms; i++) {
-            float base = i * TAU / arms + time * 0.045F + seed;
-            Vector3f[] points = new Vector3f[count];
-            float[] widths = new float[count];
-            float[] cores = new float[count];
-            int[] colors = new int[count];
-            int[] coreColors = new int[count];
-            for (int j = 0; j < count; j++) {
-                float s = j / (float) (count - 1);
-                float reach = radius * (0.1F + 0.82F * s);
-                float theta = base + s * 2.2F + 0.3F * Mth.sin(time * 0.06F + i * 1.7F + s * 4.0F);
-                float depth = 0.025F * Mth.sin(time * 0.09F + i + s * 5.0F);
-                float x = Mth.cos(theta) * reach;
-                float y = Mth.sin(theta) * reach;
-                points[j] = new Vector3f(c.x + u.x * x + v.x * y + n.x * depth, c.y + u.y * x + v.y * y + n.y * depth,
-                        c.z + u.z * x + v.z * y + n.z * depth);
-                float envelope = Mth.sin(s * (float) Math.PI);
-                widths[j] = 0.02F + 0.1F * envelope;
-                cores[j] = widths[j] * 0.3F;
-                colors[j] = Glow.withAlpha(ScarletPalette.SCARLET, fade * 0.22F * envelope);
-                coreColors[j] = Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, fade * 0.35F * envelope);
-            }
-            Glow.ribbon(buffer, pose, axes, points, widths, colors);
-            Glow.ribbon(buffer, pose, axes, points, cores, coreColors);
+            return lit;
         }
     }
 
     /**
-     * A ribbon of energy from a palm into the shield, with beads of light running along it.
+     * A strand of energy from a palm into the shield, thickening as it goes in, with beads of light running along it.
      */
-    private static void link(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Vector3f palm, Vector3f c, Vector3f u, Vector3f v,
-                             Vector3f n, float radius, float fade, float time, float side) {
+    private static void link(VertexConsumer buffer, PoseStack.Pose pose, Vector3f palm, Vector3f c, Vector3f u, Vector3f v, float radius,
+                             float fade, int frame, float side) {
         Vector3f target = new Vector3f(c).add(new Vector3f(u).mul(side * radius * 0.22F)).add(new Vector3f(v).mul(-0.08F));
-        Vector3f control = new Vector3f(palm).add(target).mul(0.5F).add(new Vector3f(v).mul(0.06F)).add(new Vector3f(n).mul(-0.04F));
-        int count = 7;
-        Vector3f[] points = new Vector3f[count];
-        float[] widths = new float[count];
-        int[] colors = new int[count];
-        for (int i = 0; i < count; i++) {
-            float s = i / (float) (count - 1);
-            float wobble = 0.025F * Mth.sin(time * 0.4F + s * 6.0F + side) * Mth.sin(s * (float) Math.PI);
-            points[i] = bezier(palm, control, target, s).add(new Vector3f(u).mul(wobble));
-            widths[i] = 0.05F + 0.11F * s;
-            colors[i] = Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, fade * (0.45F - 0.25F * s));
-        }
-        Glow.ribbon(buffer, pose, axes, points, widths, colors);
-        for (int i = 0; i < 2; i++) {
-            float s = (time * 0.12F + i * 0.5F + side * 0.25F) % 1.0F;
-            if (s < 0.0F) {
-                s += 1.0F;
+        Vector3f control = new Vector3f(palm).add(target).mul(0.5F).add(new Vector3f(v).mul(0.06F));
+        PixelSprite sprite = new PixelSprite(pose, palm.x, palm.y, palm.z);
+        int count = 14;
+        Vector3f previous = null;
+        for (int k = 0; k <= count; k++) {
+            float s = k / (float) count;
+            float wobble = 0.03F * Mth.sin(frame * 0.4F + s * 7.0F + side) * Mth.sin(s * (float) Math.PI);
+            Vector3f at = bezier(palm, control, target, s).add(new Vector3f(u).mul(wobble)).add(new Vector3f(v).mul(wobble * 0.5F));
+            if (previous != null) {
+                sprite.line(previous, at, Pixels.ramp(s < 0.3F ? Pixels.SCARLET : Pixels.BRIGHT, fade), 1, s > 0.55F ? 2 : 1);
             }
-            Vector3f bead = bezier(palm, control, target, s);
-            Glow.spark(buffer, pose, axes, bead.x, bead.y, bead.z, 0.03F, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET,
-                    fade * Mth.sin(s * (float) Math.PI));
+            previous = at;
         }
+        for (int b = 0; b < 2; b++) {
+            float s = ((frame * 0.12F + b * 0.5F + side * 0.25F) % 1.0F + 1.0F) % 1.0F;
+            Vector3f bead = bezier(palm, control, target, s);
+            sprite.plot(bead.x, bead.y, bead.z, Pixels.ramp(Pixels.PINK, fade), 2, 2);
+        }
+        sprite.draw(buffer);
     }
 
-    private static void drawShatter(VertexConsumer buffer, PoseStack.Pose pose, Glow.Billboard axes, Shatter shatter, double now, Vec3 camera) {
+    /**
+     * The shield breaking: a white-hot burst where it stood, a ring of light flung out from it, and chunks of it
+     * tumbling away, each burning down the ramp and dithering out as it flies.
+     */
+    private static void drawShatter(VertexConsumer buffer, PoseStack.Pose pose, Shatter shatter, double now, Vec3 camera) {
         float t = (float) (now - shatter.start());
         if (t < 0.0F || t > SHATTER_TICKS) {
             return;
         }
         float k = t / SHATTER_TICKS;
-        float fade = (float) Math.pow(1.0F - k, 1.3) * (shatter.own() ? FIRST_PERSON_ALPHA : 1.0F);
+        float alpha = shatter.own() ? FIRST_PERSON_ALPHA : 1.0F;
+        float p = Pixels.SIZE;
         Vector3f c = shatter.center().subtract(camera).toVector3f();
         Vector3f u = shatter.right().toVector3f();
         Vector3f v = shatter.up().toVector3f();
-        if (t < 4.0F) {
-            float flash = 1.0F - t / 4.0F;
-            if (!shatter.own()) {
-                Glow.disc(buffer, pose, axes, c.x, c.y, c.z, 1.5F, Glow.withAlpha(ScarletPalette.SCARLET, 0.35F * flash));
+
+        float ring = Magic.SHIELD_RADIUS * (1.0F + 1.1F * Ease.outCubic(k));
+        float half = (k < 0.4F ? 1.0F : 0.55F) * p;
+        int ringStep = k < 0.3F ? Pixels.PINK : k < 0.6F ? Pixels.BRIGHT : Pixels.SCARLET;
+        int reach = (int) Math.ceil((ring + half) / p) + 1;
+        for (int i = -reach; i < reach; i++) {
+            for (int j = -reach; j < reach; j++) {
+                float x = (i + 0.5F) * p;
+                float y = (j + 0.5F) * p;
+                if (Math.abs((float) Math.sqrt(x * x + y * y) - ring) < half && Pixels.shows(1.3F * (1.0F - k), i, j)) {
+                    Pixels.cell(buffer, pose, c, u, v, i, j, p, Pixels.ramp(ringStep, alpha));
+                }
             }
-            Glow.disc(buffer, pose, axes, c.x, c.y, c.z, 0.7F, Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.6F * flash * fade));
-            Glow.disc(buffer, pose, axes, c.x, c.y, c.z, 0.3F, Glow.withAlpha(ScarletPalette.CORE, flash * fade));
         }
-        Glow.ring(buffer, pose, c.x, c.y, c.z, u, v, Magic.SHIELD_RADIUS * (1.0F + 1.1F * Ease.outCubic(k)), 0.18F * (1.0F - k) + 0.03F,
-                Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.8F * fade), 44);
+        if (t < 4.0F) {
+            int arm = Math.round(6.0F * (1.0F - t / 4.0F));
+            for (int d = -arm; d < arm; d++) {
+                int color = Pixels.ramp(Math.abs(d + 0.5F) < 2.0F ? Pixels.HOT : Pixels.PINK, alpha);
+                Pixels.cell(buffer, pose, c, u, v, d, -1, p, color);
+                Pixels.cell(buffer, pose, c, u, v, d, 0, p, color);
+                if (d < -1 || d > 0) {
+                    Pixels.cell(buffer, pose, c, u, v, -1, d, p, color);
+                    Pixels.cell(buffer, pose, c, u, v, 0, d, p, color);
+                }
+            }
+        }
         for (Shard shard : shatter.shards()) {
             ShardPose at = ShardPose.of(shatter, shard, t, camera);
-            float size = at.size();
-            Glow.planeDisc(buffer, pose, at.x(), at.y(), at.z(), at.u(), at.v(), size, Glow.withAlpha(ScarletPalette.SCARLET, 0.18F * fade),
-                    Glow.withAlpha(ScarletPalette.SCARLET, 0.06F * fade), 6);
-            int edge = Glow.withAlpha(ScarletPalette.BRIGHT_SCARLET, 0.9F * fade);
-            for (int i = 0; i < 6; i++) {
-                double a0 = TAU * i / 6.0;
-                double a1 = TAU * (i + 1) / 6.0;
-                Glow.planeLine(buffer, pose, at.x(), at.y(), at.z(), at.u(), at.v(), (float) Math.cos(a0) * size, (float) Math.sin(a0) * size,
-                        (float) Math.cos(a1) * size, (float) Math.sin(a1) * size, 0.03F, edge);
+            Vector3f origin = new Vector3f(at.x(), at.y(), at.z());
+            int size = Math.max(1, Math.round(at.size() / p));
+            int step = Pixels.SCARLET + (int) (k * 2.5F);
+            for (int a = -size; a < size; a++) {
+                for (int b = -size; b < size; b++) {
+                    float da = a + 0.5F;
+                    float db = b + 0.5F;
+                    if (Math.abs(da) + Math.abs(db) > size + 0.5F || k > 0.55F && !Pixels.shows((1.0F - k) / 0.45F, a, b)) {
+                        continue;
+                    }
+                    // lit along its upper edge, shadowed along its lower one
+                    float rim = da + db;
+                    int shadeStep = rim > size - 1.0F ? step - 1 : rim < 1.0F - size ? step + 1 : step;
+                    Pixels.cell(buffer, pose, origin, at.u(), at.v(), a, b, p, Pixels.ramp(Math.min(shadeStep, Pixels.WINE), alpha));
+                }
             }
         }
     }
@@ -622,14 +589,6 @@ public final class ShieldFx {
     private static float smoothstep(float from, float to, float x) {
         float t = Ease.clamp01((x - from) / (to - from));
         return t * t * (3.0F - 2.0F * t);
-    }
-
-    private static float hash(int q, int r) {
-        int h = q * 73856093 ^ r * 19349663;
-        h ^= h >>> 13;
-        h *= 0x5BD1E995;
-        h ^= h >>> 15;
-        return (h & 0xFFFF) / 65535.0F;
     }
 
     private static int count(RandomSource random, float expected) {

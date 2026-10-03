@@ -6,6 +6,7 @@ package com.yashjit.scarlet;
 public final class ScarletPalette {
 
     public static final int CORE = 0xFFE6EC;
+    public static final int PINK = 0xFF8C9E;
     public static final int BRIGHT_SCARLET = 0xFF3355;
     public static final int SCARLET = 0xE0143C;
     public static final int CRIMSON = 0xA50D2C;

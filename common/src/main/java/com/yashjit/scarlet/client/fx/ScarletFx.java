@@ -1,9 +1,12 @@
 package com.yashjit.scarlet.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
+import com.yashjit.scarlet.client.render.PixelSprite;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -15,12 +18,16 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * World-space glowing sparks, and the black smoke that rises off a corrupted caster's magic: simulated on the client
- * tick, drawn every frame with interpolation. Each spark keeps the darkness it was spawned with. The particle budget
- * follows the effects quality setting.
+ * World-space sparks, and the black smoke that rises off a corrupted caster's magic: simulated on the client tick,
+ * drawn every frame with interpolation. A spark is a pixel or two of magic, starting at its color and stepping down the
+ * ramp as it dies, now and then winking a step darker; smoke is a dithered puff of near-black pixels. Each keeps the
+ * darkness it was spawned with. The particle budget follows the effects quality setting.
  */
 public final class ScarletFx {
 
+    /** Sparks nearer the eyes than this are not drawn, and up to the second distance only a pixel across. */
+    private static final float NEAR = 0.9F;
+    private static final float SMALL = 2.5F;
     private static final List<Spark> SPARKS = new ArrayList<>();
     private static final List<Spark> SMOKE = new ArrayList<>();
     private static final RandomSource RANDOM = RandomSource.create();
@@ -110,26 +117,32 @@ public final class ScarletFx {
             return;
         }
         int count = SPARKS.size();
-        float[] values = new float[count * 6];
-        int[] colors = new int[count * 2];
+        float[] values = new float[count * 5];
+        int[] colors = new int[count];
         for (int i = 0; i < count; i++) {
             Spark spark = SPARKS.get(i);
-            values[i * 6] = (float) (spark.lerpX(partialTick) - camera.x);
-            values[i * 6 + 1] = (float) (spark.lerpY(partialTick) - camera.y);
-            values[i * 6 + 2] = (float) (spark.lerpZ(partialTick) - camera.z);
-            values[i * 6 + 3] = spark.size;
-            values[i * 6 + 4] = spark.alpha(partialTick);
-            values[i * 6 + 5] = spark.darkness;
-            colors[i * 2] = spark.coreColor;
-            colors[i * 2 + 1] = spark.haloColor;
+            float x = (float) (spark.lerpX(partialTick) - camera.x);
+            float y = (float) (spark.lerpY(partialTick) - camera.y);
+            float z = (float) (spark.lerpZ(partialTick) - camera.z);
+            float distance2 = x * x + y * y + z * z;
+            values[i * 5] = x;
+            values[i * 5 + 1] = y;
+            values[i * 5 + 2] = z;
+            // right at the eyes a pixel would be a wall of color: there it is not drawn, and a little further a single one
+            values[i * 5 + 3] = distance2 < NEAR * NEAR ? 0.0F : spark.size >= 0.03F && distance2 > SMALL * SMALL ? Pixels.SIZE : Pixels.SIZE * 0.5F;
+            values[i * 5 + 4] = spark.darkness;
+            colors[i] = spark.color(partialTick);
         }
-        GlowPass.submit(collector, poseStack, (pose, buffer) -> {
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             Glow.Billboard axes = Glow.billboard(pose);
             float before = Glow.darkness();
             for (int i = 0; i < count; i++) {
-                Glow.darken(values[i * 6 + 5]);
-                Glow.spark(buffer, pose, axes, values[i * 6], values[i * 6 + 1], values[i * 6 + 2], values[i * 6 + 3],
-                        colors[i * 2], colors[i * 2 + 1], values[i * 6 + 4]);
+                if (values[i * 5 + 3] <= 0.0F) {
+                    continue;
+                }
+                Glow.darken(values[i * 5 + 4]);
+                Pixels.square(buffer, pose, axes.right(), axes.up(), values[i * 5], values[i * 5 + 1], values[i * 5 + 2], values[i * 5 + 3],
+                        colors[i]);
             }
             Glow.darken(before);
         });
@@ -151,13 +164,30 @@ public final class ScarletFx {
             // thickens quickly, holds, then thins away as it swells
             values[i * 5 + 4] = puff.seed * Math.min(1.0F, t * 5.0F) * (1.0F - t * t);
         }
-        GlowPass.submitTint(collector, poseStack, (pose, buffer) -> {
-            Glow.Billboard axes = Glow.billboard(pose);
+        GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
             for (int i = 0; i < count; i++) {
-                Glow.tintDisc(buffer, pose, axes, values[i * 5], values[i * 5 + 1], values[i * 5 + 2], values[i * 5 + 3],
-                        GlowPass.tint(ScarletPalette.VOID, values[i * 5 + 4]));
+                puff(buffer, pose, values[i * 5], values[i * 5 + 1], values[i * 5 + 2], values[i * 5 + 3], values[i * 5 + 4], i);
             }
         });
+    }
+
+    /**
+     * A puff of smoke: a round, dithered patch of near-black pixels, densest in the middle.
+     */
+    private static void puff(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z, float radius, float density, int seed) {
+        int reach = Math.max(1, Math.round(radius / Pixels.SIZE));
+        PixelSprite sprite = new PixelSprite(pose, x, y, z);
+        for (int i = -reach; i < reach; i++) {
+            for (int j = -reach; j < reach; j++) {
+                float r = (float) Math.sqrt((i + 0.5F) * (i + 0.5F) + (j + 0.5F) * (j + 0.5F)) / reach;
+                float level = density * (1.0F - r * r) * 1.6F;
+                if (r < 1.0F && Pixels.shows(level, i + seed, j + seed * 3)) {
+                    int color = level > 0.9F ? ScarletPalette.VOID : level > 0.5F ? ScarletPalette.SHADOW : ScarletPalette.ABYSS;
+                    sprite.cell(i, j, Glow.withAlpha(color, 0.75F), 0);
+                }
+            }
+        }
+        sprite.draw(buffer);
     }
 
     private static final class Spark {
@@ -174,6 +204,8 @@ public final class ScarletFx {
         /** For a spark, the phase of its flicker; for smoke, how dark it is. */
         final float seed;
         final float darkness;
+        /** The step of the ramp it starts at. */
+        final int start;
 
         Spark(Vec3 position, Vec3 velocity, int life, float size, int coreColor, int haloColor, float gravity, float drag, float seed, float darkness) {
             this.x = this.xo = position.x;
@@ -190,6 +222,7 @@ public final class ScarletFx {
             this.drag = drag;
             this.seed = seed;
             this.darkness = darkness;
+            this.start = Pixels.stepOf(coreColor);
         }
 
         boolean tick() {
@@ -217,11 +250,17 @@ public final class ScarletFx {
             return zo + (z - zo) * t;
         }
 
-        float alpha(float partialTick) {
+        /**
+         * Its color now: its own at first, a step down the ramp past half its life and another near the end, winking a
+         * step darker now and then, and thinning out as it goes.
+         */
+        int color(float partialTick) {
             float t = (age + partialTick) / life;
-            float fadeIn = Math.min(1.0F, (age + partialTick) / 2.0F);
-            float flicker = 0.75F + 0.25F * (float) Math.sin((age + partialTick) * 1.7F + seed);
-            return fadeIn * (1.0F - t * t) * flicker;
+            int step = start + (t < 0.45F ? 0 : t < 0.8F ? 1 : 2);
+            if (Pixels.hash(age, 0, Float.floatToIntBits(seed), 3) < 0.15F) {
+                step++;
+            }
+            return Pixels.ramp(Math.min(step, Pixels.WINE), t > 0.9F ? 0.5F : 1.0F);
         }
     }
 }

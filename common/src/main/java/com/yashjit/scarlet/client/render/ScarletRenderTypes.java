@@ -98,6 +98,24 @@ public final class ScarletRenderTypes {
                     .sortOnUpload()
                     .createRenderSetup());
 
+    /**
+     * Magic as pixel art: hard-edged squares of flat color, blended over what is behind them as they are, depth tested
+     * without writing depth. Unlike light, they can be as dark as crimson over snow.
+     */
+    public static final RenderPipeline PIXEL_PIPELINE = RenderPipeline.builder(LIGHTNING_SNIPPET)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false))
+            .withLocation(Scarlet.id("pipeline/pixel"))
+            .build();
+
+    private static final OitPipelineSet PIXEL_OIT = OitPipelineSet.builder("scarlet_pixel", RenderPipeline.builder(LIGHTNING_SNIPPET)).build();
+
+    private static final RenderType PIXEL = RenderTypeInvoker.scarlet$create("scarlet_pixel",
+            RenderSetup.builder(PIXEL_PIPELINE)
+                    .setOitPipelines(PIXEL_OIT)
+                    .sortOnUpload()
+                    .createRenderSetup());
+
     private ScarletRenderTypes() {
     }
 
@@ -114,6 +132,10 @@ public final class ScarletRenderTypes {
         RenderSystem.getCompiledPipeline(TINT_OIT.depthBoundsPipeline());
         RenderSystem.getCompiledPipeline(TINT_OIT.transmittancePipeline());
         RenderSystem.getCompiledPipeline(TINT_OIT.accumulatePipeline());
+        RenderSystem.getCompiledPipeline(PIXEL_PIPELINE);
+        RenderSystem.getCompiledPipeline(PIXEL_OIT.depthBoundsPipeline());
+        RenderSystem.getCompiledPipeline(PIXEL_OIT.transmittancePipeline());
+        RenderSystem.getCompiledPipeline(PIXEL_OIT.accumulatePipeline());
     }
 
     /**
@@ -143,5 +165,12 @@ public final class ScarletRenderTypes {
      */
     public static RenderType tint() {
         return TINT;
+    }
+
+    /**
+     * Untextured flat color. Placed in the world through {@link GlowPass#submitPixels}, with {@link Pixels}.
+     */
+    public static RenderType pixel() {
+        return PIXEL;
     }
 }
