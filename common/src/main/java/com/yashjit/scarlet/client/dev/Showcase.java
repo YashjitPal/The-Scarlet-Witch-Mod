@@ -271,6 +271,14 @@ public final class Showcase {
             return steps;
         }
         Scene s = new Scene();
+        // a scene before this one may have left the view on its free camera, from where the player's turns never
+        // reach the server
+        s.then(minecraft -> {
+            if (minecraft.player != null) {
+                minecraft.setCameraEntity(minecraft.player);
+            }
+            subject = null;
+        }, 0);
         s.command("time set noon").command("weather clear").camera(CameraType.THIRD_PERSON_FRONT).hideHud(true);
         switch (name) {
             case "crown" -> s
@@ -1093,6 +1101,21 @@ public final class Showcase {
                     .suitUp().then(minecraft -> {
                     }, 40)
                     .command("item replace entity @s hotbar.8 with minecraft:air")
+                    // a Hex and its town raised on the server, on ground no earlier run has built on, an era called up
+                    // in it, and a blast inside it that mends itself
+                    .command("scarlet hex dispel all")
+                    .command("scarlet hex build town")
+                    .elsewhere()
+                    .face(0, 0).select(Spell.HEX).tap().then(minecraft -> {
+                    }, 320)
+                    .look(26.0, 150, 30, 2.0).hideHud(true).shot("online_town", 4)
+                    .command("scarlet hex era 1950s").playerCamera().face(0, 11).then(minecraft -> {
+                    }, 100)
+                    .shot("online_era", 4)
+                    .command("execute at @s run summon minecraft:tnt ^ ^ ^8 {fuse:30}")
+                    .shot("online_blast", 44).shot("online_mending", 120).shot("online_mended", 200)
+                    .command("scarlet hex dispel").then(minecraft -> {
+                    }, 100)
                     .select(Spell.CHAOS_BOLT);
             // leaving the game with the spirit away: quitting, or the game crashing straight after a save
             case "dreamquit", "dreamcrash" -> s

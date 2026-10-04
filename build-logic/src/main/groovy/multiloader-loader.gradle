@@ -11,6 +11,20 @@ configurations {
     }
 }
 
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = uri('https://api.modrinth.com/maven')
+            }
+        }
+        filter {
+            includeGroup('maven.modrinth')
+        }
+    }
+}
+
 dependencies {
     compileOnly(project(':common')) {
         def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
@@ -20,6 +34,13 @@ dependencies {
     }
     commonJava(project(path: ':common', configuration: 'commonJava'))
     commonResources(project(path: ':common', configuration: 'commonResources'))
+    // -PwithSodium, or -PwithIris (which runs on Sodium), adds them to the dev runs only, to check the magic under them
+    if (project.hasProperty('withSodium') || project.hasProperty('withIris')) {
+        runtimeOnly("maven.modrinth:sodium:${sodium_version}-${project.name}")
+    }
+    if (project.hasProperty('withIris')) {
+        runtimeOnly("maven.modrinth:iris:${iris_version}-${project.name}")
+    }
 }
 
 tasks.named('compileJava', JavaCompile) {
