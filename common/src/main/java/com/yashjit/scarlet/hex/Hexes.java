@@ -13,6 +13,7 @@ import com.yashjit.scarlet.platform.Services;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.WeakHashMap;
 import net.minecraft.core.BlockPos;
@@ -186,11 +187,13 @@ public final class Hexes {
         }
         TownMemory back = null;
         boolean founding = build != HexBuild.NOTHING;
+        boolean openLand = founding;
         int carried = 0;
         Direction facing = player.getDirection();
         if (founding) {
             back = TownMemory.first(data.towns(player.getUUID(), build), center.x, center.z);
             if (back != null) {
+                openLand = false;
                 double away = back.home().subtract(center).horizontalDistance();
                 founding = away <= HOME_RECALL;
                 if (founding) {
@@ -203,6 +206,7 @@ public final class Hexes {
                 // in to the middle of it as it is
                 Restyle.HomeSite site = Restyle.site(level, center, facing, key -> data.isBuilt(BlockPos.of(key)));
                 if (site != null) {
+                    openLand = false;
                     double away = site.center().subtract(center).horizontalDistance();
                     carried = away > 0.5 ? Mth.ceil(Math.max(0.0, away - DRIFT_EASE) / DRIFT_SPEED) + DRIFT_SETTLE : 0;
                     center = site.center();
@@ -210,12 +214,22 @@ public final class Hexes {
                 }
             }
         }
-        Hex hex = new Hex(player.getUUID(), player.getGameProfile().name(), center, CAST_RADIUS, Era.FIFTIES, Hex.DEFAULT_NAME,
-                Hex.Phase.SPREADING, now, 0.0F);
+        HexTown town = null;
         if (build != HexBuild.NOTHING) {
             List<TownMemory> remembered = data.towns(player.getUUID(), build, center, MAX_RADIUS);
-            hex.town = back != null ? HexTown.recall(back, remembered, hex.era)
-                    : HexTown.raise(build, center, facing, player.getUUID().getLeastSignificantBits() ^ now * 31L, remembered, hex.era);
+            long seed = player.getUUID().getLeastSignificantBits() ^ now * 31L;
+            town = back != null ? HexTown.recall(back, remembered, Era.FIFTIES) : HexTown.raise(build, center, facing, seed, remembered, Era.FIFTIES);
+            OptionalInt standing = openLand ? town.foundingHeight(level, center) : OptionalInt.empty();
+            if (standing.isPresent() && standing.getAsInt() != center.y) {
+                // cast from a pillar or a hollow, the home still rises on the land around it, and is founded from there
+                center = new Vec3(center.x, standing.getAsInt(), center.z);
+                town = HexTown.raise(build, center, facing, seed, remembered, Era.FIFTIES);
+            }
+        }
+        Hex hex = new Hex(player.getUUID(), player.getGameProfile().name(), center, CAST_RADIUS, Era.FIFTIES, Hex.DEFAULT_NAME,
+                Hex.Phase.SPREADING, now, 0.0F);
+        if (town != null) {
+            hex.town = town;
             int raising = founding ? hex.town.foundHome(level, hex.center, hex.era, now, carried) : -1;
             if (raising > 0) {
                 hex.enter(Hex.Phase.FOUNDING, now);

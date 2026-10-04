@@ -116,6 +116,8 @@ public final class Founding {
     /** The founding the local caster is in, by when it began, and which way is out of their home's front door. */
     private static long foundedAt = Long.MIN_VALUE;
     private static float outYaw;
+    /** How high the local caster stood as they cast, which they float from to over the middle of their home. */
+    private static double riseFrom;
     private static double blastAt = -1.0E9;
     private static Vec3 blastFrom = Vec3.ZERO;
 
@@ -214,6 +216,7 @@ public final class Founding {
             // their home's front faces back the way they were looking as they cast
             foundedAt = own.phaseSince();
             outYaw = player.getYRot() + 180.0F;
+            riseFrom = player.getY();
         }
         TownBuildPayload home = TownFx.home(own.center());
         if (home != null && home.start() >= own.phaseSince()) {
@@ -236,7 +239,7 @@ public final class Founding {
         // coming down onto the middle of the block they float over
         Vec3 middle = new Vec3(Mth.floor(center.x) + 0.5, center.y, Mth.floor(center.z) + 0.5);
         Vec3 over = center.lerp(middle, land);
-        Vec3 goal = new Vec3(over.x, center.y + rise * (FLOOR + HOVER) - land * HOVER + bob, over.z);
+        Vec3 goal = new Vec3(over.x, Mth.lerp(rise, riseFrom, center.y + FLOOR + HOVER) - land * HOVER + bob, over.z);
         // carried across to where their home stood before, cast a little way off it, no faster than flying
         Vec3 step = goal.subtract(player.position()).scale(0.35);
         double across = step.horizontalDistance();

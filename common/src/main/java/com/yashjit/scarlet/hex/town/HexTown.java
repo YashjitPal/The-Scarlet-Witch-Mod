@@ -37,6 +37,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -445,6 +446,22 @@ public final class HexTown {
         Build build = start(level, hexCenter, home, survey, WHOLE, now + delay);
         founding = false;
         return delay + build.duration();
+    }
+
+    /**
+     * Where a caster founding their home on open land stands, whatever they stood on to cast: on the land its lot is
+     * leveled to, a pillar under them cut down to it and a hollow filled in. Its floor is laid at that height, and the
+     * founding floats the caster up from there and lands them on top of it.
+     *
+     * @return empty if there is no room for their home
+     */
+    public OptionalInt foundingHeight(ServerLevel level, Vec3 hexCenter) {
+        Part home = home(BlockPos.containing(hexCenter));
+        if (mode == HexBuild.NOTHING || home == null || !isLoaded(level, home)) {
+            return OptionalInt.empty();
+        }
+        Survey survey = survey(level, home, hexCenter, WHOLE);
+        return survey == null ? OptionalInt.empty() : OptionalInt.of(survey.ground() + 1);
     }
 
     /**

@@ -15,6 +15,7 @@ import com.yashjit.scarlet.network.DreamPayload;
 import com.yashjit.scarlet.network.ShowrunnerPayload;
 import com.yashjit.scarlet.client.magic.SpellWheel;
 import com.yashjit.scarlet.client.magic.TelekinesisClient;
+import com.yashjit.scarlet.hex.Hex;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.hex.Sitcom;
@@ -42,6 +43,7 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -765,6 +767,41 @@ public final class Showcase {
                     }, 20)
                     .tap().view(4, 14, -26, 20, 3, -4).shot("home_recall_a", 30).shot("home_recall_b", 120).shot("home_recall_c", 200)
                     .playerCamera();
+            case "heights" -> s
+                    .land()
+                    .dispelHexes()
+                    .elsewhere()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build home")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("item replace entity @a weapon.offhand with minecraft:air")
+                    .command("time set noon")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-30 ~ ~-30 ~30 ~16 ~30 minecraft:air")
+                    // cast standing on a pillar of dirt four blocks high
+                    .command("execute at @a run fill ~ ~ ~ ~ ~3 ~ minecraft:dirt")
+                    .command("execute as @a at @s run tp @s ~ ~4 ~").then(minecraft -> {
+                    }, 10)
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera()
+                    .tap().then(minecraft -> {
+                    }, 520)
+                    .columnLog("pillar").face(0, -90).shot("heights_pillar_up", 4).face(0, 90).shot("heights_pillar_down", 4)
+                    .look(16.0, 150, 20, 4.0).shot("heights_pillar_house", 4).playerCamera()
+                    // and standing in a dip a block deep, on fresh ground
+                    .dispelHexes()
+                    .elsewhere()
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-30 ~ ~-30 ~30 ~16 ~30 minecraft:air")
+                    .command("execute at @a run setblock ~ ~-1 ~ minecraft:air")
+                    .command("execute as @a at @s run tp @s ~ ~-1 ~").then(minecraft -> {
+                    }, 10)
+                    .face(0, 0).playerCamera()
+                    .tap().then(minecraft -> {
+                    }, 520)
+                    .columnLog("dip").face(0, -90).shot("heights_dip_up", 4).face(0, 90).shot("heights_dip_down", 4)
+                    .look(16.0, 150, 20, 4.0).shot("heights_dip_house", 4).playerCamera()
+                    .dispelHexes();
             case "hometown" -> s
                     .land()
                     .dispelHexes()
@@ -2197,6 +2234,38 @@ public final class Showcase {
                                 player.level().dimension().identifier(), player.gameMode(), player.blockPosition(), camera.getType().getDescriptionId(),
                                 camera.blockPosition(), bodies, Services.PLAYER_DATA.dreamwalk(player).away().isPresent());
                     }
+                });
+            }, 0);
+        }
+
+        /**
+         * Writes down in the log what stands up the column the player's Hex was cast from and the columns either side of
+         * it, and where the player is, to read a block missing from their home against its neighbours.
+         */
+        Scene columnLog(String label) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null || minecraft.player == null) {
+                    return;
+                }
+                java.util.UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(id);
+                    Hex hex = Hexes.find(server, id);
+                    if (player == null || hex == null) {
+                        Scarlet.LOG.info("Showcase [{}]: no Hex", label);
+                        return;
+                    }
+                    BlockPos center = BlockPos.containing(hex.center());
+                    StringBuilder columns = new StringBuilder();
+                    for (int dx = -1; dx <= 1; dx++) {
+                        columns.append(dx == 0 ? "\n  cast from:" : dx < 0 ? "\n  west:     " : "\n  east:     ");
+                        for (int y = center.getY() - 6; y <= center.getY() + 12; y++) {
+                            columns.append(' ').append(y).append('=')
+                                    .append(BuiltInRegistries.BLOCK.getKey(player.level().getBlockState(center.offset(dx, y - center.getY(), 0)).getBlock()).getPath());
+                        }
+                    }
+                    Scarlet.LOG.info("Showcase [{}]: Hex cast from {}, player at {}{}", label, hex.center(), player.position(), columns);
                 });
             }, 0);
         }
