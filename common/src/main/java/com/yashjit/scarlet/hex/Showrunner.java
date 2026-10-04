@@ -28,6 +28,10 @@ public final class Showrunner {
             Services.PLAYER_DATA.set(player, Services.PLAYER_DATA.get(player).withHexBuild(HexBuild.byIndex(payload.value())));
             return;
         }
+        if (payload.action() == ShowrunnerPayload.REWIND) {
+            Hexes.rewind(player, payload.value() != 0);
+            return;
+        }
         ServerLevel level = player.level();
         Hex hex = HexData.of(level).byCaster(player.getUUID());
         if (hex == null || hex.phase == Hex.Phase.COLLAPSING) {

@@ -95,6 +95,9 @@ public final class ShowrunnerScreen extends Screen {
         keys.clear();
         int x0 = left();
         int y0 = top();
+        // the rewind key, top left across from the light, held to wind the scene back
+        keys.add(new Key(x0 + 6, y0 + 4, 26, 11, Component.translatable("showrunner.scarlet.rewind"), ShowrunnerPayload.REWIND, 1, true,
+                () -> RewindClient.remoteHeld() ? 1 : 0));
         Era[] eras = Era.values();
         for (int i = 0; i < eras.length; i++) {
             int value = i;
@@ -258,6 +261,13 @@ public final class ShowrunnerScreen extends Screen {
             float glow = 0.5F + 0.2F * Mth.sin((float) now * 0.2F + key.x());
             graphics.fill(key.x() + 2, key.y() + 1, key.x() + key.width() - 2, key.y() + 2, ARGB.color(alpha * glow, ScarletPalette.BRIGHT_SCARLET));
         }
+        if (key.action() == ShowrunnerPayload.REWIND) {
+            rewindArrows(graphics, key.x() + key.width() / 2 - 5, key.y() + 3, ARGB.color(alpha, lit ? ScarletPalette.CORE : TEXT));
+            if (hover) {
+                graphics.setTooltipForNextFrame(key.label(), mouseX, mouseY);
+            }
+            return;
+        }
         Component text = key.action() == ShowrunnerPayload.EPISODES
                 ? Component.translatable(current(key) == 1 ? "showrunner.scarlet.on" : "showrunner.scarlet.off") : key.label();
         graphics.pose().pushMatrix();
@@ -288,12 +298,45 @@ public final class ShowrunnerScreen extends Screen {
         if (event.button() == 0) {
             for (Key key : keys) {
                 if ((own() != null || !key.needsHex()) && key.contains((int) event.x(), (int) event.y() - slide)) {
-                    press(key, now);
+                    if (key.action() == ShowrunnerPayload.REWIND) {
+                        RewindClient.holdRemote(true);
+                        minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.2F, 0.3F));
+                    } else {
+                        press(key, now);
+                    }
                     return true;
                 }
             }
         }
         return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        if (event.button() == 0 && RewindClient.remoteHeld()) {
+            RewindClient.holdRemote(false);
+            return true;
+        }
+        return super.mouseReleased(event);
+    }
+
+    @Override
+    public void removed() {
+        RewindClient.holdRemote(false);
+        super.removed();
+    }
+
+    /**
+     * The rewind key's two arrows pointing back, in squares like the rest of the remote.
+     */
+    private static void rewindArrows(GuiGraphicsExtractor graphics, int x, int y, int color) {
+        for (int arrow = 0; arrow < 2; arrow++) {
+            int left = x + arrow * 5;
+            for (int row = 0; row < 5; row++) {
+                int reach = 5 - Math.abs(row - 2) * 2;
+                graphics.fill(left + 5 - reach, y + row, left + 5, y + row + 1, color);
+            }
+        }
     }
 
     private void press(Key key, double now) {

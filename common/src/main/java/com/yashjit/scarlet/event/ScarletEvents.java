@@ -6,6 +6,7 @@ import com.yashjit.scarlet.darkhold.Dreamwalk;
 import com.yashjit.scarlet.hex.HexEjection;
 import com.yashjit.scarlet.hex.HexMending;
 import com.yashjit.scarlet.hex.HexRipples;
+import com.yashjit.scarlet.hex.HexTape;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.magic.Magic;
@@ -69,8 +70,11 @@ public final class ScarletEvents {
 
     public static void onServerTick(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
-            Hexes.tick(level);
-            HexMending.tick(level);
+            // what the Hex does to the world itself is no part of the scene its tape records
+            HexTape.offTape(() -> {
+                Hexes.tick(level);
+                HexMending.tick(level);
+            });
             HexEjection.tick(level);
             RuneTraps.tick(level);
         }

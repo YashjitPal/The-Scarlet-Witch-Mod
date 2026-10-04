@@ -88,9 +88,11 @@ public final class HexMending {
             return;
         }
         // all taken at once, so none falls or pops off as the others go
-        for (Gap gap : gaps) {
-            level.setBlock(gap.pos(), Blocks.AIR.defaultBlockState(), TAKE_FLAGS);
-        }
+        HexTape.offTape(() -> {
+            for (Gap gap : gaps) {
+                level.setBlock(gap.pos(), Blocks.AIR.defaultBlockState(), TAKE_FLAGS);
+            }
+        });
         // the crater closes in from its edge, where the blast went off last of all
         gaps.sort(Comparator.comparingDouble(Gap::distance).reversed());
         long[] at = new long[gaps.size()];
@@ -174,14 +176,16 @@ public final class HexMending {
             return;
         }
         long now = level.getGameTime();
-        for (Mend mend : mends) {
-            for (int i = mend.next; i < mend.gaps.size(); i++) {
-                Gap gap = mend.gaps.get(i);
-                if (level.hasChunkAt(gap.pos())) {
-                    putBack(level, gap, now);
+        HexTape.offTape(() -> {
+            for (Mend mend : mends) {
+                for (int i = mend.next; i < mend.gaps.size(); i++) {
+                    Gap gap = mend.gaps.get(i);
+                    if (level.hasChunkAt(gap.pos())) {
+                        putBack(level, gap, now);
+                    }
                 }
             }
-        }
+        });
     }
 
     /**

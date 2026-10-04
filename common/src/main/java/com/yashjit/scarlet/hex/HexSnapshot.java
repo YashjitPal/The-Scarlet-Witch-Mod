@@ -23,10 +23,12 @@ import org.jspecify.annotations.Nullable;
  * @param stress      how shaken it was by the last blow to its caster, at {@code stressAt}
  * @param sky         the time of day and weather its caster has set inside it
  * @param episodes    whether the era moves on by itself every morning
+ * @param rewinding   whether its caster is winding it back right now
+ * @param rewindSince game time the rewind began, as it gathers speed
  */
 public record HexSnapshot(UUID caster, String casterName, Vec3 center, float radius, int era, String name, int phase, long phaseSince,
                           float phaseRadius, long eraSince, int previousEra, int episode, int season, @Nullable Vec3 tearAt, float opening,
-                          boolean parting, float stress, long stressAt, HexSky sky, boolean episodes) {
+                          boolean parting, float stress, long stressAt, HexSky sky, boolean episodes, boolean rewinding, long rewindSince) {
 
     public static final StreamCodec<ByteBuf, HexSnapshot> STREAM_CODEC = StreamCodec.of(
             (buf, hex) -> {
@@ -54,6 +56,8 @@ public record HexSnapshot(UUID caster, String casterName, Vec3 center, float rad
                 buf.writeByte(hex.sky.time().ordinal());
                 buf.writeByte(hex.sky.weather().ordinal());
                 buf.writeBoolean(hex.episodes);
+                buf.writeBoolean(hex.rewinding);
+                ByteBufCodecs.VAR_LONG.encode(buf, hex.rewindSince);
             },
             buf -> {
                 UUID caster = UUIDUtil.STREAM_CODEC.decode(buf);
@@ -81,8 +85,10 @@ public record HexSnapshot(UUID caster, String casterName, Vec3 center, float rad
                 long stressAt = buf.readLong();
                 HexSky sky = new HexSky(HexSky.Time.byIndex(buf.readByte()), HexSky.Weather.byIndex(buf.readByte()));
                 boolean episodes = buf.readBoolean();
+                boolean rewinding = buf.readBoolean();
+                long rewindSince = ByteBufCodecs.VAR_LONG.decode(buf);
                 return new HexSnapshot(caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius, eraSince, previousEra, episode,
-                        season, tearAt, opening, parting, stress, stressAt, sky, episodes);
+                        season, tearAt, opening, parting, stress, stressAt, sky, episodes, rewinding, rewindSince);
             });
 
     public Hex.Phase phaseValue() {

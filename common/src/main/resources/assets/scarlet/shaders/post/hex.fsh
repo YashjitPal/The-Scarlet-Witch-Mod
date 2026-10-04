@@ -45,6 +45,9 @@ layout(std140) uniform HexView {
     vec4 RemnantStyle[2];
     // xyz: where the camera is in the world's grid of blocks, as its position modulo 256
     vec4 Grid;
+    // the Hex around the camera winding back, x: how strongly (0 for not), y: how fast, 1 to 4 times, z: seconds since
+    // it began
+    vec4 Rewind;
 };
 
 // Seconds the view takes to come through a wall.
@@ -192,6 +195,93 @@ vec3 eraLook(vec3 color, int era, vec2 uv, vec2 screen, float time) {
         return desaturate(flattened, 0.9) * vec3(0.98, 1.0, 1.03);
     }
     return color;
+}
+
+// Winding back, as the set an era is played on would throw the picture about: 1950s film yanked back through the
+// projector, jumping and rolling with its frame line and weaving in the gate; a 1960s broadcast rolling as its vertical
+// hold goes and tearing as the horizontal one does; 1970s film and tape juddering; 1980s videotape squashed and skewed as
+// the heads race back over it, bands of it slipping sideways as they crawl up; a 2000s disc holding, then jumping back
+// in blocks. A stream scrubs back smoothly. amount: how strongly; speed: 1 to 4 times; t: seconds since it began;
+// motion: 0 with camera shake turned down. seam: where the frame line rolls through the screen, for the look to draw.
+vec2 rewindWarp(vec2 uv, int era, float amount, float speed, float t, float time, vec2 screen, float motion, out float seam) {
+    seam = -1.0;
+    if (amount <= 0.0) {
+        return uv;
+    }
+    float frame = floor(time * 18.0);
+    if (era <= 1) {
+        float roll = fract(t * (era == 0 ? 0.55 : 0.32) * speed);
+        float jump = era == 0 ? (hash12(vec2(frame, 3.0)) - 0.5) * 0.05 : 0.0;
+        float shift = (roll + jump) * amount * motion;
+        seam = motion > 0.0 ? 1.0 - fract(shift) : -1.0;
+        uv.y = fract(uv.y + shift);
+        uv.x += sin(time * 11.0 + frame) * 0.004 * amount * motion;
+        if (era == 1) {
+            uv.x += pow(uv.y, 4.0) * 0.07 * amount * motion * sin(uv.y * 30.0 + time * 9.0);
+        }
+        return uv;
+    }
+    if (era == 2) {
+        uv.y += (hash12(vec2(floor(time * 12.0), 7.0)) - 0.5) * 0.014 * amount * motion;
+        uv.x += sin(time * 5.0) * 0.003 * amount * motion;
+        return uv;
+    }
+    if (era == 3) {
+        uv.y = (uv.y - 0.5) * (1.0 + 0.08 * amount) + 0.5;
+        uv.x += (uv.y - 0.5) * 0.035 * amount;
+        float band = fract(uv.y * 2.5 - t * 1.6 * speed);
+        float slip = step(0.82, band) * (hash12(vec2(floor(uv.y * 90.0), floor(time * 30.0))) - 0.5);
+        uv.x += slip * 0.06 * amount;
+        return uv;
+    }
+    if (era == 4 && fract(time * 2.0 * speed) < 0.35 * amount) {
+        vec2 block = vec2(16.0) * clamp(screen.y / 480.0, 1.0, 3.0);
+        uv = (floor(uv * screen / block) + 0.5) * block / screen;
+    }
+    return uv;
+}
+
+// What winding back lays over the picture: the projector's flicker, scratches, dust and dark frame line rolling through
+// in the 1950s and 1960s; a smear to one side and the odd dropout across 1970s tape; bands of snow and white streaks on
+// videotape; a slight dim on a disc or a stream. flash: how strongly flicker shows, less with flashing turned down.
+vec3 rewindLook(vec3 color, vec2 uv, vec2 screenUv, vec2 pixel, int era, float amount, float speed, float t, float time, vec2 screen,
+                float flash, float seam) {
+    if (amount <= 0.0) {
+        return color;
+    }
+    float frame = floor(time * 18.0);
+    if (era <= 1) {
+        color *= 1.0 + (hash12(vec2(frame, 1.0)) - 0.5) * 0.6 * amount * flash;
+        for (int k = 0; k < 2; k++) {
+            float x = hash12(vec2(frame, 5.0 + float(k) * 7.0));
+            float line = 1.0 - smoothstep(0.0, 1.2 / screen.x, abs(screenUv.x - x));
+            color = mix(color, vec3(k == 0 ? 0.92 : 0.08), line * step(0.45, hash12(vec2(frame, 9.0 + float(k)))) * 0.65 * amount);
+        }
+        float dust = step(0.9975, hash12(floor(pixel / 3.0) + frame * vec2(13.0, 7.0)));
+        color = mix(color, vec3(era == 0 ? 0.04 : 0.9), dust * amount);
+        if (seam >= 0.0) {
+            float d = abs(screenUv.y - seam);
+            d = min(d, 1.0 - d);
+            color *= 1.0 - (1.0 - smoothstep(0.0, 0.035, d)) * amount;
+        }
+        return color;
+    }
+    if (era == 2) {
+        vec3 smear = texture(InSampler, clamp(uv + vec2(0.012, 0.0), 0.0, 1.0)).rgb;
+        color = mix(color, eraLook(smear, 2, uv, screen, time), 0.35 * amount);
+        color *= mix(vec3(1.0), vec3(1.08, 0.98, 0.84), amount);
+        float dropout = step(0.985, hash12(vec2(floor(screenUv.y * 140.0), floor(time * 20.0))));
+        return mix(color, vec3(0.95, 0.9, 0.8), dropout * amount * 0.8 * flash);
+    }
+    if (era == 3) {
+        float band = fract(screenUv.y * 2.5 - t * 1.6 * speed);
+        float inBand = smoothstep(0.78, 0.86, band) * (1.0 - smoothstep(0.95, 1.0, band));
+        float snow = hash12(pixel + floor(time * 60.0) * vec2(17.0, 31.0));
+        color = mix(color, vec3(snow), inBand * 0.55 * amount);
+        float streak = step(0.993, hash12(vec2(floor(screenUv.y * 220.0), floor(time * 40.0))));
+        return mix(color, vec3(1.0), streak * amount * 0.7 * flash);
+    }
+    return color * (1.0 - 0.12 * amount);
 }
 
 // Where a color lies around the wheel, 0 to 1 from red.
@@ -683,6 +773,10 @@ void main() {
     float p = Crossing.x >= 0.0 ? Crossing.x / CROSS_SECONDS : 2.0;
     bool coming = p < 1.0;
     vec2 uv = coming ? crossingWarp(texCoord, p, time, Crossing.z, Crossing.w) : texCoord;
+    // winding back, the picture inside is thrown about the way the era's set would show it
+    float rewind = Rewind.x * Camera.y;
+    float seam;
+    uv = rewindWarp(uv, int(Camera.z + 0.5), rewind, Rewind.y, Rewind.z, time, screen, Crossing.w, seam);
     // nothing shows past the edge of the bulging glass
     float tube = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
     uv = clamp(uv, 0.0, 1.0);
@@ -827,6 +921,7 @@ void main() {
     if (coming) {
         color = crossingLook(color, uv, texCoord, pixel, p, time, screen, Crossing.z, Crossing.w);
     }
+    color = rewindLook(color, uv, texCoord, pixel, insideEra, rewind, Rewind.y, Rewind.z, time, screen, Crossing.z, seam);
 
     float television = Params.w;
     if (television > 0.0) {

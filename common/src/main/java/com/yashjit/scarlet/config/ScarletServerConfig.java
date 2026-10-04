@@ -31,6 +31,9 @@ public final class ScarletServerConfig {
     public boolean corruptionSideEffects = true;
     /** Whether the Darkhold's Dreamwalking can be cast at all. */
     public boolean dreamwalking = true;
+    /** Whether a caster can rewind the last seconds inside their Hex, and whether other players are wound back with it. */
+    public boolean rewind = true;
+    public boolean rewindPlayers = true;
 
     public static ScarletServerConfig get() {
         return instance;

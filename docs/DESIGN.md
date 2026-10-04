@@ -277,6 +277,38 @@ The centerpiece. Inspired by Westview.
   - The caster's own suit-up costume takes priority over the era outfit.
 - **Everything era-related exists only inside.** The era's picture (black and white, warm 70s color, videotape and so on) is only seen from within: from outside, everything in the hex looks normal through the wall. Step out and it falls away with a quick TV-static flicker: normal colors, normal clothes, armor back. The one exception is the home a fallen hex leaves glitching behind it, which slips through the eras' pictures wherever it is seen from.
 
+### Rewind
+
+As Wanda turns back the scene when the beekeeper climbs out of the manhole, the caster can rewind the last ten seconds inside their Hex: hold the rewind button on the Showrunner remote, or the rewind key, from anywhere in its world.
+
+- **What runs backward:**
+  - Creatures and other players walk back along the paths they took, and their wounds close.
+  - Anything thrown flies back, and whatever was thrown in that time is gone again, back in the hand that threw it.
+  - Blocks broken or placed in that time are put back as they were, a chest with what was in it.
+  - Creatures killed in that time get back up, and those that came into the world in it are gone again.
+- **What doesn't:** the caster, who is the showrunner; anything held by Telekinesis, steered by Mind Control or sat in a dream; and what the Hex does itself: its town, its paint, its mending and its era.
+- **Nothing is doubled.** What someone has picked up can't be taken back, so the rewind never hands anything out twice:
+  - A block whose drops have been picked up stays broken, and so does everything that happened at that spot before.
+  - A block placed in that time goes back into the hand of whoever placed it.
+  - Whatever was filled or emptied with a bucket or a bottle stays as it was left.
+  - A creature whose drops have been picked up gets back up with nothing left to drop.
+  - What is in inventories, chests and furnaces isn't rewound at all.
+  - A player's own death can't be undone: they have already left the scene.
+- **Playing it:** it starts at normal speed and gathers to four times as fast after a second, so the whole ten seconds run back in about three. Creatures stand frozen while it runs. Let go and the scene plays on from there: what was rewound past is gone.
+- **Cost:** 3 energy for every second wound back, and it rests 3 seconds after.
+- **Look and sound**, more dramatic the older the era (inside only; from outside, the wall glitches hard while it runs):
+
+| Era | Rewind |
+|---|---|
+| 1950s | Film yanked backward through a projector: heavy flicker, scratches and dust, the frame jumping and rolling, the projector whirring in reverse |
+| 1960s | A black-and-white broadcast slipping: the picture rolls and the horizontal hold tears |
+| 1970s | Color film and early tape: smeared, warm and juddering |
+| 1980s | VHS: tracking bands crawling up a squashed picture, "◀◀ REW" in the corner, the tape whining |
+| 2000s | DVD: the picture jumping back in blocky skips, "◀◀ ×4" in a clean font |
+| Present day | Streaming: a smooth scrub along a thin progress bar, with a ten-seconds-back icon |
+
+- Servers can turn it off, or leave other players out of it.
+
 ### Homes and the town
 
 The Hex builds Westview.
@@ -312,6 +344,7 @@ The caster's controls for their Hex, opened with the Showrunner key once the cro
 - **Name:** the Hex's name for its title cards.
 - **Your home, somewhere new:** puts the remote down to place the home (see above).
 - **Your next Hex builds:** what the next cast raises.
+- **Rewind:** hold it to wind the last ten seconds back (see Rewind above). The rewind key does the same without the remote.
 - A little display at the top shows the era and episode on air, or "off the air" with no Hex standing.
 
 ### Era decorations

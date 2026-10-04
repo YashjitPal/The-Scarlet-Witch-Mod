@@ -205,7 +205,7 @@ public final class HexPaint {
         Painted was = hex.paint.painted.get(key);
         // painted over again, it still remembers what it first was; changed by hand since, it is what it is now
         BlockState before = was != null && was.after().getBlock() == current.getBlock() ? was.before() : current;
-        level.setBlock(pos, next, QUIET);
+        HexTape.offTape(() -> level.setBlock(pos, next, QUIET));
         if (next == before) {
             hex.paint.painted.remove(key);
         } else {
@@ -336,7 +336,7 @@ public final class HexPaint {
         if (current.getBlock() != entry.after().getBlock()) {
             return false;
         }
-        level.setBlock(pos, entry.before(), QUIET);
+        HexTape.offTape(() -> level.setBlock(pos, entry.before(), QUIET));
         return true;
     }
 

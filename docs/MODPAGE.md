@@ -34,7 +34,8 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 - **It builds Westview:** your home, or a whole suburb with streets, lawns and picket fences, made over from whatever already stands rather than torn down. When the Hex falls, everything goes back the way it was.
 - **Hostile mobs become townspeople** who sit on couches, switch on the television, chat with their hands and wave as you pass.
 - **Blasts mend themselves:** whatever a creeper or TNT breaks inside comes back, chests and all.
-- **The Showrunner remote** (H): change the era, the time of day and the weather, start a new episode every morning, name your Hex, move your home and choose what the next Hex builds.
+- **Rewind the scene:** hold rewind and the last ten seconds inside run backward. Creatures and players walk back the way they came, wounds close, broken blocks return and the fallen get back up, all shown the way that era's set would show it: film juddering back through a 1950s projector, a VHS tape whining back with "REW" in the corner, a smooth scrub in the present day. Nothing can be duplicated with it: what someone has already picked up stays picked up.
+- **The Showrunner remote** (H): change the era, the time of day and the weather, start a new episode every morning, name your Hex, move your home, choose what the next Hex builds, and hold its rewind button.
 - **Era furniture:** a television, radio, telephone, fridge, stove, toaster, couch, armchair, lamp, wall clock, picture frames, posters and a parked car, each changing with the era. All craftable.
 
 ## The Darkhold
@@ -64,6 +65,7 @@ E = echo shard   C = crying obsidian   B = book
 | Right click, empty hand | Cast the chosen spell |
 | Double-tap jump | Levitate (or bind a key of its own) |
 | H | Showrunner remote |
+| Rewind (bind a key) | Hold to rewind the last ten seconds inside your Hex |
 
 ## Settings and accessibility
 
@@ -71,7 +73,7 @@ Effects quality, reduce flashing, reduce camera shake, reduce screen effects, in
 
 ## Multiplayer
 
-The server decides what happens and every client sees it, so everything works on dedicated servers. Server owners can turn off Mind Control on players (or shorten it), the Darkhold's side effects and dreamwalking in `config/scarlet-server.json`.
+The server decides what happens and every client sees it, so everything works on dedicated servers. Server owners can turn off Mind Control on players (or shorten it), the Darkhold's side effects, dreamwalking, and the rewind (or just leave other players out of it) in `config/scarlet-server.json`.
 
 ## Compatibility
 

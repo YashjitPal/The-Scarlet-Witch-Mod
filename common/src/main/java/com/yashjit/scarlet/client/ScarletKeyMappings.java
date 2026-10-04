@@ -22,10 +22,13 @@ public final class ScarletKeyMappings {
     /** Unbound to begin with: the settings are also a click away in the corner of the game's options. */
     public static final KeyMapping SETTINGS = new KeyMapping("key.scarlet.settings", InputConstants.UNKNOWN.getValue(), CATEGORY);
 
+    /** Held to wind back the last seconds inside a caster's Hex. Unbound to begin with: the remote has the button too. */
+    public static final KeyMapping REWIND = new KeyMapping("key.scarlet.rewind", InputConstants.UNKNOWN.getValue(), CATEGORY);
+
     private ScarletKeyMappings() {
     }
 
     public static List<KeyMapping> all() {
-        return List.of(SUIT_UP, SPELL_WHEEL, LEVITATE, SHOWRUNNER, SETTINGS);
+        return List.of(SUIT_UP, SPELL_WHEEL, LEVITATE, SHOWRUNNER, REWIND, SETTINGS);
     }
 }

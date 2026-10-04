@@ -76,7 +76,7 @@ public final class HexScreen {
     // through a wall, the boxes and slips of the homes fallen Hexes have left standing, and where the camera is in the
     // world's grid of blocks
     private static final int UNIFORM_SIZE = 64 + MAX_HEXES * 16 * 2 + 16 * 2 + MAX_RIPPLES * 16 + MAX_RIPPLES / 4 * 16 + MAX_HEXES * 16 + 16 + 16
-            + MAX_REMNANTS * 16 * 3 + 16;
+            + MAX_REMNANTS * 16 * 3 + 16 + 16;
     /** The camera's place in the world's grid of blocks is passed modulo this, which keeps it precise as a float. */
     private static final double GRID_WRAP = 256.0;
     private static final float ENTER_RATE = 5.0F;
@@ -374,6 +374,8 @@ public final class HexScreen {
                 }
             }
             builder.putVec4(wrapped(cameraPos.x), wrapped(cameraPos.y), wrapped(cameraPos.z), 0.0F);
+            float partial = (float) (now - Math.floor(now));
+            builder.putVec4(RewindClient.amount(partial), RewindClient.speed(now), RewindClient.seconds(now), 0.0F);
         }
     }
 

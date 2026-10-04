@@ -104,6 +104,14 @@ public final class Magic {
     }
 
     /**
+     * Takes energy for magic that is no spell of its own, such as winding back a Hex, down to none at most.
+     */
+    public static void spend(ServerPlayer player, float cost, long now) {
+        MagicState state = state(player);
+        Services.PLAYER_DATA.setMagic(player, state.withEnergy(Math.max(0.0F, energy(state, now, maxEnergy(player)) - cost), now));
+    }
+
+    /**
      * Which arm a cast uses: alternating, starting with the main arm.
      */
     public static HumanoidArm castArm(Player player, int castNumber) {

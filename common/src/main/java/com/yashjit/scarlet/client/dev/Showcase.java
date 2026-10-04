@@ -58,6 +58,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.decoration.Mannequin;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -802,6 +803,103 @@ public final class Showcase {
                     .columnLog("dip").face(0, -90).shot("heights_dip_up", 4).face(0, 90).shot("heights_dip_down", 4)
                     .look(16.0, 150, 20, 4.0).shot("heights_dip_house", 4).playerCamera()
                     .dispelHexes();
+            case "rewind" -> s
+                    .land()
+                    .dispelHexes()
+                    .elsewhere()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("gamemode survival @a")
+                    .command("clear @a")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("item replace entity @a weapon.offhand with minecraft:air")
+                    .command("time set noon")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-12 ~ ~-12 ~12 ~6 ~12 minecraft:air")
+                    .anchor()
+                    // what stands before the tape begins: a cow to walk off, one to be killed, one to be hurt, a chest of
+                    // apples and a block of dirt to mine
+                    .command("execute at @a run summon minecraft:cow ~4 ~ ~2 {Tags:[\"rw_walker\"],NoAI:1b}")
+                    .command("execute at @a run summon minecraft:cow ~-4 ~ ~2 {Tags:[\"rw_victim\"],NoAI:1b}")
+                    .command("execute at @a run summon minecraft:cow ~ ~ ~5 {Tags:[\"rw_hurt\"],NoAI:1b}")
+                    .command("execute at @a run setblock ~2 ~ ~-3 minecraft:chest{Items:[{Slot:0b,id:\"minecraft:apple\",count:5}]}")
+                    .command("execute at @a run setblock ~-2 ~ ~-3 minecraft:dirt")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera()
+                    .tap().then(minecraft -> {
+                    }, 110)
+                    .rewindLog("rewind_before")
+                    // the scene plays: the cow walks off, one is hurt and one killed, the chest is smashed open, a pig and an
+                    // arrow appear
+                    .command("execute as @e[tag=rw_walker] at @s run tp @s ~3 ~ ~").then(minecraft -> {
+                    }, 10)
+                    .command("execute as @e[tag=rw_walker] at @s run tp @s ~3 ~ ~1").then(minecraft -> {
+                    }, 10)
+                    .command("damage @e[tag=rw_hurt,limit=1] 4")
+                    .command("kill @e[tag=rw_victim]")
+                    .command("execute at @a run setblock ~2 ~ ~-3 minecraft:air destroy")
+                    .command("execute at @a run setblock ~ ~ ~-4 minecraft:stone")
+                    .command("execute at @a run summon minecraft:pig ~ ~ ~3 {Tags:[\"rw_newborn\"],NoAI:1b}")
+                    .command("execute at @a run summon minecraft:trident ~ ~1 ~2 {Motion:[0.0,0.3,0.7],Tags:[\"rw_thrown\"]}")
+                    // and by hand: the dirt mined, planks put down and a snowball thrown
+                    .command("item replace entity @a weapon.mainhand with minecraft:oak_planks 4")
+                    .aimAt(-2, 0.5, -3).then(minecraft -> minecraft.options.keyAttack.setDown(true), 30)
+                    .then(minecraft -> minecraft.options.keyAttack.setDown(false), 4)
+                    .aimAt(1, -0.5, -2).tap()
+                    .command("item replace entity @a hotbar.1 with minecraft:snowball 2")
+                    .then(minecraft -> {
+                        if (minecraft.player != null) {
+                            minecraft.player.getInventory().setSelectedSlot(1);
+                        }
+                    }, 4)
+                    .aimAt(0, 3, 10).tap().then(minecraft -> {
+                        if (minecraft.player != null) {
+                            minecraft.player.getInventory().setSelectedSlot(0);
+                        }
+                    }, 10)
+                    .rewindLog("rewind_played").shot("rewind_played", 2)
+                    // the caster winds it all back
+                    .remote(ShowrunnerPayload.REWIND, 1).shot("rewind_winding", 20).then(minecraft -> {
+                    }, 80)
+                    .remote(ShowrunnerPayload.REWIND, 0).then(minecraft -> {
+                    }, 10)
+                    .rewindLog("rewind_after").shot("rewind_after", 2)
+                    .command("gamemode creative @a")
+                    .dispelHexes();
+            case "rewind_eras" -> s
+                    .land()
+                    .dispelHexes()
+                    .elsewhere()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("item replace entity @a weapon.offhand with minecraft:air")
+                    .command("time set noon")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-12 ~ ~-12 ~12 ~6 ~12 minecraft:air")
+                    .anchor()
+                    .command("execute at @a run summon minecraft:cow ~ ~ ~6 {Tags:[\"rw_walker\"],NoAI:1b}")
+                    .command("execute at @a run setblock ~2 ~ ~4 minecraft:oak_log")
+                    .command("execute at @a run setblock ~-2 ~ ~4 minecraft:red_wool")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                    .tap().then(minecraft -> {
+                    }, 110)
+                    // the remote, its rewind key in the corner
+                    .then(com.yashjit.scarlet.client.hex.ShowrunnerScreen::open, 12).shot("rewind_remote", 2)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    .rewindIn("1950s", "rewind_1950s", false)
+                    .rewindIn("1960s", "rewind_1960s", false)
+                    .rewindIn("1970s", "rewind_1970s", false)
+                    .rewindIn("1980s", "rewind_1980s", true)
+                    .rewindIn("2000s", "rewind_2000s", false)
+                    .rewindIn("present", "rewind_present", false)
+                    // from outside, only the wall shows it, burning as the scene winds back
+                    .place(0, 0, -36).aimAt(0, 3, 0).then(minecraft -> {
+                    }, 20)
+                    .rewindIn("1950s", "rewind_outside", false)
+                    .hideHud(true)
+                    .dispelHexes();
             case "hometown" -> s
                     .land()
                     .dispelHexes()
@@ -1151,6 +1249,15 @@ public final class Showcase {
                     .shot("online_era", 4)
                     .command("execute at @s run summon minecraft:tnt ^ ^ ^8 {fuse:30}")
                     .shot("online_blast", 44).shot("online_mending", 120).shot("online_mended", 200)
+                    // and winds a scene back over the network: a cow comes along, wanders off, and is gone again
+                    .command("execute at @s run summon minecraft:cow ^ ^ ^5 {Tags:[\"rw_walker\"],NoAI:1b}").then(minecraft -> {
+                    }, 30)
+                    .command("execute as @e[tag=rw_walker] at @s run tp @s ~4 ~ ~").then(minecraft -> {
+                    }, 20)
+                    .shot("online_before_rewind", 2)
+                    .remote(ShowrunnerPayload.REWIND, 1).shot("online_rewinding", 10).then(minecraft -> {
+                    }, 40)
+                    .remote(ShowrunnerPayload.REWIND, 0).shot("online_rewound", 10)
                     .command("scarlet hex dispel").then(minecraft -> {
                     }, 100)
                     .select(Spell.CHAOS_BOLT);
@@ -2266,6 +2373,88 @@ public final class Showcase {
                         }
                     }
                     Scarlet.LOG.info("Showcase [{}]: Hex cast from {}, player at {}{}", label, hex.center(), player.position(), columns);
+                });
+            }, 0);
+        }
+
+        /**
+         * Calls up an era, walks the cow off and back, and winds it all back, held from the remote or with the rewind key,
+         * photographing the picture as it winds.
+         */
+        Scene rewindIn(String era, String label, boolean byKey) {
+            Scene scene = command("execute as @a run scarlet hex era " + era).then(minecraft -> {
+            }, 90);
+            for (int step = 0; step < 3; step++) {
+                scene = scene.command("execute as @e[tag=rw_walker] at @s run tp @s ~2 ~ ~").then(minecraft -> {
+                }, 8);
+            }
+            scene = byKey ? scene.then(minecraft -> ScarletKeyMappings.REWIND.setDown(true), 0) : scene.remote(ShowrunnerPayload.REWIND, 1);
+            scene = scene.shot(label + "_a", 6).shot(label + "_b", 12).then(minecraft -> {
+            }, 14);
+            scene = byKey ? scene.then(minecraft -> ScarletKeyMappings.REWIND.setDown(false), 2) : scene.remote(ShowrunnerPayload.REWIND, 0);
+            return scene.then(minecraft -> {
+            }, 70);
+        }
+
+        /**
+         * Writes down in the log what the rewind scene left where, measured from the anchor: its creatures and how hurt,
+         * its blocks and the chest's apples, what lies on the ground and what the player holds.
+         */
+        Scene rewindLog(String label) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null || minecraft.player == null) {
+                    return;
+                }
+                java.util.UUID id = minecraft.player.getUUID();
+                Vec3 from = anchor;
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(id);
+                    if (player == null) {
+                        return;
+                    }
+                    net.minecraft.server.level.ServerLevel level = player.level();
+                    StringBuilder line = new StringBuilder();
+                    for (String tag : List.of("rw_walker", "rw_victim", "rw_hurt", "rw_newborn", "rw_thrown")) {
+                        List<Entity> tagged = level.getEntities((Entity) null, player.getBoundingBox().inflate(40), e -> e.entityTags().contains(tag));
+                        line.append("\n  ").append(tag).append(": ");
+                        if (tagged.isEmpty()) {
+                            line.append("gone");
+                            continue;
+                        }
+                        Entity entity = tagged.getFirst();
+                        Vec3 at = entity.position().subtract(from);
+                        line.append(String.format(java.util.Locale.ROOT, "at %.1f %.1f %.1f", at.x, at.y, at.z));
+                        if (entity instanceof net.minecraft.world.entity.LivingEntity living) {
+                            line.append(String.format(java.util.Locale.ROOT, ", health %.1f", living.getHealth()));
+                        }
+                    }
+                    for (int[] spot : new int[][] {{2, 0, -3}, {0, 0, -4}, {-2, 0, -3}, {1, 0, -2}}) {
+                        BlockPos pos = BlockPos.containing(from.add(spot[0], spot[1], spot[2]));
+                        line.append(String.format(java.util.Locale.ROOT, "\n  block %d %d %d: %s", spot[0], spot[1], spot[2],
+                                BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).getPath()));
+                        if (level.getBlockEntity(pos) instanceof net.minecraft.world.Container chest) {
+                            int apples = 0;
+                            for (int slot = 0; slot < chest.getContainerSize(); slot++) {
+                                apples += chest.getItem(slot).is(net.minecraft.world.item.Items.APPLE) ? chest.getItem(slot).getCount() : 0;
+                            }
+                            line.append(", ").append(apples).append(" apples in it");
+                        }
+                    }
+                    for (net.minecraft.world.entity.item.ItemEntity item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
+                            player.getBoundingBox().inflate(16))) {
+                        line.append("\n  lying: ").append(item.getItem().getCount()).append(' ')
+                                .append(BuiltInRegistries.ITEM.getKey(item.getItem().getItem()).getPath());
+                    }
+                    line.append("\n  carrying:");
+                    for (ItemStack carried : player.getInventory().getNonEquipmentItems()) {
+                        if (!carried.isEmpty()) {
+                            line.append(' ').append(carried.getCount()).append(' ').append(BuiltInRegistries.ITEM.getKey(carried.getItem()).getPath());
+                        }
+                    }
+                    Hex hex = Hexes.find(server, id);
+                    line.append("\n  hex: ").append(hex == null ? "none" : hex.phase().getSerializedName());
+                    Scarlet.LOG.info("Showcase [{}]:{}", label, line);
                 });
             }, 0);
         }

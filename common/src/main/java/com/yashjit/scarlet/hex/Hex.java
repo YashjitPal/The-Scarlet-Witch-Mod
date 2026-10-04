@@ -94,6 +94,13 @@ public final class Hex {
     HexSky sky = HexSky.WORLD;
     /** The blocks its caster has restyled. */
     final HexPaint paint;
+    /** The last ten seconds inside it, kept while it stands for its caster to rewind. Not saved. */
+    @Nullable HexTape tape;
+    /** Whether its caster is winding it back right now, and since when. */
+    boolean rewinding;
+    long rewindSince;
+    /** When it can be wound back again, resting after the last time. */
+    long rewindReadyAt;
 
     Hex(UUID caster, String casterName, Vec3 center, float radius, Era era, String name, Phase phase, long phaseSince, float phaseRadius) {
         this(caster, casterName, center, radius, era, name, phase, phaseSince, phaseRadius, new HexPaint());
@@ -170,7 +177,7 @@ public final class Hex {
 
     HexSnapshot snapshot() {
         return new HexSnapshot(caster, casterName, center, radius, era.ordinal(), name, phase.ordinal(), phaseSince, phaseRadius, eraSince,
-                previousEra.ordinal(), episode, season, tearAt, opening, parting, stress, stressAt, sky, episodes);
+                previousEra.ordinal(), episode, season, tearAt, opening, parting, stress, stressAt, sky, episodes, rewinding, rewindSince);
     }
 
     public float unrest(double now) {

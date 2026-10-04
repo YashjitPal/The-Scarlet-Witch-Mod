@@ -11,7 +11,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * A press on the Showrunner's remote: the caster changing something about their Hex, or what their next one builds.
  *
  * @param action one of the constants below
- * @param value  what it is changed to: an ordinal, or 0 or 1 for episodes
+ * @param value  what it is changed to: an ordinal, or 0 or 1 for episodes and rewind
  * @param text   the new name, for {@link #NAME}
  */
 public record ShowrunnerPayload(int action, int value, String text) implements CustomPacketPayload {
@@ -23,6 +23,8 @@ public record ShowrunnerPayload(int action, int value, String text) implements C
     public static final int NAME = 4;
     /** What the caster's next Hex builds as it spreads. */
     public static final int BUILD = 5;
+    /** Rewind held, 1, or let go, 0. */
+    public static final int REWIND = 6;
 
     public static final Type<ShowrunnerPayload> TYPE = new Type<>(Scarlet.id("showrunner"));
     public static final StreamCodec<RegistryFriendlyByteBuf, ShowrunnerPayload> STREAM_CODEC = StreamCodec.composite(

@@ -39,6 +39,7 @@ import com.yashjit.scarlet.client.hex.LaughTrack;
 import com.yashjit.scarlet.client.hex.OutfitLayer;
 import com.yashjit.scarlet.client.hex.Outfits;
 import com.yashjit.scarlet.client.hex.ResidentsClient;
+import com.yashjit.scarlet.client.hex.RewindClient;
 import com.yashjit.scarlet.client.hex.TitleCard;
 import com.yashjit.scarlet.client.hex.Remnants;
 import com.yashjit.scarlet.client.hex.TownSlips;
@@ -145,6 +146,7 @@ public final class ScarletClient {
         platform.registerHud(Scarlet.id("dreamwalk"), DreamFx::render);
         platform.registerHud(Scarlet.id("magic"), MagicHud::render);
         platform.registerHud(Scarlet.id("title_card"), TitleCard::render);
+        platform.registerHud(Scarlet.id("rewind"), RewindClient::render);
         platform.registerHud(Scarlet.id("mist"), MistFx::render);
         platform.registerHud(Scarlet.id("hex_burst"), Founding::render);
         platform.liftStatusBars(MagicHud::lift);
@@ -192,6 +194,7 @@ public final class ScarletClient {
             }
         }
         HexClient.tick(minecraft);
+        RewindClient.tick(minecraft);
         HexSkyClient.tick(minecraft);
         HomePlacement.tick(minecraft);
         Founding.tick(minecraft);

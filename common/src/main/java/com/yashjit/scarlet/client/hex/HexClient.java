@@ -145,7 +145,7 @@ public final class HexClient {
         for (HexSnapshot hex : Hexes.clientHexes()) {
             Wall wall = WALLS.computeIfAbsent(hex.caster(), id -> new Wall(hex.radius()));
             float radius = radius(hex, wall, now);
-            float flare = flare(hex, now, wall.speed(now));
+            float flare = flare(hex, now, wall.speed(now), !HexShape.contains(hex.center(), radius, camera));
             wall.flare = Ease.damp(wall.flare, flare, flare > wall.flare ? FLARE_RISE : FLARE_FALL, seconds);
             if (radius < 0.05F) {
                 continue;
@@ -190,17 +190,19 @@ public final class HexClient {
     }
 
     /**
-     * How brightly the wall's front should burn: as it spreads and as it falls, and while it is being resized.
+     * How brightly the wall's front should burn: as it spreads and as it falls, while it is being resized, and, seen from
+     * outside, while its caster winds it back. Inside, the picture itself shows the rewind.
      *
-     * @param speed blocks a tick the wall is gliding at
+     * @param speed   blocks a tick the wall is gliding at
+     * @param outside whether it is seen from outside
      */
-    private static float flare(HexSnapshot hex, double now, float speed) {
+    private static float flare(HexSnapshot hex, double now, float speed, boolean outside) {
         float t = (float) (now - hex.phaseSince());
         return switch (hex.phaseValue()) {
             case FOUNDING -> 0.0F;
             case SPREADING -> 1.0F - Ease.clamp01(t / Hexes.SPREAD_TICKS) * 0.8F;
             case COLLAPSING -> 0.6F + 0.4F * Ease.clamp01(t / Hexes.collapseTicks(hex.phaseRadius()));
-            default -> 0.6F * Math.min(1.0F, speed / (Hexes.RESIZE_SPEED * Hexes.SHRINK_SHARE));
+            default -> Math.max(hex.rewinding() && outside ? 0.95F : 0.0F, 0.6F * Math.min(1.0F, speed / (Hexes.RESIZE_SPEED * Hexes.SHRINK_SHARE)));
         };
     }
 

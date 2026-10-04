@@ -7,6 +7,7 @@ import com.yashjit.scarlet.hex.town.HomeRemnant;
 import com.yashjit.scarlet.hex.town.Restyle;
 import com.yashjit.scarlet.hex.town.TownMemory;
 import com.yashjit.scarlet.hex.town.TownPlan;
+import com.yashjit.scarlet.config.ScarletServerConfig;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.network.HexSyncPayload;
 import com.yashjit.scarlet.platform.Services;
@@ -75,6 +76,10 @@ public final class Hexes {
      */
     public static final int LAND_TICKS = 20;
     public static final int LANDING_TICKS = LAND_TICKS + 6;
+    /** Energy for each tick a rewind winds back: 3 a second of tape. */
+    private static final float REWIND_COST = 0.15F;
+    /** Ticks a rewind rests once it ends. */
+    private static final int REWIND_REST_TICKS = 60;
     /** How near where their home stood a caster must cast over a town of theirs again for it to rise around them there. */
     public static final double HOME_RECALL = 16.0;
     /** How far off a caster can raise their home again inside their Hex, as far as they can aim. */
@@ -171,6 +176,10 @@ public final class Hexes {
      * @return whether a Hex was cast; a caster with one standing anywhere cannot cast another
      */
     public static boolean cast(ServerPlayer player, long now) {
+        return HexTape.offTape(() -> castHex(player, now));
+    }
+
+    private static boolean castHex(ServerPlayer player, long now) {
         ServerLevel level = player.level();
         if (find(level.getServer(), player.getUUID()) != null) {
             return false;
@@ -389,6 +398,10 @@ public final class Hexes {
      * it goes up there instead. A Hex that builds nothing builds just their home from then on.
      */
     public static void raiseHome(ServerPlayer player, TownPlan.HomeLot lot) {
+        HexTape.offTape(() -> raiseHomeOffTape(player, lot));
+    }
+
+    private static void raiseHomeOffTape(ServerPlayer player, TownPlan.HomeLot lot) {
         ServerLevel level = player.level();
         HexData data = HexData.of(level);
         Hex hex = data.byCaster(player.getUUID());
@@ -633,6 +646,7 @@ public final class Hexes {
         tickRemnants(level, data, now);
         HexDecor.tick(level, data, now);
         if (data.all().isEmpty()) {
+            HexTape.gather(level, data.all());
             return;
         }
         List<Hex> fallen = new ArrayList<>();
@@ -746,10 +760,99 @@ public final class Hexes {
                     data.setDirty();
                 }
             }
+            tape(level, data, hex, caster, crowned, now);
         }
         for (Hex hex : fallen) {
             takeDownTown(level, data, hex);
             data.remove(hex);
+        }
+        HexTape.gather(level, data.all());
+    }
+
+    /**
+     * Keeps a standing Hex's tape running, and winds it back while its caster holds rewind: faster the longer they hold
+     * it, for as long as there is tape left and they have the energy to wind it.
+     */
+    private static void tape(ServerLevel level, HexData data, Hex hex, @Nullable ServerPlayer caster, boolean crowned, long now) {
+        if (hex.phase != Hex.Phase.STANDING || !ScarletServerConfig.get().rewind) {
+            dropTape(level, data, hex, now);
+            return;
+        }
+        if (hex.tape == null) {
+            hex.tape = new HexTape(hex);
+        }
+        if (!hex.rewinding) {
+            hex.tape.advance();
+            return;
+        }
+        if (caster == null || !crowned || caster.level() != level) {
+            stopRewind(level, data, hex, now);
+            return;
+        }
+        float gathered = Math.min(1.0F, (now - hex.rewindSince) / (float) HexTape.GATHER_TICKS);
+        int speed = 1 + Math.round((HexTape.TOP_SPEED - 1) * gathered);
+        int affordable = caster.isCreative() ? speed : (int) (Magic.energy(caster, now) / REWIND_COST);
+        int wound = hex.tape.windBack(level, Math.min(speed, affordable));
+        if (wound > 0 && !caster.isCreative()) {
+            Magic.spend(caster, wound * REWIND_COST, now);
+        }
+        if (wound < speed || hex.tape.left() <= 0) {
+            // out of tape, or of the energy to wind it
+            stopRewind(level, data, hex, now);
+        }
+    }
+
+    /**
+     * The caster holds rewind, or lets go of it.
+     */
+    public static void rewind(ServerPlayer player, boolean hold) {
+        ServerLevel level = player.level();
+        HexData data = HexData.of(level);
+        Hex hex = data.byCaster(player.getUUID());
+        if (hex == null) {
+            return;
+        }
+        long now = level.getGameTime();
+        if (!hold) {
+            stopRewind(level, data, hex, now);
+            return;
+        }
+        if (hex.rewinding || hex.phase != Hex.Phase.STANDING || hex.tape == null || hex.tape.left() <= 0 || now < hex.rewindReadyAt
+                || !player.isCreative() && Magic.energy(player, now) < REWIND_COST) {
+            return;
+        }
+        hex.tape.beginRewind(level);
+        hex.rewinding = true;
+        hex.rewindSince = now;
+        data.changed();
+    }
+
+    private static void stopRewind(ServerLevel level, HexData data, Hex hex, long now) {
+        if (!hex.rewinding) {
+            return;
+        }
+        if (hex.tape != null) {
+            HexTape tape = hex.tape;
+            HexTape.offTape(() -> tape.endRewind(level));
+        }
+        hex.rewinding = false;
+        hex.rewindReadyAt = now + REWIND_REST_TICKS;
+        data.changed();
+    }
+
+    private static void dropTape(ServerLevel level, HexData data, Hex hex, long now) {
+        stopRewind(level, data, hex, now);
+        hex.tape = null;
+    }
+
+    /**
+     * Ends every rewind running in a level, as it is about to be saved, so nothing stood still by one is saved that way.
+     */
+    public static void stopRewinds(ServerLevel level) {
+        HexData data = HexData.of(level);
+        long now = level.getGameTime();
+        for (Hex hex : data.all()) {
+            stopRewind(level, data, hex, now);
         }
     }
 
@@ -766,14 +869,19 @@ public final class Hexes {
      * Takes down every Hex in a dimension at once, without the fall, and any homes fallen ones have left standing.
      */
     public static void dispelAll(ServerLevel level) {
-        HexData data = HexData.of(level);
-        for (Hex hex : List.copyOf(data.all())) {
-            takeDownTown(level, data, hex);
-            data.remove(hex);
-        }
-        for (HomeRemnant remnant : List.copyOf(data.remnants())) {
-            finish(level, data, remnant);
-        }
+        HexTape.offTape(() -> {
+            HexData data = HexData.of(level);
+            long now = level.getGameTime();
+            for (Hex hex : List.copyOf(data.all())) {
+                dropTape(level, data, hex, now);
+                takeDownTown(level, data, hex);
+                data.remove(hex);
+            }
+            for (HomeRemnant remnant : List.copyOf(data.remnants())) {
+                finish(level, data, remnant);
+            }
+            HexTape.gather(level, data.all());
+        });
     }
 
     /**
