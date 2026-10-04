@@ -21,6 +21,11 @@ public final class CastGestures {
     private static final float STRIKE_END = 2.0F;
     private static final float HOLD_END = 4.5F;
     private static final float RECOVER_END = 12.0F;
+    /**
+     * Where in a strike its magic leaves the palm: once the thrust has the arm at full reach, as the blast leaves from
+     * there. At the end of the wind-up the hand is still drawn back low at the side.
+     */
+    private static final float RELEASE = WIND_UP + (STRIKE_END - WIND_UP) * 0.55F;
 
     private static final Int2ObjectMap<Track> TRACKS = new Int2ObjectOpenHashMap<>();
 
@@ -62,7 +67,7 @@ public final class CastGestures {
      */
     public static double releaseTime(Player player, HumanoidArm arm) {
         Track track = track(player);
-        return (arm == HumanoidArm.RIGHT ? track.rightStart : track.leftStart) + WIND_UP;
+        return (arm == HumanoidArm.RIGHT ? track.rightStart : track.leftStart) + RELEASE;
     }
 
     /**
