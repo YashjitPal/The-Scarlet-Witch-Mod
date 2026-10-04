@@ -826,14 +826,15 @@ public final class HexTown {
                 : adopted ? Houses.around(frame, survey.ground(), survey::height, occupied)
                 : blueprint(part, survey, clip != WHOLE, occupied);
         List<Piece> pieces = blueprint.schedule();
-        // the caster floats in the middle of their home as it rises around them; nothing goes where they are
+        // the caster floats in the middle of their home as it rises around them; nothing goes where they are but the rug
+        // they come down onto, which lies lower than they float
         BlockPos caster = BlockPos.containing(hexCenter);
         int floor = caster.getY() + 1;
         boolean home = part.kind() == Kind.HOME && homeShift > 0 && founding;
         pieces.removeIf(piece -> survey.isBlocked(part, piece.pos()) || !within(hexCenter, clip, piece.pos())
                 || standing.contains(piece.pos().asLong())
                 || home && piece.pos().getX() == caster.getX() && piece.pos().getZ() == caster.getZ() && piece.pos().getY() >= floor
-                && piece.pos().getY() <= floor + 2 && piece.role() != Role.CLEAR);
+                && piece.pos().getY() <= floor + 2 && piece.role() != Role.CLEAR && piece.role() != Role.RUG);
         // whatever of this part stood here before and isn't in what it will be now gives way too
         LongOpenHashSet planned = new LongOpenHashSet();
         for (Piece piece : pieces) {
