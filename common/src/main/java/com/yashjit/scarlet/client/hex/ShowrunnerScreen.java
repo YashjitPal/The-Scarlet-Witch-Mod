@@ -95,28 +95,29 @@ public final class ShowrunnerScreen extends Screen {
         keys.clear();
         int x0 = left();
         int y0 = top();
-        String[] eras = {"50s", "60s", "70s", "80s", "00s", "Now"};
-        for (int i = 0; i < Era.values().length && i < eras.length; i++) {
+        Era[] eras = Era.values();
+        for (int i = 0; i < eras.length; i++) {
             int value = i;
-            keys.add(new Key(x0 + 6 + i * 26, y0 + ERA_ROW, 24, 16, eras[i], ShowrunnerPayload.ERA, value, true,
+            keys.add(new Key(x0 + 6 + i * 26, y0 + ERA_ROW, 24, 16, label("era", eras[i].getSerializedName()), ShowrunnerPayload.ERA, value, true,
                     () -> own() == null ? -1 : own().era()));
         }
-        keys.add(new Key(x0 + WIDTH - 50, y0 + EPISODE_ROW, 44, 14, "", ShowrunnerPayload.EPISODES, -1, true,
+        keys.add(new Key(x0 + WIDTH - 50, y0 + EPISODE_ROW, 44, 14, Component.empty(), ShowrunnerPayload.EPISODES, -1, true,
                 () -> own() != null && own().episodes() ? 1 : 0));
-        keys.add(new Key(x0 + WIDTH - 50, y0 + HOME_ROW, 44, 14, "Raise", RAISE_HOME, 0, true, () -> -1));
-        String[] hours = {"Real", "Dawn", "Noon", "Dusk", "Night"};
-        for (int i = 0; i < HexSky.Time.values().length; i++) {
-            keys.add(new Key(x0 + 6 + i * 31, y0 + TIME_ROW, 29, 14, hours[i], ShowrunnerPayload.TIME, i, true,
+        keys.add(new Key(x0 + WIDTH - 50, y0 + HOME_ROW, 44, 14, Component.translatable("showrunner.scarlet.raise"), RAISE_HOME, 0, true, () -> -1));
+        HexSky.Time[] hours = HexSky.Time.values();
+        for (int i = 0; i < hours.length; i++) {
+            keys.add(new Key(x0 + 6 + i * 31, y0 + TIME_ROW, 29, 14, label("time", hours[i].getSerializedName()), ShowrunnerPayload.TIME, i, true,
                     () -> own() == null ? -1 : own().sky().time().ordinal()));
         }
-        String[] weathers = {"Real", "Clear", "Rain", "Storm"};
-        for (int i = 0; i < HexSky.Weather.values().length; i++) {
-            keys.add(new Key(x0 + 6 + i * 39, y0 + WEATHER_ROW, 37, 14, weathers[i], ShowrunnerPayload.WEATHER, i, true,
-                    () -> own() == null ? -1 : own().sky().weather().ordinal()));
+        HexSky.Weather[] weathers = HexSky.Weather.values();
+        for (int i = 0; i < weathers.length; i++) {
+            keys.add(new Key(x0 + 6 + i * 39, y0 + WEATHER_ROW, 37, 14, label("weather", weathers[i].getSerializedName()), ShowrunnerPayload.WEATHER, i,
+                    true, () -> own() == null ? -1 : own().sky().weather().ordinal()));
         }
-        String[] builds = {"Town", "Home", "None", "Orchard"};
-        for (int i = 0; i < HexBuild.values().length && i < builds.length; i++) {
-            keys.add(new Key(x0 + 6 + i * 39, y0 + BUILD_ROW, 37, 14, builds[i], ShowrunnerPayload.BUILD, i, false, this::nextBuild));
+        HexBuild[] builds = HexBuild.values();
+        for (int i = 0; i < builds.length; i++) {
+            keys.add(new Key(x0 + 6 + i * 39, y0 + BUILD_ROW, 37, 14, label("build", builds[i].getSerializedName()), ShowrunnerPayload.BUILD, i, false,
+                    this::nextBuild));
         }
         EditBox box = new EditBox(font, x0 + 8, y0 + NAME_ROW + 5, WIDTH - 16, 14, Component.translatable("showrunner.scarlet.name"));
         box.setMaxLength(Hex.MAX_NAME_LENGTH);
@@ -257,11 +258,12 @@ public final class ShowrunnerScreen extends Screen {
             float glow = 0.5F + 0.2F * Mth.sin((float) now * 0.2F + key.x());
             graphics.fill(key.x() + 2, key.y() + 1, key.x() + key.width() - 2, key.y() + 2, ARGB.color(alpha * glow, ScarletPalette.BRIGHT_SCARLET));
         }
-        String text = key.action() == ShowrunnerPayload.EPISODES ? (current(key) == 1 ? "On" : "Off") : key.label();
+        Component text = key.action() == ShowrunnerPayload.EPISODES
+                ? Component.translatable(current(key) == 1 ? "showrunner.scarlet.on" : "showrunner.scarlet.off") : key.label();
         graphics.pose().pushMatrix();
         graphics.pose().translate(key.x() + key.width() / 2.0F, key.y() + (key.height() - 1) / 2.0F - 2.5F);
         graphics.pose().scale(0.75F);
-        graphics.centeredText(font, Component.literal(text), 0, 0, ARGB.color(alpha, lit ? ScarletPalette.CORE : TEXT));
+        graphics.centeredText(font, text, 0, 0, ARGB.color(alpha, lit ? ScarletPalette.CORE : TEXT));
         graphics.pose().popMatrix();
     }
 
@@ -364,10 +366,17 @@ public final class ShowrunnerScreen extends Screen {
     }
 
     /**
+     * A button's own short label, kept apart from the longer names used elsewhere so it fits on the button.
+     */
+    private static Component label(String row, String value) {
+        return Component.translatable("showrunner.scarlet." + row + "." + value);
+    }
+
+    /**
      * @param needsHex whether it only does anything while the caster's Hex stands
      * @param current  what its row stands at now, to light the one in effect
      */
-    private record Key(int x, int y, int width, int height, String label, int action, int value, boolean needsHex, IntSupplier current) {
+    private record Key(int x, int y, int width, int height, Component label, int action, int value, boolean needsHex, IntSupplier current) {
 
         boolean contains(int mouseX, int mouseY) {
             return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
