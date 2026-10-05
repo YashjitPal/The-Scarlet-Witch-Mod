@@ -144,12 +144,19 @@ public final class ScarletClient {
         platform.registerHud(Scarlet.id("corruption"), CorruptionClient::render);
         platform.registerHud(Scarlet.id("mind_control"), MindControlFx::render);
         platform.registerHud(Scarlet.id("dreamwalk"), DreamFx::render);
-        platform.registerHud(Scarlet.id("magic"), MagicHud::render);
+        platform.registerHud(Scarlet.id("magic"), (graphics, deltaTracker) -> {
+            if (!Showcase.overlaysOnly()) {
+                MagicHud.render(graphics, deltaTracker);
+            }
+        });
         platform.registerHud(Scarlet.id("title_card"), TitleCard::render);
         platform.registerHud(Scarlet.id("rewind"), RewindClient::render);
         platform.registerHud(Scarlet.id("mist"), MistFx::render);
         platform.registerHud(Scarlet.id("hex_burst"), Founding::render);
         platform.liftStatusBars(MagicHud::lift);
+        if (Showcase.enabled()) {
+            platform.hideVanillaHud(Showcase::overlaysOnly);
+        }
         platform.onSubmitWorldGeometry(ScarletFx::submit);
         platform.onSubmitWorldGeometry(BoltFx::submit);
         platform.onSubmitWorldGeometry(ShieldFx::submit);

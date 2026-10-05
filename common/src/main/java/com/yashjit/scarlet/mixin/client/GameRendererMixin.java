@@ -3,6 +3,7 @@ package com.yashjit.scarlet.mixin.client;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.yashjit.scarlet.client.dev.ShowcaseRecorder;
 import com.yashjit.scarlet.client.hex.HexScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
@@ -44,5 +45,10 @@ abstract class GameRendererMixin {
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;applyPostEffects()V"))
     private void scarlet$drawHexes(CallbackInfo ci) {
         HexScreen.render(mainRenderTarget, hud3DTarget);
+    }
+
+    @Inject(method = "render", at = @At("TAIL"))
+    private void scarlet$filmTheFrame(CallbackInfo ci) {
+        ShowcaseRecorder.frameEnded(mainRenderTarget);
     }
 }

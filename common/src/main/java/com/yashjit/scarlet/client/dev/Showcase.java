@@ -2,6 +2,7 @@ package com.yashjit.scarlet.client.dev;
 
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.client.ScarletKeyMappings;
+import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.anim.FirstPersonGestures;
 import com.yashjit.scarlet.client.config.SettingsScreen;
 import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
@@ -30,6 +31,8 @@ import com.mojang.serialization.Lifecycle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -42,8 +45,12 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -64,8 +71,11 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -78,7 +88,13 @@ import org.jspecify.annotations.Nullable;
  */
 public final class Showcase {
 
-    private static final String WORLD = "scarlet-showcase";
+    /**
+     * Films are made in a world of ordinary land grown from a seed of its own, given by {@code -PshowcaseFilm}; other
+     * scenes play on flat test ground.
+     */
+    private static final boolean FILM_WORLD = "film".equals(System.getProperty("scarlet.showcase.world"));
+    private static final String WORLD = FILM_WORLD ? "scarlet-film" : "scarlet-showcase";
+    private static final long FILM_SEED = 20261004L;
     private static final @Nullable String SCENE = System.getProperty("scarlet.showcase");
     private static final boolean QUIT = Boolean.getBoolean("scarlet.showcase.quit");
     /** A server to play the scene on instead of the test world, given by {@code -PshowcaseServer=<address>}. */
@@ -93,11 +109,17 @@ public final class Showcase {
     private static int index;
     private static List<Step> steps = List.of();
     private static @Nullable ArmorStand camera;
+    /** A camera move under way, the free camera put along its path each tick as the steps go on. */
+    private static @Nullable Move move;
     private static @Nullable Entity subject;
     /** Where the player stood when a scene marked it, for views and aims placed from there. */
     private static Vec3 anchor = Vec3.ZERO;
     private static @Nullable Boolean savedImprovedTransparency;
     private static @Nullable BackupConfirmScreen answeredPrompt;
+    /** While a film wants only the mod's own overlays over the picture, the rest of the HUD left undrawn. */
+    private static boolean overlaysOnly;
+    /** How far ahead of whoever an orbit circles it looks, so that what they face is in the shot with them. */
+    private static double lookAhead;
 
     private Showcase() {
     }
@@ -108,6 +130,10 @@ public final class Showcase {
 
     public static boolean isFreeCameraActive() {
         return camera != null && Minecraft.getInstance().getCameraEntity() == camera;
+    }
+
+    public static boolean overlaysOnly() {
+        return overlaysOnly;
     }
 
     /**
@@ -148,6 +174,7 @@ public final class Showcase {
         if (minecraft.gui.screen() instanceof PauseScreen) {
             minecraft.gui.setScreen(null);
         }
+        advanceMove(minecraft);
         if (wait > 0) {
             wait--;
             return;
@@ -166,6 +193,56 @@ public final class Showcase {
         Step step = steps.get(index++);
         step.action().accept(minecraft);
         wait = step.waitAfter();
+    }
+
+    /**
+     * Starts a camera move, putting the camera at its start at once.
+     */
+    private static void startMove(Minecraft minecraft, int ticks, Path path) {
+        Move started = new Move(Math.max(1, ticks), path);
+        move = started;
+        path.place(minecraft, 0.0F, true);
+        started.tick = 1;
+    }
+
+    /**
+     * Moves the camera on along its path. Once through, it stands still where it ended, its last place and this one
+     * the same, as anything drawn between the two would shake.
+     */
+    private static void advanceMove(Minecraft minecraft) {
+        Move moving = move;
+        if (moving == null) {
+            return;
+        }
+        if (moving.tick > moving.ticks) {
+            if (camera != null) {
+                camera.setOldPosAndRot();
+                camera.yHeadRotO = camera.getYHeadRot();
+            }
+            move = null;
+            return;
+        }
+        moving.path.place(minecraft, Ease.inOutCubic(moving.tick / (float) moving.ticks), false);
+        moving.tick++;
+    }
+
+    /**
+     * Where a camera move puts the camera, {@code t} of the way along it.
+     */
+    @FunctionalInterface
+    private interface Path {
+        void place(Minecraft minecraft, float t, boolean first);
+    }
+
+    private static final class Move {
+        final int ticks;
+        final Path path;
+        int tick;
+
+        Move(int ticks, Path path) {
+            this.ticks = ticks;
+            this.path = path;
+        }
     }
 
     private static void handOver(Minecraft minecraft) {
@@ -231,8 +308,10 @@ public final class Showcase {
         }
         LevelSettings settings = new LevelSettings(WORLD, GameType.CREATIVE,
                 new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true, WorldDataConfiguration.DEFAULT);
-        minecraft.createWorldOpenFlows().createFreshLevel(WORLD, settings, WorldOptions.testWorldWithRandomSeed(),
-                WorldPresets::createTestWorldDimensions, new TitleScreen());
+        WorldOptions options = FILM_WORLD ? new WorldOptions(FILM_SEED, false, false) : WorldOptions.testWorldWithRandomSeed();
+        Function<HolderLookup.Provider, WorldDimensions> dimensions = FILM_WORLD ? WorldPresets::createNormalWorldDimensions
+                : WorldPresets::createTestWorldDimensions;
+        minecraft.createWorldOpenFlows().createFreshLevel(WORLD, settings, options, dimensions, new TitleScreen());
     }
 
     /**
@@ -281,6 +360,9 @@ public final class Showcase {
                 minecraft.setCameraEntity(minecraft.player);
             }
             subject = null;
+            move = null;
+            overlaysOnly = false;
+            lookAhead = 0.0;
         }, 0);
         s.command("time set noon").command("weather clear").camera(CameraType.THIRD_PERSON_FRONT).hideHud(true);
         switch (name) {
@@ -333,6 +415,323 @@ public final class Showcase {
                     .command("time set noon")
                     .playerCamera().hideHud(false).shot("first_person", 12).hideHud(true)
                     .look(3.2, 25, 6, 1.0).suitUp().shot("dismiss_a", 8).shot("dismiss_b", 8).shot("dismiss_done", 20);
+            // films for the mod page and the trailer, made with -PshowcaseFilm: each on ground of its own, far from the
+            // others, at film size, with the clock stepping a frame at a time while they roll
+            case "film_suit" -> s
+                    .filmSet("plains", 7500, 0, 11000)
+                    .levelGround(6, 6, 6, 6)
+                    .orbit(2.5, -40, -40, 2, 1.0, 1).film(20)
+                    .roll("suit_up")
+                    // drawing slowly in across the front as the threads spiral up and the crown flares
+                    .orbit(2.5, 2.0, -40, 30, 2, 8, 1.0, 140)
+                    .film(24).suitUp().film(116)
+                    .orbit(2.0, 2.7, 30, 75, 8, 4, 1.05, 110)
+                    .film(60).suitUp().film(50)
+                    .cut();
+            case "film_bolt" -> s
+                    .filmSet("plains", 5000, 0, 6000)
+                    .suited()
+                    .command("gamemode survival @a")
+                    .command("difficulty easy")
+                    .select(Spell.CHAOS_BOLT)
+                    // husks, as the sun never burns them, coming on from ahead
+                    .command("execute at @a run summon minecraft:husk ~-1.5 ~ ~13 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~2 ~ ~15 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~-0.5 ~ ~17 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    // over her shoulder, the blasts flying off at what comes on
+                    .orbit(3.6, 3.2, 152, 160, 7, 5, 1.55, 110).film(8)
+                    .roll("chaos_bolt")
+                    .film(14)
+                    .aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap()
+                    .aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap()
+                    .film(10)
+                    // and from in front, her hands throwing them
+                    .orbit(4.2, 3.8, 62, 48, 4, 3, 1.25, 130)
+                    .aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap()
+                    .aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap()
+                    .aimAtNearest("minecraft:husk").tap().aimAtNearest("minecraft:husk").tap()
+                    .film(50)
+                    .cut()
+                    .command("gamemode creative @a");
+            case "film_shield" -> s
+                    .filmSet("plains", 5000, 0, 6000)
+                    .suited()
+                    .command("gamemode survival @a")
+                    .command("difficulty easy")
+                    .select(Spell.CHAOS_SHIELD)
+                    .command("execute at @a run summon minecraft:skeleton ~-2 ~ ~10 {PersistenceRequired:1b,Rotation:[180f,0f],"
+                            + "equipment:{head:{id:\"minecraft:iron_helmet\",count:1},mainhand:{id:\"minecraft:bow\",count:1}}}")
+                    .command("execute at @a run summon minecraft:skeleton ~2.5 ~ ~11 {PersistenceRequired:1b,Rotation:[180f,0f],"
+                            + "equipment:{head:{id:\"minecraft:iron_helmet\",count:1},mainhand:{id:\"minecraft:bow\",count:1}}}")
+                    // raised before her, from the front
+                    .orbit(3.6, 3.2, 25, 45, 6, 4, 1.3, 70).film(6)
+                    .roll("chaos_shield")
+                    .film(8).hold(true).film(56)
+                    // over her shoulder, the arrows striking the disc and flung back
+                    .orbit(3.4, 3.0, 148, 160, 8, 6, 1.5, 150)
+                    .film(150).hold(false).film(14)
+                    .cut()
+                    .command("gamemode creative @a");
+            case "film_levitate" -> s
+                    .filmSet("plains", 7500, 0, 6000)
+                    .levelGround(9, 9, 7, 12)
+                    .suited()
+                    .command("gamemode survival @a")
+                    .select(Spell.CHAOS_BOLT)
+                    // from low on the ground, looking up as she lifts away from it; a third press of jump inside the
+                    // double tap's window would set her down again, so the climb waits
+                    .glide(new Vec3(-2.2, 1.0, 3.4), new Vec3(0, 1.1, 0), new Vec3(-3.8, 1.3, 5.4), new Vec3(0, 5.4, 1), 70).film(4)
+                    .roll("levitation")
+                    .film(10).jumpTap().jumpTap().film(12)
+                    .then(minecraft -> minecraft.options.keyJump.setDown(true), 10)
+                    .then(minecraft -> minecraft.options.keyJump.setDown(false), 10)
+                    // flying on, casting in the air, the camera going with her
+                    .orbit(5.0, 4.4, 150, 118, 6, 2, 1.0, 130)
+                    .walk(true).film(20).tap().tap().tap().tap().film(10).walk(false).film(46)
+                    .cut()
+                    .jumpTap().jumpTap().film(40)
+                    .command("gamemode creative @a");
+            case "film_telekinesis" -> s
+                    .filmSet("plains", 7500, 0, 6000)
+                    .suited()
+                    .select(Spell.TELEKINESIS)
+                    .command("execute at @a run summon minecraft:cow ~ ~ ~5 {PersistenceRequired:1b,Rotation:[90f,0f]}")
+                    .film(10).aimAtNearest("minecraft:cow")
+                    // from her right, the two of them in the shot as the cow goes up and is flung off
+                    .glide(new Vec3(-7.0, 2.0, 0.8), new Vec3(0, 1.3, 2.6), new Vec3(-6.4, 3.2, 3.8), new Vec3(0.6, 2.8, 3.0), 190).film(4)
+                    .roll("telekinesis")
+                    .film(10).hold(true).film(24)
+                    // up into the air, swung aside, and thrown
+                    .sweep(0, -32, 26).film(16)
+                    .sweep(-35, 0, 16)
+                    .then(minecraft -> TelekinesisClient.attack(), 0).film(40)
+                    .hold(false).film(20)
+                    .cut();
+            case "film_mist" -> s
+                    .filmSet("plains", 7500, 0, 6000)
+                    .levelGround(16, 4, 4, 12)
+                    .suited()
+                    .select(Spell.RED_MIST)
+                    .face(90, 0)
+                    // from the side, drifting along with her as she goes twelve blocks and back
+                    .glide(new Vec3(-3.5, 2.0, 9.0), new Vec3(-6, 1.2, 0), new Vec3(-8.5, 2.4, 8.5), new Vec3(-6, 1.2, 0), 190)
+                    .roll("red_mist")
+                    .film(24).tap().film(50)
+                    .sweep(180, 0, 14).film(16)
+                    .tap().film(60)
+                    .cut();
+            case "film_shockwave" -> s
+                    .filmSet("plains", 5000, 0, 6000)
+                    .suited()
+                    .command("gamemode survival @a")
+                    .command("difficulty easy")
+                    .select(Spell.SHOCKWAVE)
+                    .command("execute at @a run summon minecraft:husk ~3.5 ~ ~0 {PersistenceRequired:1b,Rotation:[90f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~2.5 ~ ~2.5 {PersistenceRequired:1b,Rotation:[135f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~0 ~ ~3.5 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~-2.5 ~ ~2.5 {PersistenceRequired:1b,Rotation:[225f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~-3.5 ~ ~0 {PersistenceRequired:1b,Rotation:[270f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~-2.5 ~ ~-2.5 {PersistenceRequired:1b,Rotation:[315f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~0 ~ ~-3.5 {PersistenceRequired:1b,Rotation:[0f,0f]}")
+                    .command("execute at @a run summon minecraft:husk ~2.5 ~ ~-2.5 {PersistenceRequired:1b,Rotation:[45f,0f]}")
+                    .orbit(9.5, 30, 30, 24, 1.0, 1).film(10)
+                    .roll("shockwave")
+                    .orbit(9.5, 8.0, 30, 75, 24, 16, 1.0, 120)
+                    .film(26)
+                    // the blast in slow motion
+                    .filmSpeed(0.5F).tap().film(36)
+                    .filmSpeed(1.0F).film(50)
+                    .cut()
+                    .command("gamemode creative @a");
+            case "film_mind" -> s
+                    .filmSet("plains", 5000, 0, 6000)
+                    .suited()
+                    .command("difficulty easy")
+                    .select(Spell.MIND_CONTROL)
+                    .command("execute at @a run summon minecraft:husk ~ ~ ~6 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    // from her right, both her and what she takes hold of in the shot
+                    .lookAhead(3.0).orbit(6.5, 6.0, 78, 66, 8, 6, 1.5, 40).film(4)
+                    .roll("mind_control")
+                    .film(8)
+                    // tendrils into its head, a crown of light, its eyes kindling
+                    .hold(true).film(32)
+                    // then out through its eyes, looking back at her; turned away, and walked off
+                    .dreamCamera().film(30).turnHeld(180.0F).film(16)
+                    .walk(true).film(30).walk(false)
+                    // and from outside: the thread from brow to brow
+                    .look(8.5, 120, 12, 1.3).film(50)
+                    .hold(false).film(16)
+                    .cut();
+            case "film_rune" -> s
+                    .filmSet("plains", 5000, 0, 6000)
+                    .suited()
+                    .command("gamemode survival @a")
+                    .command("difficulty easy")
+                    .select(Spell.RUNE_TRAP)
+                    .face(0, 35)
+                    // high over the ground ahead, sinking toward where the sigil is written
+                    .glide(new Vec3(5, 5, 9), new Vec3(0, 0.3, 3), new Vec3(3, 2.8, 6.5), new Vec3(0, 0.8, 3), 230)
+                    .roll("rune_trap")
+                    .film(12).tap().film(46)
+                    .command("execute at @a run summon minecraft:husk ~ ~ ~10 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    .film(150)
+                    .cut()
+                    .command("gamemode creative @a");
+            // the Hex, one film after another in the same town: founded, built, through the eras, its townspeople, its
+            // mending, its rewind, its remote, and its fall
+            case "film_hex" -> s
+                    .filmSet("plains", 22500, 0, 6000)
+                    .command("execute as @a run scarlet hex build town")
+                    .command("execute as @a run scarlet hex forget")
+                    .suited()
+                    .select(Spell.HEX).playerCamera()
+                    // the home rising under the founding's own camera, and the Hex bursting out of her
+                    .roll("hex_founding")
+                    .film(10).tap().film(400)
+                    .cut()
+                    .whereLog("founded")
+                    // high over it as she widens the Hex, the town building itself out across the land it takes in
+                    .circle(Vec3.ZERO, 70, 96, 200, 250, 38, 40, 660)
+                    .roll("hex_town")
+                    .film(10).hold(true).film(70).hold(false)
+                    .filmSpeed(3.0F).film(580)
+                    .cut()
+                    .whereLog("built")
+                    .circle(new Vec3(0, 3, 0), 28, 25, 150, 215, 16, 12, 480)
+                    .roll("hex_eras")
+                    .film(40)
+                    .command("execute as @a at @s run scarlet hex era 1960s").film(70)
+                    .command("execute as @a at @s run scarlet hex era 1970s").film(80)
+                    .command("execute as @a at @s run scarlet hex era 1980s").film(80)
+                    .command("execute as @a at @s run scarlet hex era 2000s").film(80)
+                    .command("execute as @a at @s run scarlet hex era present").film(90)
+                    .cut()
+                    // an episode's title card, through her own eyes
+                    .place(0, 1.5, -15).land().face(0, 0).playerCamera().cleanHud(true)
+                    .roll("hex_title_card")
+                    .film(10)
+                    .command("execute as @a at @s run scarlet hex era 1950s").film(120)
+                    .cut()
+                    .cleanHud(false)
+                    // creatures of the night, rewritten as townspeople the moment they are inside, with her indoors and
+                    // out of the shot
+                    .command("execute as @a at @s run scarlet hex era 1970s").film(60)
+                    .place(0, 1.2, 0).land()
+                    .command("difficulty easy")
+                    .circle(new Vec3(0, 1, -9), 10, 8, 165, 205, 15, 10, 230)
+                    .roll("hex_residents")
+                    .film(12)
+                    .summonAt("minecraft:zombie", -2, 1, -9, "{PersistenceRequired:1b}")
+                    .summonAt("minecraft:skeleton", 2, 1, -8, "{PersistenceRequired:1b}")
+                    .summonAt("minecraft:creeper", 0, 1, -11, "{PersistenceRequired:1b}")
+                    .summonAt("minecraft:witch", 4, 1, -10, "{PersistenceRequired:1b}")
+                    .film(210)
+                    .cut()
+                    // a blast at the front of the home, mending itself
+                    .command("execute at @a run kill @e[type=!minecraft:player,distance=..40]")
+                    .view(-11, 6, -20, 0, 3, -3).film(10)
+                    .roll("hex_mend")
+                    .film(16)
+                    .summonAt("minecraft:tnt", 0.5, 1, -4.5, "{fuse:30}")
+                    .summonAt("minecraft:tnt", -1.5, 1, -4.5, "{fuse:30}")
+                    .film(70)
+                    .filmSpeed(2.5F).film(260).filmSpeed(1.0F)
+                    .film(20)
+                    .cut()
+                    // in the eighties, the scene wound back like a tape
+                    .command("execute as @a at @s run scarlet hex era 1980s").film(60)
+                    .command("execute at @a run kill @e[type=minecraft:item,distance=..40]")
+                    .summonAt("minecraft:cow", -3, 1, -8, "{PersistenceRequired:1b}")
+                    .summonAt("minecraft:cow", 2.5, 1, -9, "{PersistenceRequired:1b}")
+                    .summonAt("minecraft:cow", 0, 1, -6, "{PersistenceRequired:1b}")
+                    .place(-4, 1.5, -13).land()
+                    .select(Spell.CHAOS_BOLT).refill().film(30)
+                    // from up the street, clear of the lamps: her, the cows and the front of the home
+                    .view(-11, 5, -19, -1, 1.5, -8).cleanHud(true).film(10)
+                    .roll("hex_rewind")
+                    .film(16)
+                    .aimAtNearest("minecraft:cow").tap().aimAtNearest("minecraft:cow").tap().aimAtNearest("minecraft:cow").tap()
+                    .aimAtNearest("minecraft:cow").tap().aimAtNearest("minecraft:cow").tap().aimAtNearest("minecraft:cow").tap()
+                    .summonAt("minecraft:tnt", -4, 1, -5, "{fuse:16}")
+                    .film(40)
+                    .remote(ShowrunnerPayload.REWIND, 1).film(100)
+                    .remote(ShowrunnerPayload.REWIND, 0).film(40)
+                    .cut()
+                    .cleanHud(false)
+                    // the remote beside her view as night falls, then a storm over the town, and dusk
+                    .command("execute as @a at @s run scarlet hex era present").film(40)
+                    .playerCamera().face(180, -8).cleanHud(true)
+                    .roll("hex_remote")
+                    .film(10).then(ShowrunnerScreen::open, 30)
+                    .remote(ShowrunnerPayload.TIME, HexSky.Time.NIGHT.ordinal()).film(60)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 2).cleanHud(false)
+                    .circle(new Vec3(0, 4, 0), 36, 32, 200, 240, 22, 16, 330)
+                    .film(50)
+                    .remote(ShowrunnerPayload.WEATHER, HexSky.Weather.STORM.ordinal()).film(120)
+                    .remote(ShowrunnerPayload.WEATHER, HexSky.Weather.CLEAR.ordinal())
+                    .remote(ShowrunnerPayload.TIME, HexSky.Time.DUSK.ordinal()).film(110)
+                    .cut()
+                    .remote(ShowrunnerPayload.TIME, HexSky.Time.WORLD.ordinal()).film(60)
+                    // and when it falls, everything goes back the way it was
+                    .circle(Vec3.ZERO, 64, 56, 230, 260, 32, 26, 800)
+                    .roll("hex_fall").filmSpeed(3.0F)
+                    .film(20)
+                    .command("execute as @a run scarlet hex dispel")
+                    .film(780)
+                    .cut()
+                    .command("difficulty peaceful")
+                    .playerCamera();
+            case "film_darkhold" -> s
+                    .filmSet("plains", 5000, 0, 11600)
+                    .command("item replace entity @a weapon.mainhand with scarlet:darkhold")
+                    .suited()
+                    .orbit(2.7, 25, 25, 8, 1.35, 1).film(16)
+                    .roll("darkhold")
+                    // it rises out of her hand to float open before her, turning its own pages, and darkens her magic
+                    .orbit(2.7, 2.3, 25, 75, 8, 14, 1.4, 220)
+                    .film(16).hold(true).film(80)
+                    .command("scarlet corruption @p set 80")
+                    .film(124)
+                    // her own eyes, the veins creeping in at the edges
+                    .playerCamera().cleanHud(true).film(80)
+                    .hold(false).film(20)
+                    .cut()
+                    .cleanHud(false)
+                    .command("scarlet corruption @p set 0")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air");
+            case "film_dream" -> s
+                    .filmSet("plains", 7500, 0, 6000)
+                    .levelGround(7, 7, 7, 21)
+                    .command("item replace entity @a hotbar.8 with scarlet:darkhold")
+                    .suited()
+                    .command("execute at @a run spawnpoint @a ~ ~ ~16")
+                    .command("execute at @a run summon minecraft:cow ~ ~ ~16 {PersistenceRequired:1b,Rotation:[180f,0f]}")
+                    // rooted where she would wake until her spirit is in it, rather than grazing off
+                    .command("execute at @a run effect give @e[type=minecraft:cow,distance=..40] minecraft:slowness 120 9 true")
+                    .select(Spell.DREAMWALK).playerCamera().cleanHud(true)
+                    // choosing where to go
+                    .roll("dreamwalk")
+                    .film(6).tap().film(30)
+                    .then(minecraft -> {
+                        if (minecraft.gui.screen() != null) {
+                            minecraft.gui.screen().keyPressed(new KeyEvent(InputConstants.KEY_1, 0, 0));
+                        }
+                    }, 0)
+                    // sitting down cross-legged and rising, as the dark closes in
+                    .cleanHud(false).orbit(3.4, 3.0, 30, 75, 6, 10, 0.9, 120)
+                    .film(56)
+                    // out through the eyes of the cow by where she would wake, looking back at the body she left
+                    .dreamCamera().film(12)
+                    .subjectBody().aimHeldAtSubject()
+                    .command("effect clear @e[type=minecraft:cow]").film(14)
+                    // running back to it, stopping short so the camera can come round her without passing through
+                    .sprint(true).walk(true).film(34).walk(false).sprint(false)
+                    .orbit(2.9, 2.5, 20, 80, 6, 12, 0.9, 110)
+                    .film(110)
+                    .cut()
+                    .command("damage @e[type=scarlet:dream_body,limit=1] 1").film(40)
+                    .command("item replace entity @a hotbar.8 with minecraft:air")
+                    .select(Spell.CHAOS_BOLT);
             case "flare" -> s
                     .command("item replace entity @a armor.head with scarlet:witch_tiara")
                     .command("item replace entity @a weapon.mainhand with minecraft:air")
@@ -379,6 +778,40 @@ public final class Showcase {
                     }, 10)
                     .hold(true).shot("hud_casting", 8).hold(false).shot("hud_after", 30)
                     .command("gamemode creative @a").hideHud(true);
+            // where a blast leaves her when she casts on the ground and in the air, seen through the game's own third-person
+            // views, as a player sees it
+            case "levbolt" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("gamemode survival @a")
+                    .command("effect give @a minecraft:resistance 120 4 true")
+                    .ensureUnsuited().face(90, 0).select(Spell.CHAOS_BOLT)
+                    .camera(CameraType.THIRD_PERSON_BACK).then(minecraft -> {
+                    }, 10)
+                    .hold(true).shot("levbolt_ground_a", 1).shot("levbolt_ground_b", 0).shot("levbolt_ground_c", 0).hold(false).then(minecraft -> {
+                    }, 10)
+                    // up and climbing, then hovering
+                    .jumpTap().jumpTap().then(minecraft -> {
+                    }, 14)
+                    .then(minecraft -> minecraft.options.keyJump.setDown(true), 20)
+                    .then(minecraft -> minecraft.options.keyJump.setDown(false), 20)
+                    .hold(true).shot("levbolt_air_a", 1).shot("levbolt_air_b", 0).shot("levbolt_air_c", 0).hold(false).then(minecraft -> {
+                    }, 10)
+                    .camera(CameraType.THIRD_PERSON_FRONT).then(minecraft -> {
+                    }, 4)
+                    .hold(true).shot("levbolt_air_front_a", 1).shot("levbolt_air_front_b", 0).shot("levbolt_air_front_c", 0).hold(false).then(minecraft -> {
+                    }, 10)
+                    // flying on
+                    .camera(CameraType.THIRD_PERSON_BACK).walk(true).then(minecraft -> {
+                    }, 12)
+                    .hold(true).shot("levbolt_flying_a", 1).shot("levbolt_flying_b", 0).shot("levbolt_flying_c", 0).hold(false).walk(false).then(minecraft -> {
+                    }, 10)
+                    .jumpTap().jumpTap().then(minecraft -> {
+                    }, 60)
+                    .command("gamemode creative @a");
             case "gesture" -> s
                     .command("item replace entity @a armor.head with scarlet:witch_tiara")
                     .command("item replace entity @a weapon.mainhand with minecraft:air")
@@ -2171,6 +2604,19 @@ public final class Showcase {
             }, 0);
         }
 
+        /**
+         * Shows the HUD with only the mod's own overlays on it, a title card or a tape's corner, and none of vanilla's;
+         * or hides it all again.
+         */
+        Scene cleanHud(boolean clean) {
+            return then(minecraft -> {
+                overlaysOnly = clean;
+                if (minecraft.gui.hud.isHidden() == clean) {
+                    minecraft.gui.hud.toggle();
+                }
+            }, 0);
+        }
+
         Scene face(float yaw, float pitch) {
             return then(minecraft -> {
                 var player = minecraft.player;
@@ -2206,6 +2652,7 @@ public final class Showcase {
          */
         Scene look(double distance, float yawOffset, float elevation, double targetHeight) {
             return then(minecraft -> {
+                move = null;
                 Entity focus = subject != null && !subject.isRemoved() ? subject : minecraft.player;
                 if (focus == null || minecraft.level == null) {
                     return;
@@ -2232,6 +2679,415 @@ public final class Showcase {
         }
 
         /**
+         * Sizes the window for filming, at the size films are made at.
+         */
+        Scene filmWindow() {
+            return then(minecraft -> minecraft.getWindow().setWindowed(ShowcaseRecorder.WIDTH, ShowcaseRecorder.HEIGHT), 30);
+        }
+
+        /**
+         * Waits, a tick at a time, until something is so, or for at most some ticks.
+         */
+        Scene until(Predicate<Minecraft> ready, int mostTicks) {
+            int[] waited = new int[1];
+            return then(minecraft -> {
+                if (!ready.test(minecraft) && waited[0]++ < mostTicks) {
+                    index--;
+                } else {
+                    waited[0] = 0;
+                }
+            }, 0);
+        }
+
+        /**
+         * Waits for the land around to arrive and be drawn, after the player has gone far: most of the land in sight
+         * there, and nothing of it left to draw.
+         */
+        Scene settle() {
+            return then(minecraft -> {
+            }, 60).until(minecraft -> {
+                if (minecraft.level == null) {
+                    return false;
+                }
+                int distance = minecraft.options.getEffectiveRenderDistance();
+                return minecraft.level.getChunkSource().getLoadedChunksCount() >= 0.75 * Math.PI * distance * distance
+                        && minecraft.levelRenderer.hasRenderedAllSections();
+            }, 2400).then(minecraft -> {
+            }, 40);
+        }
+
+        /**
+         * Takes the player to the most level open ground of a biome, the nearest to a spot in the world, facing south,
+         * and marks it as the anchor once the land around is drawn.
+         */
+        Scene scout(String biome, int x, int z) {
+            java.util.concurrent.atomic.AtomicBoolean there = new java.util.concurrent.atomic.AtomicBoolean();
+            return then(minecraft -> {
+                there.set(false);
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    there.set(true);
+                    return;
+                }
+                server.execute(() -> {
+                    try {
+                        ServerLevel level = server.overworld();
+                        ResourceKey<Biome> key = ResourceKey.create(Registries.BIOME, Identifier.withDefaultNamespace(biome));
+                        var found = level.findClosestBiome3d(holder -> holder.is(key), new BlockPos(x, 64, z), 6400, 32, 64);
+                        if (found == null) {
+                            Scarlet.LOG.warn("Showcase: no {} near {} {}", biome, x, z);
+                            return;
+                        }
+                        BlockPos spot = levelGround(level, found.getFirst(), key);
+                        Scarlet.LOG.info("Showcase: scouted {} at {}", biome, spot.toShortString());
+                        String command = String.format(java.util.Locale.ROOT, "tp @a %.1f %d %.1f 0 0", spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+                        server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command);
+                    } finally {
+                        there.set(true);
+                    }
+                });
+            }, 0).until(minecraft -> there.get(), 6000).settle().anchor();
+        }
+
+        /**
+         * The most level dry ground of a biome around a spot: where the land forty-nine blocks across, trees and water
+         * counted, rises and falls least, lowland before hills.
+         */
+        private static BlockPos levelGround(ServerLevel level, BlockPos near, ResourceKey<Biome> biome) {
+            BlockPos best = surface(level, near.getX(), near.getZ());
+            int leastScore = Integer.MAX_VALUE;
+            for (int dx = -96; dx <= 96; dx += 16) {
+                for (int dz = -96; dz <= 96; dz += 16) {
+                    BlockPos at = surface(level, near.getX() + dx, near.getZ() + dz);
+                    if (!level.getBiome(at).is(biome)) {
+                        continue;
+                    }
+                    int low = at.getY();
+                    int high = at.getY();
+                    for (int ox = -24; ox <= 24; ox += 6) {
+                        for (int oz = -24; oz <= 24; oz += 6) {
+                            BlockPos ground = surface(level, at.getX() + ox, at.getZ() + oz);
+                            int y = level.getFluidState(ground.below()).isEmpty() ? ground.getY() : -10000;
+                            low = Math.min(low, y);
+                            high = Math.max(high, y);
+                        }
+                    }
+                    int score = high - low + Math.max(0, at.getY() - 78) / 2;
+                    if (score < leastScore) {
+                        leastScore = score;
+                        best = at;
+                    }
+                }
+            }
+            return best;
+        }
+
+        /**
+         * The first open block over the ground at a column, the land there grown first if it has not been yet: a level
+         * asked about land it has not grown answers with the bottom of the world.
+         */
+        private static BlockPos surface(ServerLevel level, int x, int z) {
+            int top = level.getChunk(x >> 4, z >> 4).getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15);
+            return new BlockPos(x, top + 1, z);
+        }
+
+        /**
+         * Levels a box of ground around the player, so many blocks west, east, north and south, to the height they stand
+         * at: the steps a creature or a dash cannot climb cut away, hollows filled, and short grass grown back over it.
+         */
+        Scene levelGround(int west, int east, int north, int south) {
+            String box = "execute at @a run fill ~" + -west + " ~%d ~" + -north + " ~" + east + " ~%d ~" + south + " ";
+            return command(box.formatted(-1, -1) + "minecraft:grass_block")
+                    .command(box.formatted(0, 10) + "minecraft:air")
+                    .command(box.formatted(0, 0) + "minecraft:short_grass");
+        }
+
+        /**
+         * Opens a film shoot: the window at film size, a clear sky held at a time of day, nothing written to chat, the
+         * player on the most level ground of a biome with no creature near, crowned, with nothing in hand.
+         */
+        Scene filmSet(String biome, int x, int z, int time) {
+            return filmWindow().land().dispelHexes()
+                    .command("gamerule advance_time false")
+                    .command("gamerule advance_weather false")
+                    .command("gamerule send_command_feedback false")
+                    .command("gamerule log_admin_commands false")
+                    .command("gamerule spawn_mobs false")
+                    .command("difficulty peaceful")
+                    .command("weather clear")
+                    .command("time set " + time)
+                    .scout(biome, x, z)
+                    .command("execute at @a run kill @e[type=!minecraft:player,distance=..64]")
+                    .command("execute at @a run kill @e[type=minecraft:item,distance=..64]")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("item replace entity @a weapon.offhand with minecraft:air")
+                    .command("scarlet corruption @p set 0")
+                    .command("effect give @a minecraft:resistance 600 4 true")
+                    .then(minecraft -> minecraft.gui.hud.getChat().clearMessages(false), 0)
+                    .ensureUnsuited().face(0, 0).hideHud(true);
+        }
+
+        /**
+         * Fills the caster's magic back up, so a long take never runs dry.
+         */
+        Scene refill() {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null || minecraft.player == null) {
+                    return;
+                }
+                java.util.UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(id);
+                    if (player != null) {
+                        long now = player.level().getGameTime();
+                        Magic.spend(player, Magic.energy(player, now) - Magic.maxEnergy(player), now);
+                    }
+                });
+            }, 1);
+        }
+
+        /**
+         * Turns the player to look at the middle of the nearest creature of a kind.
+         */
+        Scene aimAtNearest(String type) {
+            return then(minecraft -> {
+                var player = minecraft.player;
+                if (player == null || minecraft.level == null) {
+                    return;
+                }
+                Entity nearest = null;
+                for (Entity entity : minecraft.level.entitiesForRendering()) {
+                    if (entity != player && entity.isAlive() && BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString().equals(type)
+                            && (nearest == null || entity.distanceToSqr(player) < nearest.distanceToSqr(player))) {
+                        nearest = entity;
+                    }
+                }
+                if (nearest == null) {
+                    return;
+                }
+                Vec3 to = nearest.getBoundingBox().getCenter().subtract(player.getEyePosition());
+                float yaw = (float) Math.toDegrees(Math.atan2(-to.x, to.z));
+                float pitch = (float) Math.toDegrees(-Math.atan2(to.y, Math.hypot(to.x, to.z)));
+                player.setYRot(player.getYRot() + Mth.wrapDegrees(yaw - player.getYRot()));
+                player.setXRot(pitch);
+                player.setYHeadRot(player.getYRot());
+            }, 0);
+        }
+
+        /**
+         * Turns the player's view by some degrees over some ticks, easing in and out, as a hand on the mouse would.
+         */
+        Scene sweep(float yaw, float pitch, int ticks) {
+            float[] from = new float[2];
+            for (int i = 0; i <= ticks; i++) {
+                float t = Ease.inOutCubic(i / (float) ticks);
+                boolean first = i == 0;
+                then(minecraft -> {
+                    var player = minecraft.player;
+                    if (player == null) {
+                        return;
+                    }
+                    if (first) {
+                        from[0] = player.getYRot();
+                        from[1] = player.getXRot();
+                    }
+                    player.setYRot(from[0] + yaw * t);
+                    player.setXRot(Math.clamp(from[1] + pitch * t, -90.0F, 90.0F));
+                    player.setYHeadRot(player.getYRot());
+                }, 0);
+            }
+            return this;
+        }
+
+        /**
+         * Suits up off camera, and waits for the costume to finish weaving on.
+         */
+        Scene suited() {
+            return then(minecraft -> {
+                if (minecraft.player != null && !Services.PLAYER_DATA.get(minecraft.player).suited()) {
+                    Services.NETWORK.sendToServer(ToggleSuitPayload.INSTANCE);
+                }
+            }, 70);
+        }
+
+        /**
+         * Lets the film run on for some ticks with nothing new happening.
+         */
+        Scene film(int ticks) {
+            return then(minecraft -> {
+            }, Math.max(0, ticks - 1));
+        }
+
+        /**
+         * Starts filming a shot, to the Videos folder: from here the game's clock moves a frame at a time.
+         */
+        Scene roll(String name) {
+            return then(minecraft -> ShowcaseRecorder.roll(minecraft, name), 0);
+        }
+
+        /**
+         * Stops filming for a moment while the next shot is set up, then films on.
+         */
+        Scene holdFilm() {
+            return then(minecraft -> ShowcaseRecorder.hold(), 0);
+        }
+
+        Scene resumeFilm() {
+            return then(ShowcaseRecorder::resume, 0);
+        }
+
+        /**
+         * Ends the film, and gives ffmpeg a moment to finish it.
+         */
+        Scene cut() {
+            return then(minecraft -> ShowcaseRecorder.cut(), 40);
+        }
+
+        /**
+         * Glides a free camera from one spot to another over some ticks, easing in and out, its aim gliding from one
+         * point to another with it, all measured from the anchor. The steps after go on as it moves.
+         */
+        Scene glide(Vec3 fromEye, Vec3 fromLook, Vec3 toEye, Vec3 toLook, int ticks) {
+            return then(minecraft -> startMove(minecraft, ticks, (mc, t, first) ->
+                    placeCamera(mc, anchor.add(fromEye.lerp(toEye, t)), anchor.add(fromLook.lerp(toLook, t)), first)), 0);
+        }
+
+        /**
+         * Circles a free camera around the subject, or the player, from one angle to another over some ticks, following
+         * them as they move. Angles are measured from straight in front of them as the orbit begins. The steps after go
+         * on as it moves.
+         */
+        Scene orbit(double distance, float fromYaw, float toYaw, float elevation, double targetHeight, int ticks) {
+            return orbit(distance, distance, fromYaw, toYaw, elevation, elevation, targetHeight, ticks);
+        }
+
+        /**
+         * An orbit that draws in or out and rises or sinks as it goes round.
+         */
+        Scene orbit(double fromDistance, double toDistance, float fromYaw, float toYaw, float fromElevation, float toElevation,
+                double targetHeight, int ticks) {
+            float[] facing = new float[1];
+            return then(minecraft -> startMove(minecraft, ticks, (mc, t, first) -> {
+                Entity focus = subject != null && !subject.isRemoved() ? subject : mc.player;
+                if (focus == null) {
+                    return;
+                }
+                if (first) {
+                    facing[0] = focus.getYRot();
+                }
+                double faced = Math.toRadians(facing[0]);
+                Vec3 target = focus.position().add(-Math.sin(faced) * lookAhead, targetHeight, Math.cos(faced) * lookAhead);
+                double distance = Mth.lerp(t, fromDistance, toDistance);
+                double yaw = Math.toRadians(facing[0] + Mth.lerp(t, fromYaw, toYaw));
+                double pitch = Math.toRadians(Mth.lerp(t, fromElevation, toElevation));
+                Vec3 out = new Vec3(-Math.sin(yaw), 0, Math.cos(yaw));
+                Vec3 eye = target.add(out.scale(distance * Math.cos(pitch))).add(0, distance * Math.sin(pitch), 0);
+                placeCamera(mc, eye, target, first);
+            }), 0);
+        }
+
+        /**
+         * Circles a free camera around a point measured from the anchor, from one angle to another over some ticks,
+         * drawing in or out and rising or sinking as it goes; at an angle of naught it is south of the point, looking
+         * north. The steps after go on as it moves.
+         */
+        Scene circle(Vec3 center, double fromDistance, double toDistance, float fromYaw, float toYaw, float fromElevation,
+                float toElevation, int ticks) {
+            return then(minecraft -> startMove(minecraft, ticks, (mc, t, first) -> {
+                Vec3 target = anchor.add(center);
+                double distance = Mth.lerp(t, fromDistance, toDistance);
+                double yaw = Math.toRadians(Mth.lerp(t, fromYaw, toYaw));
+                double pitch = Math.toRadians(Mth.lerp(t, fromElevation, toElevation));
+                Vec3 out = new Vec3(-Math.sin(yaw), 0, Math.cos(yaw));
+                Vec3 eye = target.add(out.scale(distance * Math.cos(pitch))).add(0, distance * Math.sin(pitch), 0);
+                placeCamera(mc, eye, target, first);
+            }), 0);
+        }
+
+        /**
+         * Summons something at a spot measured from the anchor.
+         */
+        Scene summonAt(String type, double x, double y, double z, String data) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                Vec3 at = anchor.add(x, y, z);
+                String command = String.format(java.util.Locale.ROOT, "summon %s %.2f %.2f %.2f %s", type, at.x, at.y, at.z, data);
+                server.execute(() -> server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command));
+            }, 1);
+        }
+
+        /**
+         * Writes down in the log where the player is, measured from the anchor, and the ground's height there.
+         */
+        Scene whereLog(String label) {
+            return then(minecraft -> {
+                if (minecraft.player != null && minecraft.level != null) {
+                    Vec3 at = minecraft.player.position().subtract(anchor);
+                    int ground = minecraft.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, minecraft.player.getBlockX(),
+                            minecraft.player.getBlockZ());
+                    Scarlet.LOG.info("Showcase [{}]: player at {} {} {}, ground at {}", label, String.format(java.util.Locale.ROOT, "%.1f", at.x),
+                            String.format(java.util.Locale.ROOT, "%.1f", at.y), String.format(java.util.Locale.ROOT, "%.1f", at.z),
+                            String.format(java.util.Locale.ROOT, "%.1f", ground - anchor.y));
+                }
+            }, 0);
+        }
+
+        /**
+         * Has later orbits look some blocks ahead of whoever they circle, as they faced when the orbit began.
+         */
+        Scene lookAhead(double blocks) {
+            return then(minecraft -> lookAhead = blocks, 0);
+        }
+
+        /**
+         * Lets the film's clock run slower or faster than the game's: below one, slow motion, drawn smooth between the
+         * ticks; above one, time-lapse.
+         */
+        Scene filmSpeed(float speed) {
+            return then(minecraft -> ShowcaseRecorder.speed(speed), 0);
+        }
+
+        /**
+         * Puts the free camera at a spot looking at another. A cut jumps there; otherwise it moves there over the tick,
+         * drawn in between.
+         */
+        private static void placeCamera(Minecraft minecraft, Vec3 eye, Vec3 target, boolean cut) {
+            if (minecraft.level == null) {
+                return;
+            }
+            if (camera == null || camera.level() != minecraft.level) {
+                camera = new ArmorStand(minecraft.level, 0, 0, 0);
+                camera.setInvisible(true);
+                cut = true;
+            }
+            Vec3 to = target.subtract(eye);
+            float yaw = (float) Math.toDegrees(Math.atan2(-to.x, to.z));
+            float pitch = (float) Math.toDegrees(-Math.atan2(to.y, Math.hypot(to.x, to.z)));
+            if (cut || minecraft.getCameraEntity() != camera) {
+                camera.snapTo(eye.x, eye.y - camera.getEyeHeight(), eye.z, yaw, pitch);
+                camera.setYHeadRot(yaw);
+                camera.yHeadRotO = yaw;
+                camera.setOldPosAndRot();
+            } else {
+                // turning the short way round, so the view never spins through the long way
+                float turned = camera.getYRot() + Mth.wrapDegrees(yaw - camera.getYRot());
+                camera.setOldPosAndRot();
+                camera.yHeadRotO = camera.getYHeadRot();
+                camera.setPos(eye.x, eye.y - camera.getEyeHeight(), eye.z);
+                camera.setYRot(turned);
+                camera.setXRot(pitch);
+                camera.setYHeadRot(turned);
+            }
+            minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+            minecraft.setCameraEntity(camera);
+        }
+
+        /**
          * Makes the nearest mannequin the focus of later camera moves. The local player is never drawn from a detached
          * camera, so close-ups of worn items use a mannequin.
          */
@@ -2254,6 +3110,7 @@ public final class Showcase {
 
         Scene playerCamera() {
             return then(minecraft -> {
+                move = null;
                 minecraft.setCameraEntity(minecraft.player);
                 minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             }, 2);
@@ -2264,6 +3121,7 @@ public final class Showcase {
          */
         Scene dreamCamera() {
             return then(minecraft -> {
+                move = null;
                 Entity inside = MindControlClient.insideOf();
                 if (inside != null) {
                     minecraft.setCameraEntity(inside);
@@ -2494,6 +3352,7 @@ public final class Showcase {
          */
         Scene view(double x, double y, double z, double targetX, double targetY, double targetZ) {
             return then(minecraft -> {
+                move = null;
                 if (minecraft.level == null) {
                     return;
                 }
@@ -2698,6 +3557,10 @@ public final class Showcase {
 
         Scene sneak(boolean down) {
             return then(minecraft -> minecraft.options.keyShift.setDown(down), 0);
+        }
+
+        Scene sprint(boolean down) {
+            return then(minecraft -> minecraft.options.keySprint.setDown(down), 0);
         }
 
         /**

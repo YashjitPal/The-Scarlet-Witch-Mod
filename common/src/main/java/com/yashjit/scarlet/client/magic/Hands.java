@@ -9,6 +9,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Player;
@@ -69,7 +70,7 @@ public final class Hands {
         Camera camera = Minecraft.getInstance().gameRenderer.mainCamera();
         int i = right ? 0 : 1;
         FIRST_PERSON[i] = new Vector3f(palm.dot(camera.leftVector()), palm.dot(camera.upVector()), palm.dot(camera.forwardVector()));
-        FIRST_PERSON_AT[i] = System.nanoTime();
+        FIRST_PERSON_AT[i] = Util.getNanos();
     }
 
     /**
@@ -82,7 +83,7 @@ public final class Hands {
         }
         int i = arm == HumanoidArm.RIGHT ? 0 : 1;
         Vector3f shown = FIRST_PERSON[i];
-        if (shown != null && System.nanoTime() - FIRST_PERSON_AT[i] < FIRST_PERSON_NANOS) {
+        if (shown != null && Util.getNanos() - FIRST_PERSON_AT[i] < FIRST_PERSON_NANOS) {
             // hands are drawn in a view of their own, so it lands where the hand shows at its depth in the world's
             Camera camera = Minecraft.getInstance().gameRenderer.mainCamera();
             float widen = (float) (Math.tan(Math.toRadians(camera.getFov()) / 2.0) / Math.tan(Math.toRadians(Camera.BASE_HUD_FOV) / 2.0));

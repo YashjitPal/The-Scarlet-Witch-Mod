@@ -23,6 +23,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.util.Util;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.HumanoidArm;
@@ -182,7 +183,7 @@ public final class CorruptionClient {
      * Dark veins at the edges of the view.
      */
     public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
-        long nanos = System.nanoTime();
+        long nanos = Util.getNanos();
         float seconds = lastNanos == 0 ? 0.0F : Math.min(0.1F, (nanos - lastNanos) / 1.0E9F);
         lastNanos = nanos;
         Minecraft minecraft = Minecraft.getInstance();

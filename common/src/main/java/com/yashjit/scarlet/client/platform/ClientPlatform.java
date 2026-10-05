@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.client.platform;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.client.DeltaTracker;
@@ -52,6 +53,12 @@ public interface ClientPlatform {
      * Moves vanilla's status bars up by however many GUI pixels {@code lift} asks for, to make room beneath them.
      */
     void liftStatusBars(StatusBarLift lift);
+
+    /**
+     * Leaves vanilla's own parts of the HUD undrawn whenever {@code when} holds, the mod's still drawn: for the
+     * showcase's films, in development only.
+     */
+    void hideVanillaHud(BooleanSupplier when);
 
     /**
      * Draws {@code draw} raised by {@code pixels}.

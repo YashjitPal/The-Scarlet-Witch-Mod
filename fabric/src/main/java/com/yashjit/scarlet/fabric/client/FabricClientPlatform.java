@@ -1,6 +1,8 @@
 package com.yashjit.scarlet.fabric.client;
 
 import com.yashjit.scarlet.client.platform.ClientPlatform;
+import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -61,6 +63,20 @@ public final class FabricClientPlatform implements ClientPlatform {
                 VanillaHudElements.MOUNT_HEALTH, VanillaHudElements.AIR_BAR);
         lift(lift, StatusBar.LEVEL, VanillaHudElements.EXPERIENCE_LEVEL);
         lift(lift, StatusBar.MESSAGES, VanillaHudElements.HELD_ITEM_TOOLTIP, VanillaHudElements.OVERLAY_MESSAGE);
+    }
+
+    @Override
+    public void hideVanillaHud(BooleanSupplier when) {
+        for (Identifier id : List.of(VanillaHudElements.CROSSHAIR, VanillaHudElements.HOTBAR, VanillaHudElements.ARMOR_BAR,
+                VanillaHudElements.HEALTH_BAR, VanillaHudElements.FOOD_BAR, VanillaHudElements.AIR_BAR, VanillaHudElements.MOUNT_HEALTH,
+                VanillaHudElements.INFO_BAR, VanillaHudElements.EXPERIENCE_LEVEL, VanillaHudElements.HELD_ITEM_TOOLTIP,
+                VanillaHudElements.MOB_EFFECTS, VanillaHudElements.OVERLAY_MESSAGE, VanillaHudElements.CHAT, VanillaHudElements.SUBTITLES)) {
+            HudElementRegistry.replaceElement(id, element -> (graphics, deltaTracker) -> {
+                if (!when.getAsBoolean()) {
+                    element.extractRenderState(graphics, deltaTracker);
+                }
+            });
+        }
     }
 
     private static void lift(StatusBarLift lift, StatusBar bar, Identifier... elements) {

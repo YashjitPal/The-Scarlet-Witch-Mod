@@ -38,6 +38,7 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
@@ -140,7 +141,7 @@ public final class HexScreen {
 
     private static void draw(RenderTarget main, RenderTarget hand) {
         Minecraft minecraft = Minecraft.getInstance();
-        long nanos = System.nanoTime();
+        long nanos = Util.getNanos();
         float seconds = lastNanos == 0 ? 0.0F : Math.min(0.1F, (nanos - lastNanos) / 1.0E9F);
         lastNanos = nanos;
         if (broken || minecraft.level == null) {

@@ -3,6 +3,7 @@ package com.yashjit.scarlet.neoforge.client;
 import com.yashjit.scarlet.client.platform.ClientPlatform;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
@@ -52,6 +53,7 @@ public final class NeoForgeClientPlatform implements ClientPlatform {
     private static final List<Renderer<?>> RENDERERS = new ArrayList<>();
     private static final List<Hud> HUDS = new ArrayList<>();
     private static final List<StatusBarLift> LIFTS = new ArrayList<>();
+    private static final List<BooleanSupplier> HIDE_VANILLA = new ArrayList<>();
 
     @Override
     public void registerLayerDefinition(ModelLayerLocation location, Supplier<LayerDefinition> definition) {
@@ -86,6 +88,11 @@ public final class NeoForgeClientPlatform implements ClientPlatform {
     @Override
     public void liftStatusBars(StatusBarLift lift) {
         LIFTS.add(lift);
+    }
+
+    @Override
+    public void hideVanillaHud(BooleanSupplier when) {
+        HIDE_VANILLA.add(when);
     }
 
     public static void attach(IEventBus modBus) {
@@ -140,6 +147,19 @@ public final class NeoForgeClientPlatform implements ClientPlatform {
                     VanillaGuiLayers.VEHICLE_HEALTH, VanillaGuiLayers.AIR_LEVEL);
             lift(event, lift, StatusBar.LEVEL, VanillaGuiLayers.EXPERIENCE_LEVEL);
             lift(event, lift, StatusBar.MESSAGES, VanillaGuiLayers.SELECTED_ITEM_NAME, VanillaGuiLayers.OVERLAY_MESSAGE);
+        }
+        for (BooleanSupplier when : HIDE_VANILLA) {
+            for (Identifier id : List.of(VanillaGuiLayers.CROSSHAIR, VanillaGuiLayers.HOTBAR, VanillaGuiLayers.PLAYER_HEALTH,
+                    VanillaGuiLayers.ARMOR_LEVEL, VanillaGuiLayers.FOOD_LEVEL, VanillaGuiLayers.VEHICLE_HEALTH, VanillaGuiLayers.AIR_LEVEL,
+                    VanillaGuiLayers.CONTEXTUAL_INFO_BAR_BACKGROUND, VanillaGuiLayers.CONTEXTUAL_INFO_BAR, VanillaGuiLayers.EXPERIENCE_LEVEL,
+                    VanillaGuiLayers.SELECTED_ITEM_NAME, VanillaGuiLayers.EFFECTS, VanillaGuiLayers.OVERLAY_MESSAGE, VanillaGuiLayers.CHAT,
+                    VanillaGuiLayers.SUBTITLE_OVERLAY)) {
+                event.wrapLayer(id, layer -> (graphics, deltaTracker) -> {
+                    if (!when.getAsBoolean()) {
+                        layer.render(graphics, deltaTracker);
+                    }
+                });
+            }
         }
     }
 

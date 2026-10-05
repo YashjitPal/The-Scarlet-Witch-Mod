@@ -25,7 +25,13 @@ neoForge {
                 if (project.hasProperty('showcaseServer')) {
                     systemProperty('scarlet.showcase.server', project.property('showcaseServer').toString())
                 }
-                programArguments.addAll('--width', '1280', '--height', '720', '--username', 'Showcase')
+                // films: a world of ordinary land, a player whose default skin is Alex's, at film size
+                if (project.hasProperty('showcaseFilm')) {
+                    systemProperty('scarlet.showcase.world', 'film')
+                    programArguments.addAll('--width', '1920', '--height', '1080', '--username', 'Scarlet')
+                } else {
+                    programArguments.addAll('--width', '1280', '--height', '720', '--username', 'Showcase')
+                }
             }
         }
         data {

@@ -19,6 +19,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Util;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -86,7 +87,7 @@ public final class TitleCard {
         if (pending != null && now >= pendingAt) {
             if (pending.hex.equals(inside)) {
                 showing = pending;
-                shownAt = System.nanoTime();
+                shownAt = Util.getNanos();
                 HexTunes.play(pending.era);
             }
             pending = null;
@@ -98,7 +99,7 @@ public final class TitleCard {
         if (card == null) {
             return;
         }
-        float t = (System.nanoTime() - shownAt) / 1.0E9F;
+        float t = (Util.getNanos() - shownAt) / 1.0E9F;
         if (t >= LENGTH) {
             showing = null;
             return;

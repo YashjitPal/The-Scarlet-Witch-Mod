@@ -9,6 +9,7 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.HumanoidArm;
 import org.jspecify.annotations.Nullable;
 
@@ -172,7 +173,7 @@ public final class FirstPersonGestures {
     public static void offHand(ArmDrawer drawer, HumanoidArm offArm, boolean offHandEmpty) {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        long nanos = System.nanoTime();
+        long nanos = Util.getNanos();
         float seconds = lastNanos == 0 ? 0.0F : Math.min(0.1F, (nanos - lastNanos) / 1.0E9F);
         lastNanos = nanos;
         if (player == null) {

@@ -35,6 +35,7 @@
     "client.KeyboardHandlerMixin",
     "client.KeyboardInputMixin",
     "client.LevelExtractorMixin",
+    "client.LocalPlayerMixin",
     "client.LivingEntityViewMixin",
     "client.LevelRendererMixin",
     "client.LevelWeatherMixin",

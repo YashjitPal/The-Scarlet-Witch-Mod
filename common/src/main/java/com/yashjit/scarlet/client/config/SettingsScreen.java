@@ -22,6 +22,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Util;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -48,7 +49,7 @@ public final class SettingsScreen extends Screen {
 
     private final @Nullable Screen parent;
     private final List<Entry> entries = new ArrayList<>();
-    private final long openedAt = System.nanoTime();
+    private final long openedAt = Util.getNanos();
     private long lastNanos;
     /** The setting the mouse or the keys last picked. */
     private int picked = -1;
@@ -84,7 +85,7 @@ public final class SettingsScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        long nanos = System.nanoTime();
+        long nanos = Util.getNanos();
         float seconds = lastNanos == 0 ? 0.0F : Math.min(0.1F, (nanos - lastNanos) / 1.0E9F);
         lastNanos = nanos;
         float open = Ease.outCubic(Ease.clamp01((nanos - openedAt) / 1.0E9F / OPEN_SECONDS));

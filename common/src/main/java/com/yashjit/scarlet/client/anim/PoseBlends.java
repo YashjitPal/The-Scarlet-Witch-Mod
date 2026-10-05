@@ -13,6 +13,7 @@ import com.yashjit.scarlet.registry.ScarletItems;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.player.Player;
 
 /**
@@ -32,7 +33,7 @@ public final class PoseBlends {
 
     public static Blend of(Player player) {
         Blend blend = BLENDS.computeIfAbsent(player.getId(), id -> new Blend());
-        long nanos = System.nanoTime();
+        long nanos = Util.getNanos();
         float seconds = blend.lastNanos == 0 ? 0.0F : Math.min(0.1F, (nanos - blend.lastNanos) / 1.0E9F);
         blend.lastNanos = nanos;
         MagicState state = Magic.state(player);

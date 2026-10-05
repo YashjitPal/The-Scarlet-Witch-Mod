@@ -26,7 +26,13 @@ loom {
                 if (project.hasProperty('showcaseServer')) {
                     vmArg("-Dscarlet.showcase.server=${project.property('showcaseServer')}")
                 }
-                programArgs('--width', '1280', '--height', '720', '--username', 'Showcase')
+                // films: a world of ordinary land, a player whose default skin is Alex's, at film size
+                if (project.hasProperty('showcaseFilm')) {
+                    vmArg('-Dscarlet.showcase.world=film')
+                    programArgs('--width', '1920', '--height', '1080', '--username', 'Scarlet')
+                } else {
+                    programArgs('--width', '1280', '--height', '720', '--username', 'Showcase')
+                }
             }
         }
         server {
