@@ -841,8 +841,19 @@ void main() {
             // from within
             vec3 entry = eye + dir * t0;
             int entryFace = int(span.z + 0.5);
+            float open = openingAt(entry, entryFace, c, r, Tears[i], time).x;
+            if (open > 0.0 && t1 < dist) {
+                // through where it stands open, the rest of the wall stands beyond it, just as plain to someone outside,
+                // if a little fainter for being further off
+                vec3 farSide = eye + dir * t1;
+                float farContact = exp(-max(dist - t1, 0.0) * 3.0);
+                vec4 far = wallLayer(farSide, t1, c, r, int(span.w + 0.5), dir, pixelAngle, time, Styles[i], 0.8, Tears[i]);
+                far.rgb = mix(far.rgb, vec3(1.0, 0.8, 0.84), farContact * 0.5);
+                far.a = clamp(far.a + farContact * 0.4, 0.0, 0.95) * outsideFade(farSide.y - c.y, r) * open;
+                wall = over(wall, far);
+            }
             // burning brighter where the wall meets the ground and whatever stands in it, though not where it stands open
-            float contact = exp(-max(dist - t0, 0.0) * 3.0) * (1.0 - openingAt(entry, entryFace, c, r, Tears[i], time).x);
+            float contact = exp(-max(dist - t0, 0.0) * 3.0) * (1.0 - open);
             vec4 layer = wallLayer(entry, t0, c, r, entryFace, dir, pixelAngle, time, Styles[i], 1.0, Tears[i]);
             layer.rgb = mix(layer.rgb, vec3(1.0, 0.8, 0.84), contact * 0.5);
             layer.a = clamp(layer.a + contact * 0.4, 0.0, 0.95) * outsideFade(entry.y - c.y, r);

@@ -21,6 +21,7 @@ import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.hex.Era;
 import com.yashjit.scarlet.hex.Hex;
+import com.yashjit.scarlet.hex.HexRipples;
 import com.yashjit.scarlet.hex.HexShape;
 import com.yashjit.scarlet.hex.HexSnapshot;
 import com.yashjit.scarlet.hex.Hexes;
@@ -104,6 +105,8 @@ public final class HexScreen {
     private static @Nullable Object seenLevel;
     private static double crossedAt = -1.0E9;
     private static boolean crossedIn;
+    /** Where the view was the frame before, to tell where it came through a wall. */
+    private static @Nullable Vec3 lastCamera;
 
     private HexScreen() {
     }
@@ -214,18 +217,20 @@ public final class HexScreen {
      * grows, shrinks or falls, and starts the picture coming through with it, with the sound of it: the hum of the field
      * and the crackle of the snow, and the picture humming into tune. Arriving in a world, or in another one, is not
      * coming through, and nor is a caster's own Hex spreading out from them as they cast it: the era just comes over
-     * them with it.
+     * them with it. Nor is stepping through where a wall stands parted, which is no wall at all.
      *
      * @return seconds since the view last came through
      */
     private static float cross(Minecraft minecraft, boolean isInside, double now) {
+        Vec3 before = lastCamera;
+        lastCamera = cameraPos;
         if (minecraft.level != seenLevel) {
             seenLevel = minecraft.level;
             wasInside = isInside;
             crossedAt = -1.0E9;
         } else if (isInside != wasInside) {
             wasInside = isInside;
-            if (isInside && castingAround(minecraft, now)) {
+            if (isInside && castingAround(minecraft, now) || before != null && throughOpening(before, now)) {
                 return (float) ((now - crossedAt) / 20.0);
             }
             double since = (now - crossedAt) / 20.0;
@@ -238,6 +243,20 @@ public final class HexScreen {
             sounds.playDelayed(SimpleSoundInstance.forUI(SoundEvents.BEACON_POWER_SELECT, isInside ? 1.6F : 1.3F, volume * 0.6F), 14);
         }
         return (float) ((now - crossedAt) / 20.0);
+    }
+
+    /**
+     * Whether the view came from {@code before} to where it is now through where a wall stands parted.
+     */
+    private static boolean throughOpening(Vec3 before, double now) {
+        for (HexSnapshot hex : Hexes.clientHexes()) {
+            float radius = HexClient.drawnRadius(hex, now);
+            Vec3 at = HexRipples.crossing(hex.center(), radius, before, cameraPos);
+            if (at != null) {
+                return Hexes.inOpening(hex.center(), radius, hex.tearAt(), HexClient.opening(hex), at);
+            }
+        }
+        return false;
     }
 
     /**

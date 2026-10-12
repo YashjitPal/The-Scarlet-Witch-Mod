@@ -17,6 +17,8 @@ import com.yashjit.scarlet.network.ShowrunnerPayload;
 import com.yashjit.scarlet.client.magic.SpellWheel;
 import com.yashjit.scarlet.client.magic.TelekinesisClient;
 import com.yashjit.scarlet.hex.Hex;
+import com.yashjit.scarlet.hex.HexData;
+import com.yashjit.scarlet.hex.HexSnapshot;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.hex.Sitcom;
@@ -28,6 +30,7 @@ import com.yashjit.scarlet.network.SelectSpellPayload;
 import com.yashjit.scarlet.network.ToggleSuitPayload;
 import com.yashjit.scarlet.platform.Services;
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.Window;
 import com.mojang.serialization.Lifecycle;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,10 +46,13 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.BackupConfirmScreen;
 import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.DeathScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -80,6 +86,7 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -118,6 +125,12 @@ public final class Showcase {
     private static @Nullable Entity subject;
     /** Where the player stood when a scene marked it, for views and aims placed from there. */
     private static Vec3 anchor = Vec3.ZERO;
+    /** While a scene clicks the mouse itself, which goes through as a player's click would. */
+    private static boolean clicking;
+    /** How far either way from the anchor the ground is noted, past where a Hex cast there builds. */
+    private static final int GROUND_REACH = 44;
+    /** The blocks around the anchor as a scene noted them, by position. */
+    private static final java.util.Map<Long, BlockState> GROUND = new java.util.HashMap<>();
     private static @Nullable Boolean savedImprovedTransparency;
     private static @Nullable BackupConfirmScreen answeredPrompt;
     /** While a film wants only the mod's own overlays over the picture, the rest of the HUD left undrawn. */
@@ -145,7 +158,7 @@ public final class Showcase {
      * cannot walk the player off or open screens mid-scene. The scene presses its own keys directly.
      */
     public static boolean ignoresPlayerInput() {
-        return enabled() && state != State.DONE;
+        return enabled() && state != State.DONE && !clicking;
     }
 
     public static void tick(Minecraft minecraft) {
@@ -162,6 +175,7 @@ public final class Showcase {
                 if (minecraft.gui.screen() instanceof BackupConfirmScreen screen) {
                     skipBackupPrompt(screen);
                 }
+                respawnIfDead(minecraft);
                 if (minecraft.player != null && minecraft.level != null && minecraft.gui.screen() == null) {
                     reportUnstableRegistries(minecraft);
                     wait = SETTLE_TICKS;
@@ -174,10 +188,24 @@ public final class Showcase {
         }
     }
 
+    /**
+     * A run left the player falling out of the world, or something killed them: back they come at the world's spawn,
+     * rather than every step after waiting on the death screen.
+     */
+    private static void respawnIfDead(Minecraft minecraft) {
+        if (minecraft.player != null && minecraft.player.isDeadOrDying()) {
+            minecraft.player.respawn();
+            if (minecraft.gui.screen() instanceof DeathScreen) {
+                minecraft.gui.setScreen(null);
+            }
+        }
+    }
+
     private static void play(Minecraft minecraft) {
         if (minecraft.gui.screen() instanceof PauseScreen) {
             minecraft.gui.setScreen(null);
         }
+        respawnIfDead(minecraft);
         advanceMove(minecraft);
         if (wait > 0) {
             wait--;
@@ -1161,6 +1189,338 @@ public final class Showcase {
                     }, 90)
                     .command("kill @e[type=!minecraft:player]")
                     .command("difficulty peaceful");
+            // out of a Hex and back in through where its caster parted the wall, which is no crossing over at all; from
+            // outside, the rest of the wall seen from within through the opening; then out through the wall itself
+            case "gate" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-34 ~ ~-34 ~34 ~12 ~34 minecraft:air")
+                    .command("execute at @a run fill ~-34 ~-1 ~-34 ~34 ~-1 ~34 minecraft:grass_block")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX)
+                    .tap().then(minecraft -> {
+                    }, 90)
+                    .anchor()
+                    // up to the north wall, parted wide
+                    .command("execute as @a at @s run tp @s ~ ~ ~-19 180 0")
+                    .playerCamera().hideHud(true).then(minecraft -> {
+                    }, 10)
+                    .hold(true).then(minecraft -> {
+                    }, 45)
+                    .hold(false).shot("gate_parted", 4)
+                    // out through it
+                    .walk(true).shot("gate_out_a", 20).shot("gate_out_b", 5).shot("gate_out_c", 5).shot("gate_out_d", 10).walk(false)
+                    // outside, looking back in through it
+                    .face(0, 0).shot("gate_view_in", 10)
+                    .view(0.0, 4.0, -42.0, 0.0, 3.0, 0.0).shot("gate_outside", 6)
+                    .view(10.0, 3.0, -34.0, 0.0, 3.0, 0.0).shot("gate_outside_angle", 4)
+                    .view(-14.0, 6.0, -46.0, 2.0, 2.0, 0.0).shot("gate_outside_far", 4)
+                    // and back in through it
+                    .playerCamera().shot("gate_back", 4)
+                    .walk(true).shot("gate_in_a", 18).shot("gate_in_b", 5).shot("gate_in_c", 5).shot("gate_in_d", 10).walk(false)
+                    // out through the wall itself, which is crossing over as ever
+                    .place(0.0, 0.0, 19.0).face(0, 0).shot("wall_before", 6)
+                    .walk(true).shot("wall_out_a", 22).shot("wall_out_b", 5).shot("wall_out_c", 5).shot("wall_out_d", 10).walk(false)
+                    .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                    }, 90);
+            // a town raised in a desert and let fall the way a caster lets it, the crown taken off, then the home left
+            // standing taken apart: what of the desert is not as it was, at each stage
+            case "desert" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build town")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-44 ~ ~-44 ~0 ~14 ~0 minecraft:air")
+                    .command("execute at @a run fill ~1 ~ ~-44 ~44 ~14 ~0 minecraft:air")
+                    .command("execute at @a run fill ~-44 ~ ~1 ~0 ~14 ~44 minecraft:air")
+                    .command("execute at @a run fill ~1 ~ ~1 ~44 ~14 ~44 minecraft:air")
+                    .command("execute at @a run fill ~-44 ~-4 ~-44 ~44 ~-2 ~44 minecraft:sandstone")
+                    .command("execute at @a run fill ~-44 ~-1 ~-44 ~44 ~-1 ~44 minecraft:sand")
+                    .command("execute at @a run fillbiome ~-48 ~-8 ~-48 ~48 ~24 ~48 minecraft:desert")
+                    // dunes of loose sand, and a pit, for the town to cut down and fill in
+                    .command("execute at @a run fill ~-20 ~ ~-20 ~-8 ~2 ~-8 minecraft:sand")
+                    .command("execute at @a run fill ~-17 ~3 ~-17 ~-11 ~4 ~-11 minecraft:sand")
+                    .command("execute at @a run fill ~5 ~ ~6 ~18 ~1 ~16 minecraft:sand")
+                    .command("execute at @a run fill ~-6 ~ ~12 ~4 ~3 ~22 minecraft:sand")
+                    .command("execute at @a run fill ~10 ~-3 ~-18 ~20 ~-1 ~-10 minecraft:air")
+                    .command("execute at @a run fill ~-26 ~ ~4 ~-14 ~1 ~10 minecraft:sand")
+                    .then(minecraft -> {
+                    }, 40)
+                    .anchor().snapshotGround()
+                    .view(0.0, 70.0, 0.5, 0.0, 0.0, 0.0).shot("desert_before", 10)
+                    .playerCamera().ensureUnsuited().face(0, 0).select(Spell.HEX)
+                    .tap().then(minecraft -> {
+                    }, 1400)
+                    .logGround("built").view(0.0, 70.0, 0.5, 0.0, 0.0, 0.0).shot("desert_built", 10)
+                    // the crown taken off: a warning, then the fall
+                    .playerCamera().command("item replace entity @a armor.head with minecraft:air").then(minecraft -> {
+                    }, 300)
+                    .logGround("fallen").view(0.0, 70.0, 0.5, 0.0, 0.0, 0.0).shot("desert_fallen", 10)
+                    .then(minecraft -> {
+                    }, 640)
+                    .logGround("home gone").view(0.0, 70.0, 0.5, 0.0, 0.0, 0.0).shot("desert_after", 10)
+                    .view(20.0, 12.0, -30.0, 0.0, 0.0, 0.0).shot("desert_after_low", 6)
+                    .playerCamera();
+            // a caster's home raised in four places far apart, none of them remembered, the towns before them kept in
+            // mind: each a different house from the last few
+            case "newhomes" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("execute as @a run scarlet hex build home")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX);
+                for (int i = 0; i < 4; i++) {
+                    // ground of its own each time, wherever that is
+                    s.command("execute as @a at @s run tp @s ~ 6 ~400 0 0").then(minecraft -> {
+                            }, 20)
+                            .command("execute at @a run fill ~-18 1 ~-18 ~18 3 ~18 minecraft:dirt")
+                            .command("execute at @a run fill ~-18 4 ~-18 ~18 4 ~18 minecraft:grass_block")
+                            .command("execute at @a run fill ~-18 5 ~-18 ~18 20 ~18 minecraft:air")
+                            .command("execute as @a at @s align xz run tp @s ~0.5 5 ~0.5 0 0").then(minecraft -> {
+                            }, 40)
+                            .anchor().tap().then(minecraft -> {
+                            }, 420)
+                            .view(16.0, 9.0, -18.0, 0.0, 4.0, 0.0).shot("home_" + i, 6).playerCamera()
+                            .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                            }, 20);
+                }
+            }
+            // a town raised on a hillside: where a street climbs from one stretch to the next, steps of the road's own
+            // colors, which change with the era like the rest of it
+            case "slope" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 90 0");
+                for (int x = -44; x <= 44; x += 11) {
+                    s.command("execute at @a run fill ~" + x + " ~ ~-44 ~" + Math.min(44, x + 10) + " ~30 ~44 minecraft:air");
+                }
+                // rising a block every four along z, from the north edge to the south, which the main street runs up
+                for (int i = 1; i < 22; i++) {
+                    int z0 = -44 + 4 * i;
+                    s.command("execute at @a run fill ~-44 ~ ~" + z0 + " ~44 ~" + (i - 1) + " ~" + (z0 + 3) + " minecraft:grass_block");
+                }
+                s.command("execute as @a at @s run tp @s ~ ~11 ~ 90 0").then(minecraft -> {
+                        }, 20)
+                        .anchor().ensureUnsuited().select(Spell.HEX).playerCamera()
+                        .tap().then(minecraft -> {
+                        }, 1400)
+                        .logSteps("built")
+                        .view(-34.0, 26.0, 0.0, 6.0, 0.0, 0.0).shot("slope_side", 40)
+                        .view(10.0, 6.0, -30.0, 10.0, 0.0, 6.0).shot("slope_street", 40)
+                        .view(10.0, 14.0, 28.0, 10.0, 4.0, -6.0).shot("slope_street_down", 40)
+                        .command("execute as @a run scarlet hex era present").then(minecraft -> {
+                        }, 260)
+                        .logSteps("present").view(10.0, 6.0, -30.0, 10.0, 0.0, 6.0).shot("slope_present", 40)
+                        .playerCamera()
+                        .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                        }, 20);
+            }
+            // mobs inside a Hex, rewritten as townspeople, and the names over their heads
+            case "names" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("gamemode creative @a")
+                    .command("difficulty easy")
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-8 ~ ~-8 ~8 ~6 ~8 minecraft:air")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                    .tap().then(minecraft -> {
+                    }, 90)
+                    .command("execute at @a run summon minecraft:creeper ~-2 ~ ~5 {PersistenceRequired:1b,NoAI:1b,Rotation:[180f,0f]}")
+                    .command("execute at @a run summon minecraft:zombie ~0 ~ ~5 {PersistenceRequired:1b,NoAI:1b,Rotation:[180f,0f]}")
+                    .command("execute at @a run summon minecraft:skeleton ~2 ~ ~5 {PersistenceRequired:1b,NoAI:1b,Rotation:[180f,0f]}")
+                    .command("execute at @a run summon minecraft:zombie ~4 ~ ~5 {PersistenceRequired:1b,NoAI:1b,Rotation:[180f,0f],"
+                            + "CustomName:\"Mr. Named\"}")
+                    .then(minecraft -> {
+                    }, 80)
+                    .then(minecraft -> {
+                        if (minecraft.level == null || minecraft.player == null) {
+                            return;
+                        }
+                        for (Entity entity : minecraft.level.getEntities(minecraft.player, minecraft.player.getBoundingBox().inflate(12.0))) {
+                            if (entity instanceof Mob) {
+                                Scarlet.LOG.info("Showcase: the {} goes by {}, {}", BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).getPath(),
+                                        com.yashjit.scarlet.client.hex.ResidentsClient.nameOf(entity).getString(),
+                                        com.yashjit.scarlet.client.hex.ResidentsClient.isResident(entity) ? "a townsperson" : "not a townsperson");
+                            }
+                        }
+                    }, 2)
+                    .face(0, 8).shot("names", 6)
+                    .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                    }, 20)
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("difficulty peaceful");
+            // in survival in their own Hex, Set Dressing beside the inventory: a television and a car taken from it with
+            // clicks, for a little chaos energy each; then outside the Hex, where it is gone
+            case "props" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("gamemode survival @a")
+                    .command("clear @a")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                    .tap().then(minecraft -> {
+                    }, 120)
+                    .logCarried("before")
+                    .inventory().then(minecraft -> {
+                    }, 10).shot("props_panel", 4)
+                    .clickProp(0).then(minecraft -> {
+                    }, 20)
+                    .clickProp(12).then(minecraft -> {
+                    }, 20)
+                    .logCarried("after a television and a car").shot("props_taken", 4)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    .command("execute as @a at @s run tp @s ~ ~ ~40").then(minecraft -> {
+                    }, 30)
+                    .inventory().then(minecraft -> {
+                    }, 10).shot("props_outside", 4)
+                    .clickProp(0).then(minecraft -> {
+                    }, 20)
+                    .logCarried("after a click outside the Hex")
+                    .then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    .command("gamemode creative @a")
+                    .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                    }, 20);
+            // a refrigerator that keeps things and spills them when broken, a range that cooks, a clock that tells the
+            // time, and a car driven off over a step and round, then got out of
+            case "appliances" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("gamemode survival @a")
+                    .command("clear @a")
+                    .command("time set 13000")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-8 ~ ~-3 ~8 ~5 ~30 minecraft:air")
+                    .command("execute at @a run fill ~-8 ~-1 ~-3 ~8 ~-1 ~30 minecraft:oak_planks")
+                    .anchor()
+                    .command("execute at @a run setblock ~-2 ~ ~3 scarlet:refrigerator[half=lower,facing=north]")
+                    .command("execute at @a run setblock ~-2 ~1 ~3 scarlet:refrigerator[half=upper,facing=north]")
+                    .command("execute at @a run setblock ~0 ~ ~3 scarlet:stove[facing=north]")
+                    .command("execute at @a run setblock ~2 ~1 ~4 minecraft:stone_bricks")
+                    .command("execute at @a run setblock ~2 ~1 ~3 scarlet:wall_clock[facing=north]")
+                    .command("execute at @a run item replace block ~-2 ~ ~3 container.0 with minecraft:apple 5")
+                    .command("execute at @a run item replace block ~-2 ~ ~3 container.4 with minecraft:milk_bucket")
+                    .face(0, 25).then(minecraft -> {
+                    }, 10)
+                    .useBlock(-2, 0, 3).then(minecraft -> {
+                    }, 10).shot("fridge_open", 4)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    // the range turned on with an empty hand, then raw beef held to it
+                    .useBlock(0, 0, 3).then(minecraft -> {
+                    }, 6)
+                    .command("item replace entity @a weapon.mainhand with minecraft:beef 3")
+                    .useBlock(0, 0, 3).then(minecraft -> {
+                    }, 6)
+                    .useBlock(0, 0, 3).then(minecraft -> {
+                    }, 6)
+                    .logCarried("after cooking").shot("stove_cooking", 2)
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .useBlock(2, 1, 3).then(minecraft -> {
+                    }, 4).shot("clock_time", 4)
+                    .command("kill @e[type=minecraft:item]").then(minecraft -> {
+                    }, 4)
+                    .command("execute at @a run setblock ~-2 ~ ~3 minecraft:air destroy").then(minecraft -> {
+                    }, 20)
+                    .logDropped("the refrigerator broken")
+                    .command("kill @e[type=minecraft:item]")
+                    // the car, a step across its way
+                    .command("execute at @a run fill ~-4 ~ ~15 ~4 ~ ~16 minecraft:stone_bricks")
+                    .command("execute at @a run summon scarlet:parked_car ~ ~ ~7 {Rotation:[0f,0f]}").then(minecraft -> {
+                    }, 10)
+                    .face(0, 10).getInCar().then(minecraft -> {
+                    }, 10).logCar("got in")
+                    .view(-4.5, 2.0, 7.0, 0.0, 0.9, 7.0).shot("car_seated", 4).playerCamera().shot("car_seated_view", 4)
+                    .walk(true).then(minecraft -> {
+                    }, 30).logCar("driving off").shot("car_driving", 2)
+                    .then(minecraft -> {
+                    }, 25).logCar("over the step")
+                    .then(minecraft -> minecraft.options.keyLeft.setDown(true), 30).logCar("turning left")
+                    .then(minecraft -> minecraft.options.keyLeft.setDown(false), 0).walk(false).then(minecraft -> {
+                    }, 40).logCar("rolled to a stop")
+                    .view(-8.0, 6.0, 0.0, 0.0, 1.0, 14.0).shot("car_parked_again", 4).playerCamera()
+                    .then(minecraft -> minecraft.options.keyShift.setDown(true), 4).then(minecraft -> minecraft.options.keyShift.setDown(false), 10)
+                    .logCar("got out")
+                    .command("gamemode creative @a")
+                    .command("time set noon");
+            // a refrigerator broken from below and another from above: what each leaves lying, piece by piece
+            case "fridgebreak" -> s
+                    .land()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-4 ~ ~2 ~4 ~3 ~6 minecraft:air")
+                    .anchor()
+                    .command("execute at @a run setblock ~-2 ~ ~4 scarlet:refrigerator[half=lower,facing=north]")
+                    .command("execute at @a run setblock ~-2 ~1 ~4 scarlet:refrigerator[half=upper,facing=north]")
+                    .command("execute at @a run setblock ~2 ~ ~4 scarlet:refrigerator[half=lower,facing=north]")
+                    .command("execute at @a run setblock ~2 ~1 ~4 scarlet:refrigerator[half=upper,facing=north]").then(minecraft -> {
+                    }, 10)
+                    .command("kill @e[type=minecraft:item]").then(minecraft -> {
+                    }, 4)
+                    .then(minecraft -> {
+                        IntegratedServer server = minecraft.getSingleplayerServer();
+                        if (server != null) {
+                            BlockPos origin = BlockPos.containing(anchor);
+                            server.execute(() -> Scarlet.LOG.info("Showcase: the first stands as {} under {}",
+                                    server.overworld().getBlockState(origin.offset(-2, 0, 4)), server.overworld().getBlockState(origin.offset(-2, 1, 4))));
+                        }
+                    }, 2)
+                    .command("execute at @a run setblock ~-2 ~ ~4 minecraft:air destroy").then(minecraft -> {
+                    }, 1)
+                    .logDropped("the first, the moment it is broken from below").then(minecraft -> {
+                    }, 20)
+                    .logDropped("the first broken from below")
+                    .command("kill @e[type=minecraft:item]").then(minecraft -> {
+                    }, 4)
+                    .command("execute at @a run setblock ~2 ~1 ~4 minecraft:air destroy").then(minecraft -> {
+                    }, 20)
+                    .logDropped("the second broken from above");
+            // the remote clicked the way a player clicks it, the cursor put on each button through the mouse handler
+            case "remoteclick" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                    .tap().then(minecraft -> {
+                    }, 120)
+                    .then(ShowrunnerScreen::open, 12).logRemote("opened").shot("remote_open", 2)
+                    // the third channel, night, a storm, episodes on, and the next Hex a town
+                    .clickRemote(6 + 2 * 26 + 12, 60 + 8).then(minecraft -> {
+                    }, 30).logRemote("third channel clicked")
+                    .clickRemote(6 + 4 * 31 + 14, 127 + 7).then(minecraft -> {
+                    }, 30).logRemote("night clicked")
+                    .clickRemote(6 + 3 * 39 + 18, 156 + 7).then(minecraft -> {
+                    }, 30).logRemote("storm clicked")
+                    .clickRemote(168 - 50 + 22, 79 + 7).then(minecraft -> {
+                    }, 30).logRemote("episodes clicked")
+                    .clickRemote(6 + 18, 185 + 7).then(minecraft -> {
+                    }, 30).logRemote("town clicked")
+                    .shot("remote_clicked", 2)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 2)
+                    .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                    }, 90);
             case "paint" -> s
                     .land()
                     .dispelHexes()
@@ -1681,7 +2041,7 @@ public final class Showcase {
             // on a dedicated server (-PshowcaseServer): suited up, a bolt cast, then dreamwalking into a pig nearby,
             // looking back at the body left behind and seeing it close, and a blow to it snapping the spirit back
             case "online" -> s
-                    .command("gamemode creative")
+                    .command("gamemode creative @a")
                     .command("difficulty peaceful")
                     .command("time set noon")
                     .command("kill @e[type=!minecraft:player]")
@@ -3553,6 +3913,268 @@ public final class Showcase {
                                 Math.round(Magic.energy(player, player.level().getGameTime())), Math.round(Magic.maxEnergy(player)));
                     }
                 });
+            }, 2);
+        }
+
+        /**
+         * A right click on a block measured from the anchor, as a player gives it: the game's own use of what is in hand
+         * on a block, its top face.
+         */
+        Scene useBlock(int x, int y, int z) {
+            return then(minecraft -> {
+                if (minecraft.player == null || minecraft.gameMode == null) {
+                    return;
+                }
+                BlockPos pos = BlockPos.containing(anchor.add(x, y, z));
+                minecraft.gameMode.useItemOn(minecraft.player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                        new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(pos), net.minecraft.core.Direction.UP, pos, false));
+            }, 4);
+        }
+
+        /**
+         * A right click on the nearest car, as a player gives it.
+         */
+        Scene getInCar() {
+            return then(minecraft -> {
+                if (minecraft.player == null || minecraft.gameMode == null || minecraft.level == null) {
+                    return;
+                }
+                List<com.yashjit.scarlet.entity.ParkedCar> cars = minecraft.level.getEntitiesOfClass(com.yashjit.scarlet.entity.ParkedCar.class,
+                        minecraft.player.getBoundingBox().inflate(10.0));
+                if (!cars.isEmpty()) {
+                    minecraft.gameMode.interact(minecraft.player, cars.getFirst(), new net.minecraft.world.phys.EntityHitResult(cars.getFirst()),
+                            net.minecraft.world.InteractionHand.MAIN_HAND);
+                }
+            }, 6);
+        }
+
+        /**
+         * Writes down in the log where the nearest car is, measured from the anchor, which way it faces, how fast it goes
+         * and who is in it.
+         */
+        Scene logCar(String when) {
+            return then(minecraft -> {
+                if (minecraft.player == null || minecraft.level == null) {
+                    return;
+                }
+                List<com.yashjit.scarlet.entity.ParkedCar> cars = minecraft.level.getEntitiesOfClass(com.yashjit.scarlet.entity.ParkedCar.class,
+                        minecraft.player.getBoundingBox().inflate(40.0));
+                if (cars.isEmpty()) {
+                    Scarlet.LOG.info("Showcase: {}: no car", when);
+                    return;
+                }
+                var car = cars.getFirst();
+                Vec3 at = car.position().subtract(anchor);
+                Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: the car at %.1f %.2f %.1f facing %.0f going %.2f, %d riding, the player %s",
+                        when, at.x, at.y, at.z, Mth.wrapDegrees(car.getYRot()), car.speed(), car.getPassengers().size(),
+                        minecraft.player.getVehicle() == car ? "driving" : "on foot"));
+            }, 1);
+        }
+
+        /**
+         * Writes down in the log what the player carries of the decorations, the car and the kitchen's food, and how much
+         * chaos energy they have.
+         */
+        Scene logCarried(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(id);
+                    if (player == null) {
+                        return;
+                    }
+                    java.util.Map<String, Integer> carried = new java.util.TreeMap<>();
+                    for (ItemStack stack : player.getInventory().getNonEquipmentItems()) {
+                        if (!stack.isEmpty()) {
+                            carried.merge(BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath(), stack.getCount(), Integer::sum);
+                        }
+                    }
+                    Scarlet.LOG.info("Showcase: {}: carrying {}, with {} chaos energy", when, carried,
+                            Math.round(Magic.energy(player, player.level().getGameTime())));
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log the items lying around the anchor.
+         */
+        Scene logDropped(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                server.execute(() -> {
+                    java.util.Map<String, Integer> lying = new java.util.TreeMap<>();
+                    StringBuilder pieces = new StringBuilder();
+                    for (var item : server.overworld().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
+                            new net.minecraft.world.phys.AABB(anchor, anchor).inflate(12.0))) {
+                        String name = BuiltInRegistries.ITEM.getKey(item.getItem().getItem()).getPath();
+                        lying.merge(name, item.getItem().getCount(), Integer::sum);
+                        pieces.append(String.format(java.util.Locale.ROOT, " %s x%d from y %+.1f;", name, item.getItem().getCount(),
+                                item.getY() - anchor.y));
+                    }
+                    Scarlet.LOG.info("Showcase: {}: lying about {},{}", when, lying, pieces);
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log how many steps a town has laid in its streets around the anchor, by what they are made
+         * of.
+         */
+        Scene logSteps(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                BlockPos origin = BlockPos.containing(anchor);
+                server.execute(() -> {
+                    ServerLevel level = server.overworld();
+                    java.util.Map<String, Integer> found = new java.util.TreeMap<>();
+                    for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-40, -16, -40), origin.offset(40, 24, 40))) {
+                        BlockState state = level.getBlockState(pos);
+                        if (state.is(Blocks.POLISHED_DEEPSLATE_STAIRS) || state.is(Blocks.POLISHED_ANDESITE_STAIRS)
+                                || state.is(Blocks.BLACKSTONE_STAIRS) || state.is(Blocks.POLISHED_DIORITE_STAIRS)) {
+                            found.merge(name(state), 1, Integer::sum);
+                        }
+                    }
+                    Scarlet.LOG.info("Showcase: {}: steps in the streets {}", when, found);
+                });
+            }, 2);
+        }
+
+        /**
+         * Notes every block around the anchor, out past where a Hex cast there builds, to measure what it leaves changed.
+         */
+        Scene snapshotGround() {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                BlockPos origin = BlockPos.containing(anchor);
+                server.execute(() -> {
+                    ServerLevel level = server.overworld();
+                    GROUND.clear();
+                    for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-GROUND_REACH, -5, -GROUND_REACH), origin.offset(GROUND_REACH, 16, GROUND_REACH))) {
+                        GROUND.put(pos.asLong(), level.getBlockState(pos));
+                    }
+                    Scarlet.LOG.info("Showcase: noted {} blocks around {}", GROUND.size(), origin.toShortString());
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log how many of the blocks noted are not as they were, and the commonest changes.
+         */
+        Scene logGround(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                server.execute(() -> {
+                    ServerLevel level = server.overworld();
+                    java.util.Map<String, Integer> changes = new java.util.HashMap<>();
+                    int changed = 0;
+                    for (var entry : GROUND.entrySet()) {
+                        BlockState now = level.getBlockState(BlockPos.of(entry.getKey()));
+                        if (now != entry.getValue()) {
+                            changed++;
+                            changes.merge(name(entry.getValue()) + " -> " + name(now), 1, Integer::sum);
+                        }
+                    }
+                    StringBuilder line = new StringBuilder();
+                    changes.entrySet().stream().sorted(java.util.Map.Entry.<String, Integer>comparingByValue().reversed()).limit(14)
+                            .forEach(change -> line.append("\n    ").append(change.getValue()).append(" ").append(change.getKey()));
+                    Scarlet.LOG.info("Showcase: {}: {} of {} blocks not as they were, {} Hexes standing{}", when, changed, GROUND.size(),
+                            HexData.of(level).all().size(), line);
+                });
+            }, 2);
+        }
+
+        private static String name(BlockState state) {
+            return BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        }
+
+        /**
+         * Writes down in the log what the player's Hex is on as this client has word of it, what the next Hex builds,
+         * and what screen is open.
+         */
+        Scene logRemote(String when) {
+            return then(minecraft -> {
+                if (minecraft.player == null) {
+                    return;
+                }
+                String screen = minecraft.gui.screen() == null ? "none" : minecraft.gui.screen().getClass().getSimpleName();
+                for (HexSnapshot hex : Hexes.clientHexes()) {
+                    if (hex.caster().equals(minecraft.player.getUUID())) {
+                        Scarlet.LOG.info("Showcase: {}: the {}, {} and {}, episodes {}, the next Hex builds {}, {} open", when, hex.eraValue(),
+                                hex.sky().time(), hex.sky().weather(), hex.episodes() ? "on" : "off",
+                                Services.PLAYER_DATA.get(minecraft.player).hexBuild(), screen);
+                        return;
+                    }
+                }
+                Scarlet.LOG.info("Showcase: {}: no Hex of the player's, {} open", when, screen);
+            }, 1);
+        }
+
+        /**
+         * A left click on the Showrunner's remote at a spot measured from its top left corner, given as a player gives
+         * it: the cursor put there and the button pressed and let go, through the mouse handler as the window's own
+         * callbacks reach it. The remote stands its width and margin in from the right, centred top to bottom.
+         */
+        Scene clickRemote(int x, int y) {
+            return clickAt(screen -> screen.width - 168 - 24 + x, screen -> Math.max(4, (screen.height - 230) / 2) + y);
+        }
+
+        /**
+         * A left click on Set Dressing beside the inventory, on the slot of one of the things it offers: the panel stands
+         * just right of the inventory, or left of it where the screen runs out.
+         */
+        Scene clickProp(int index) {
+            java.util.function.ToIntFunction<Screen> left = screen -> {
+                int x = (screen.width - 176) / 2 + 176 + 3;
+                return x + 62 > screen.width - 2 ? (screen.width - 176) / 2 - 3 - 62 : x;
+            };
+            return clickAt(screen -> left.applyAsInt(screen) + 4 + index % 3 * 18 + 9, screen -> (screen.height - 166) / 2 + 12 + index / 3 * 18 + 9);
+        }
+
+        /**
+         * A left click on the open screen at a spot in its own coordinates, given as a player gives it: the cursor put
+         * there and the button pressed and let go, through the mouse handler as the window's own callbacks reach it.
+         */
+        Scene clickAt(java.util.function.ToIntFunction<Screen> x, java.util.function.ToIntFunction<Screen> y) {
+            MouseButtonInfo left = new MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT, 0);
+            return then(minecraft -> {
+                Screen screen = minecraft.gui.screen();
+                if (screen == null) {
+                    return;
+                }
+                Window window = minecraft.getWindow();
+                double guiX = x.applyAsInt(screen);
+                double guiY = y.applyAsInt(screen);
+                clicking = true;
+                try {
+                    minecraft.mouseHandler.onMove(window.handle(), guiX * window.getScreenWidth() / window.getGuiScaledWidth(),
+                            guiY * window.getScreenHeight() / window.getGuiScaledHeight(), 0.0, 0.0);
+                    minecraft.mouseHandler.onButton(window.handle(), left, InputConstants.PRESS);
+                } finally {
+                    clicking = false;
+                }
+            }, 2).then(minecraft -> {
+                clicking = true;
+                try {
+                    minecraft.mouseHandler.onButton(minecraft.getWindow().handle(), left, InputConstants.RELEASE);
+                } finally {
+                    clicking = false;
+                }
             }, 2);
         }
 

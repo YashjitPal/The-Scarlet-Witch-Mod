@@ -18,10 +18,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.core.ClientAsset;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
@@ -46,6 +48,14 @@ public final class ResidentsClient {
     /** Townspeople per era; the last half have slim arms. */
     public static final int PEOPLE = 6;
     private static final float CHANGE_TICKS = 26.0F;
+    private static final String[] HIS = {"Herb", "Phil", "Norm", "Harold", "Walter", "Ralph", "Fred", "Ward", "Ozzie", "Rob", "Mel",
+            "Stan", "Arthur", "Eddie", "Gus", "Murray", "Ted", "Leonard", "Floyd", "Wally", "Bert", "Howard", "Jerry", "Frank"};
+    private static final String[] HERS = {"Dottie", "Agnes", "Sharon", "Harriet", "June", "Ethel", "Lucy", "Betty", "Doris", "Peggy",
+            "Margie", "Alice", "Edna", "Rose", "Trixie", "Millie", "Shirley", "Gloria", "Norma", "Hazel", "Laura", "Marion", "Vera",
+            "Thelma"};
+    private static final String[] FAMILIES = {"Jones", "Hart", "Fletcher", "Nelson", "Petrie", "Cleaver", "Kramden", "Mertz",
+            "Douglas", "Stephens", "Baxter", "Kowalski", "Henderson", "Tate", "Bradford", "Partridge", "Brady", "Keaton", "Seaver",
+            "Tanner", "Winslow", "Bundy", "Cunningham", "Pemberton", "Abernathy", "McAllister", "Whitfield", "Lambert"};
 
     private static IntOpenHashSet residents = new IntOpenHashSet();
     /** When each mob began changing between its two selves. */
@@ -237,6 +247,29 @@ public final class ResidentsClient {
         return SKINS.computeIfAbsent(era.ordinal() * PEOPLE + person, key -> PlayerSkin.insecure(
                 new ClientAsset.ResourceTexture(Scarlet.id("entity/resident/" + name(era) + "_" + person)), null, null,
                 person >= PEOPLE / 2 ? PlayerModelType.SLIM : PlayerModelType.WIDE));
+    }
+
+    /**
+     * Whether a mob is one of a Hex's townspeople, as this client was last told.
+     */
+    public static boolean isResident(Entity entity) {
+        return residents.contains(entity.getId());
+    }
+
+    /**
+     * What a resident goes by: a name a player gave them, or else the one the sitcom gave them, always the same for the
+     * same mob and fitting who they are dressed as.
+     */
+    public static Component nameOf(Entity entity) {
+        Component given = entity.getCustomName();
+        if (given != null) {
+            return given;
+        }
+        UUID id = entity.getUUID();
+        String[] firsts = Math.floorMod(id.hashCode(), PEOPLE) >= PEOPLE / 2 ? HERS : HIS;
+        String first = firsts[Math.floorMod(id.getMostSignificantBits() >>> 7, firsts.length)];
+        String family = FAMILIES[Math.floorMod(id.getLeastSignificantBits() >>> 11, FAMILIES.length)];
+        return Component.literal(first + " " + family);
     }
 
     /**

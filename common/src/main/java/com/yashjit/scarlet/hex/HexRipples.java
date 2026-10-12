@@ -32,12 +32,14 @@ public final class HexRipples {
 
     /**
      * Where the path from {@code from} to {@code to} goes through the wall of a Hex standing in the level, if it does.
+     * Passing through where its caster has parted it is not going through the wall.
      */
     public static @Nullable Vec3 crossing(ServerLevel level, Vec3 from, Vec3 to) {
         long now = level.getGameTime();
         for (Hex hex : HexData.of(level).all()) {
-            Vec3 at = crossing(hex.center, Hexes.wallRadius(hex, now), from, to);
-            if (at != null) {
+            float wall = Hexes.wallRadius(hex, now);
+            Vec3 at = crossing(hex.center, wall, from, to);
+            if (at != null && !Hexes.inOpening(hex, wall, at)) {
                 return at;
             }
         }

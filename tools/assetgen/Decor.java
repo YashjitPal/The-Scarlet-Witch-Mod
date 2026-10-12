@@ -1220,35 +1220,33 @@ public final class Decor {
                     """.formatted(NS, id, itemModel());
         }
 
+        /**
+         * The block's drop, written the way Minecraft 26 reads conditions: one {@code condition} object with a
+         * {@code type}, which a list of the older {@code conditions} would be silently ignored in place of. A piece two
+         * blocks tall drops only from its lower half, as a door does.
+         */
         String lootTable() {
-            String condition = twoTall ? """
-                    ,
-                              "conditions": [
-                                {
-                                  "condition": "minecraft:block_state_property",
-                                  "block": "%s:%s",
-                                  "properties": { "half": "lower" }
-                                }
-                              ]""".formatted(NS, id) : "";
+            String indent = "\n" + " ".repeat(10);
+            String condition = twoTall ? indent + "\"condition\": {" + indent + "  \"type\": \"minecraft:match_block\"," + indent + "  \"blocks\": \"" + NS + ":"
+                    + id + "\"," + indent + "  \"state\": { \"half\": \"lower\" }" + indent + "}," : "";
             return """
                     {
                       "type": "minecraft:block",
                       "pools": [
                         {
-                          "bonus_rolls": 0.0,
-                          "conditions": [ { "condition": "minecraft:survives_explosion" } ],
+                          "condition": { "type": "minecraft:survives_explosion" },
                           "entries": [
                             {
-                              "type": "minecraft:item",
-                              "name": "%s:%s"%s
+                              "type": "minecraft:item",%s
+                              "name": "%s:%s"
                             }
                           ],
-                          "rolls": 1.0
+                          "rolls": 1
                         }
                       ],
                       "random_sequence": "%s:blocks/%s"
                     }
-                    """.formatted(NS, id, condition, NS, id);
+                    """.formatted(condition, NS, id, NS, id);
         }
     }
 

@@ -24,6 +24,10 @@ final class DecorCar {
     static final float REAR_SHIFT = -5;
     /** How far across each half is moved, so that the car's middle line falls on the middle of a block. */
     static final float ACROSS_SHIFT = 8;
+    /** How far the windshield and the rear window lean in from the shoulders up to the roof, in sixteenths. */
+    static final float RAKE = 2;
+    /** How far a plate stands proud of its bumper. */
+    static final float PLATE = 0.2F;
 
     private DecorCar() {
     }
@@ -139,25 +143,38 @@ final class DecorCar {
         String paint = m("car_paint");
         // the body, painted
         model.box(-hw, s.sill(), -hl, hw, s.belt(), hl, paint).tint();
-        // the cabin: glass all round, under its roof, with pillars between the windows
+        // the cabin: glass all round, upright to the shoulders and raked back from there to the roof at the windshield
+        // and the rear window, with pillars between the windows that lean in with the glass at either end
         float cw = hw - 1.5F;
-        model.box(-cw, s.belt(), s.cabinFrom(), cw, s.roof(), s.cabinTo(), m("glass_car"));
-        Decor.Element roof = model.box(-cw - 0.25F, s.roof(), s.cabinFrom() + 0.5F, cw + 0.25F, s.roof() + 1, s.cabinTo() - 0.25F, m(s.roofMaterial()));
+        float shoulder = s.roof() - 3;
+        model.box(-cw, s.belt(), s.cabinFrom(), cw, shoulder, s.cabinTo(), m("glass_car"));
+        model.box(-cw, shoulder, s.cabinFrom() + RAKE, cw, s.roof(), s.cabinTo() - RAKE, m("glass_car"));
+        Decor.Element roof = model.box(-cw - 0.25F, s.roof(), s.cabinFrom() + RAKE + 0.5F, cw + 0.25F, s.roof() + 1, s.cabinTo() - RAKE - 0.25F,
+                m(s.roofMaterial()));
         if (s.roofTinted()) {
             roof.tint();
         }
         float[] pillars = era == 0 ? new float[] {s.cabinFrom(), 0, s.cabinTo() - 2} : era == 4
                 ? new float[] {s.cabinFrom(), 0, 14, s.cabinTo() - 2} : new float[] {s.cabinFrom(), 1, s.cabinTo() - 2};
-        for (float z : pillars) {
-            Decor.Element pillar = model.box(-cw - 0.1F, s.belt(), z, cw + 0.1F, s.roof(), z + 2, era == 0 ? m("car_white") : paint);
-            pillar.only(W, E);
-            if (era != 0) {
-                pillar.tint();
+        for (int k = 0; k < pillars.length; k++) {
+            float z = pillars[k];
+            if (k == 0 || k == pillars.length - 1) {
+                pillar(model, cw, s.belt(), shoulder, z, era, paint);
+                pillar(model, cw, shoulder, s.roof(), k == 0 ? z + RAKE : z - RAKE, era, paint);
+            } else {
+                pillar(model, cw, s.belt(), s.roof(), z, era, paint);
             }
         }
-        // bumpers
-        model.box(-hw - 0.5F, s.sill() - 1, -hl - 1, hw + 0.5F, s.sill() + 2, -hl + 1, m(s.trim()));
-        model.box(-hw - 0.5F, s.sill() - 1, hl - 1, hw + 0.5F, s.sill() + 2, hl + 1, m(s.trim()));
+        // a mirror at each foot of the windshield, in the body's paint
+        for (int side = -1; side <= 1; side += 2) {
+            float x0 = side < 0 ? -hw - 1.25F : hw + 0.25F;
+            model.box(x0, s.belt() + 0.5F, s.cabinFrom() + 0.5F, x0 + 1, s.belt() + 2, s.cabinFrom() + 2.5F, paint).tint();
+        }
+        doors(model, s);
+        plates(model, s, era);
+        // bumpers, their plates standing just proud of them at the very ends of the car, as far out as a model reaches
+        model.box(-hw - 0.5F, s.sill() - 1, -hl - 1 + PLATE, hw + 0.5F, s.sill() + 2, -hl + 1, m(s.trim()));
+        model.box(-hw - 0.5F, s.sill() - 1, hl - 1, hw + 0.5F, s.sill() + 2, hl + 1 - PLATE, m(s.trim()));
         // a strip along each side
         if (era <= 2) {
             model.box(-hw - 0.1F, s.belt() - 3.5F, -hl + 2, -hw, s.belt() - 3, hl - 2, m("chrome")).only(W);
@@ -188,7 +205,44 @@ final class DecorCar {
         return model;
     }
 
-    /** Headlights and a grille across the front, taillights at the back. */
+    private static void pillar(Decor.Model model, float cw, float y0, float y1, float z, int era, String paint) {
+        Decor.Element pillar = model.box(-cw - 0.1F, y0, z, cw + 0.1F, y1, z + 2, era == 0 ? m("car_white") : paint);
+        pillar.only(W, E);
+        if (era != 0) {
+            pillar.tint();
+        }
+    }
+
+    /** The doors down each side: a dark seam at each of their edges, and a chrome handle on each. */
+    private static void doors(Decor.Model model, Shape s) {
+        float hw = s.width() / 2;
+        float middle = (s.cabinFrom() + s.cabinTo()) / 2;
+        float[] seams = {s.cabinFrom() + 1.5F, middle, s.cabinTo() - 1.5F};
+        for (int side = -1; side <= 1; side += 2) {
+            Decor.Face out = side < 0 ? W : E;
+            float x0 = side < 0 ? -hw - 0.06F : hw;
+            for (float z : seams) {
+                model.box(x0, s.sill() + 1, z, x0 + 0.06F, s.belt() - 0.25F, z + 0.35F, m("plastic_black")).only(out);
+            }
+            float h0 = side < 0 ? -hw - 0.2F : hw;
+            for (float z : new float[] {middle - 3, s.cabinTo() - 4.5F}) {
+                model.box(h0, s.belt() - 2, z, h0 + 0.2F, s.belt() - 1.4F, z + 1.5F, m("chrome")).only(out);
+            }
+        }
+    }
+
+    /** A plate on each bumper, in the colors of the era's plates. */
+    private static void plates(Decor.Model model, Shape s, int era) {
+        float hl = s.length() / 2;
+        Decor.Element front = model.box(-4, s.sill() - 1, -hl - 1, 4, s.sill() + 2, -hl - 1 + PLATE);
+        front.only(N);
+        model.paint(front, N, Decor.detail("car_body", era, "plate"), t -> plate(t, era));
+        Decor.Element rear = model.box(-4, s.sill() - 1, hl + 1 - PLATE, 4, s.sill() + 2, hl + 1);
+        rear.only(S);
+        model.paint(rear, S, Decor.detail("car_body", era, "plate"), t -> plate(t, era));
+    }
+
+    /** Headlights and a grille across the front, taillights at the back, all lit. */
     private static void lights(Decor.Model model, Shape s, int era) {
         float hl = s.length() / 2;
         float hw = s.width() / 2;
@@ -206,9 +260,11 @@ final class DecorCar {
             float x0 = side < 0 ? -hw + 0.5F : hw - 4.5F;
             Decor.Element lamp = model.box(x0, y0, -hl - 0.3F, x0 + 4, y1, -hl);
             lamp.only(N);
+            lamp.glow(8);
             model.paint(lamp, N, Decor.detail("car_body", era, "headlight"), t -> headlight(t, era));
             Decor.Element tail = model.box(x0, y0, hl, x0 + 4, y1, hl + 0.3F);
             tail.only(S);
+            tail.glow(5);
             model.paint(tail, S, Decor.detail("car_body", era, "taillight"), t -> taillight(t, era));
         }
         if (era == 5) {
@@ -225,7 +281,7 @@ final class DecorCar {
         for (float z : new float[] {-axle, axle}) {
             for (int side = -1; side <= 1; side += 2) {
                 float x0 = side < 0 ? -hw - 0.5F : hw - 2.5F;
-                Decor.Element wheel = model.box(x0, 0, z - 6, x0 + 3, 12, z + 6, m("rubber"));
+                Decor.Element wheel = model.box(x0, 0, z - 5.5F, x0 + 3, 11, z + 5.5F, m("rubber"));
                 Decor.Face outside = side < 0 ? W : E;
                 model.paint(wheel, outside, Decor.detail("car_body", era, "wheel"), t -> wheel(t, s.wheel()));
                 wheel.faces.remove(side < 0 ? E : W);
@@ -286,6 +342,21 @@ final class DecorCar {
         } else {
             t.rect(0, 0, t.w, t.h, Decor.hex(0xC8282B));
             t.rect(0, t.h - 1, t.w, 1, Decor.hex(0xF2A33A));
+        }
+    }
+
+    /**
+     * A plate in its era's colors, its number a row of dots with a gap in the middle: black and yellow in the 1950s,
+     * the other way round in the 1960s, white since, with letters of blue, red, and blue again.
+     */
+    private static void plate(Decor.Tex t, int era) {
+        int[][] colors = {{0x1C1C1E, 0xE8C34A}, {0xE8C34A, 0x1C1C1E}, {0xF2F0EA, 0x2B4E8C}, {0xF2F0EA, 0xB3282E}, {0xF2F0EA, 0x2B4E8C},
+                {0xF4F6F8, 0x1F3A6B}};
+        t.fill(Decor.hex(colors[era][0]));
+        for (int x = 1; x < t.w - 1; x++) {
+            if (x != t.w / 2) {
+                t.px(x, t.h / 2, Decor.hex(colors[era][1]));
+            }
         }
     }
 

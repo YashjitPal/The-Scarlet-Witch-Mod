@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.network;
 
 import com.yashjit.scarlet.darkhold.Dreamwalk;
+import com.yashjit.scarlet.decor.Props;
 import com.yashjit.scarlet.hex.Showrunner;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.magic.MindControl;
@@ -12,7 +13,7 @@ public final class ScarletNetwork {
     /**
      * Bump whenever a payload's format changes, so mismatched clients and servers refuse to connect.
      */
-    public static final String VERSION = "22";
+    public static final String VERSION = "23";
 
     private ScarletNetwork() {
     }
@@ -27,6 +28,7 @@ public final class ScarletNetwork {
         registry.serverbound(ShowrunnerPayload.TYPE, ShowrunnerPayload.STREAM_CODEC, (payload, player) -> Showrunner.handle(player, payload));
         registry.serverbound(HomePayload.TYPE, HomePayload.STREAM_CODEC, (payload, player) -> Showrunner.raiseHome(player, payload));
         registry.serverbound(DreamPayload.TYPE, DreamPayload.STREAM_CODEC, Dreamwalk::handle);
+        registry.serverbound(PropPayload.TYPE, PropPayload.STREAM_CODEC, (payload, player) -> Props.conjure(player, payload.index()));
         registry.clientbound(DreamOptionsPayload.TYPE, DreamOptionsPayload.STREAM_CODEC);
         registry.clientbound(DreamStatePayload.TYPE, DreamStatePayload.STREAM_CODEC);
         registry.clientbound(PossessPayload.TYPE, PossessPayload.STREAM_CODEC);

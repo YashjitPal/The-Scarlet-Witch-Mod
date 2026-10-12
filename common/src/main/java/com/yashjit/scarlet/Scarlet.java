@@ -2,6 +2,7 @@ package com.yashjit.scarlet;
 
 import com.yashjit.scarlet.config.ScarletServerConfig;
 import com.yashjit.scarlet.platform.Services;
+import com.yashjit.scarlet.registry.ScarletBlockEntities;
 import com.yashjit.scarlet.registry.ScarletBlocks;
 import com.yashjit.scarlet.registry.ScarletCreativeTabs;
 import com.yashjit.scarlet.registry.ScarletDataComponents;
@@ -35,6 +36,7 @@ public final class Scarlet {
         ScarletSounds.bootstrap();
         ScarletItems.bootstrap();
         ScarletBlocks.bootstrap();
+        ScarletBlockEntities.bootstrap();
         ScarletEntities.bootstrap();
         ScarletTickets.bootstrap();
         ScarletRecipeSerializers.bootstrap();

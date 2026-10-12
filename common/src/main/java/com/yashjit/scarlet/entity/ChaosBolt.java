@@ -75,7 +75,7 @@ public class ChaosBolt extends ThrowableProjectile {
 
     /**
      * No chaos blast goes through the wall of a Hex: it bursts on it, and the wall flares red and ripples from where
-     * it was struck.
+     * it was struck. Through where its caster has parted the wall, it flies on.
      */
     private void strikeHex(ServerLevel level, Vec3 at) {
         burst(at, getDeltaMovement().normalize().reverse(), false, false);

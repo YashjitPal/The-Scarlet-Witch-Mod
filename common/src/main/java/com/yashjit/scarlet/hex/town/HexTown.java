@@ -326,6 +326,36 @@ public final class HexTown {
     }
 
     /**
+     * A seed for a town raised somewhere new, drawn again until its home is another house from any raised from the seeds
+     * given, as far as there are other houses to be.
+     */
+    public static long freshSeed(long seed, List<Long> lately) {
+        IntOpenHashSet had = new IntOpenHashSet();
+        for (long old : lately) {
+            had.add(homeKind(old));
+        }
+        seed = Houses.marked(seed);
+        for (int tries = 0; tries < 32 && had.contains(homeKind(seed)); tries++) {
+            seed = Houses.marked(seed * 0x5851F42D4C957F2DL + 0x14057B7EF767814FL);
+        }
+        return seed;
+    }
+
+    /**
+     * Which kind of home a town's seed raises.
+     */
+    private static int homeKind(long seed) {
+        return Houses.homeKind(looks(seed, TownPlan.HOME_LOOK), Houses.homeKinds(seed));
+    }
+
+    /**
+     * What a part of a town looks like is drawn from: its town's seed and which part it is.
+     */
+    private static RandomSource looks(long seed, int lookId) {
+        return RandomSource.create(seed ^ (lookId * 0x9E3779B97F4A7C15L));
+    }
+
+    /**
      * A town raised again just as it was, over ground it stood on before, its home wherever its caster last raised it.
      */
     public static HexTown recall(TownMemory town, List<TownMemory> remembered, Era era) {
@@ -824,7 +854,7 @@ public final class HexTown {
         }
         Blueprint blueprint = shell != null ? Houses.finished(frame, survey.ground(), survey::height, occupied, shell, paint, random)
                 : adopted ? Houses.around(frame, survey.ground(), survey::height, occupied)
-                : blueprint(part, survey, clip != WHOLE, occupied);
+                : blueprint(part, survey, clip != WHOLE, occupied, other -> levelOf(level, hexCenter, other));
         List<Piece> pieces = blueprint.schedule();
         // the caster floats in the middle of their home as it rises around them; nothing goes where they are but the rug
         // they come down onto, which lies lower than they float
@@ -1002,7 +1032,8 @@ public final class HexTown {
             Survey survey = survey(level, part, hexCenter, clip);
             int ground = levels.getOrDefault(id, survey != null ? survey.ground() : center.getY());
             Survey leveled = survey != null ? survey.at(ground) : Survey.flat(ground, part);
-            Blueprint blueprint = blueprint(part, leveled, clip != WHOLE, new boolean[leveled.columns().length]);
+            Blueprint blueprint = blueprint(part, leveled, clip != WHOLE, new boolean[leveled.columns().length],
+                    other -> levelOf(level, hexCenter, other));
             List<Piece> pieces = blueprint.schedule();
             pieces.removeIf(piece -> leveled.isBlocked(part, piece.pos()) || !within(hexCenter, clip, piece.pos()));
             Build build = new Build(part, ground, pieces, started.get(id), blueprint.duration());
@@ -1621,7 +1652,8 @@ public final class HexTown {
         builtAt.defaultReturnValue(-1);
         int duration = HomeRemnant.BUILD_TICKS;
         if (!madeOver) {
-            Blueprint blueprint = blueprint(home, Survey.flat(ground, home), false, new boolean[home.width() * home.depth()]);
+            Blueprint blueprint = blueprint(home, Survey.flat(ground, home), false, new boolean[home.width() * home.depth()],
+                    other -> OptionalInt.empty());
             for (Piece piece : blueprint.schedule()) {
                 if (piece.role() != Role.CLEAR) {
                     builtAt.put(piece.pos().asLong(), piece.tick());
@@ -1952,6 +1984,46 @@ public final class HexTown {
 
     // ---------------------------------------------------------------- the land
 
+    /**
+     * Where the road past one end of a stretch of street is laid, for the stretch to climb or step down to: a
+     * crossing's, which stays level itself, or another stretch's laid higher, which leaves the climbing to the lower one.
+     * Otherwise the stretch's own ground.
+     *
+     * @param a the column past that end, along the stretch
+     */
+    private int meet(Part part, Frame frame, int a, int ground, java.util.function.Function<Part, OptionalInt> levelOf) {
+        if (plan == null) {
+            return ground;
+        }
+        BlockPos past = frame.at(a, TownPlan.STREET_WIDTH / 2, 0);
+        for (Part other : plan.parts()) {
+            if (other.id() == part.id() || !other.kind().isStreet() || past.getX() < other.minX() || past.getX() > other.maxX()
+                    || past.getZ() < other.minZ() || past.getZ() > other.maxZ()) {
+                continue;
+            }
+            OptionalInt laid = levelOf.apply(other);
+            if (laid.isEmpty()) {
+                return ground;
+            }
+            return other.kind() == Kind.CROSSING || laid.getAsInt() > ground ? laid.getAsInt() : ground;
+        }
+        return ground;
+    }
+
+    /**
+     * Where a part of the plan is laid: as it was begun, or else as it would be begun now.
+     */
+    private OptionalInt levelOf(ServerLevel level, Vec3 hexCenter, Part part) {
+        if (levels.containsKey(part.id())) {
+            return OptionalInt.of(levels.get(part.id()));
+        }
+        if (!isLoaded(level, part)) {
+            return OptionalInt.empty();
+        }
+        Survey survey = survey(level, part, hexCenter, WHOLE);
+        return survey == null ? OptionalInt.empty() : OptionalInt.of(survey.ground());
+    }
+
     private boolean isLoaded(ServerLevel level, Part part) {
         return level.hasChunkAt(new BlockPos(part.minX(), 0, part.minZ())) && level.hasChunkAt(new BlockPos(part.maxX(), 0, part.maxZ()))
                 && level.hasChunkAt(new BlockPos(part.minX(), 0, part.maxZ())) && level.hasChunkAt(new BlockPos(part.maxX(), 0, part.minZ()));
@@ -2062,15 +2134,18 @@ public final class HexTown {
 
     /**
      * @param occupied which of the part's columns something already stands in that stays
+     * @param levelOf  where another part of the plan is laid, or would be, for a street to meet the next stretch of it
      */
-    private Blueprint blueprint(Part part, Survey survey, boolean cutThrough, boolean[] occupied) {
+    private Blueprint blueprint(Part part, Survey survey, boolean cutThrough, boolean[] occupied,
+                                java.util.function.Function<Part, OptionalInt> levelOf) {
         Frame frame = new Frame(part.origin(), part.front());
         int ground = survey.ground();
         Houses.Heights heights = survey::height;
-        RandomSource random = RandomSource.create(seedOf(part) ^ (part.lookId() * 0x9E3779B97F4A7C15L));
+        RandomSource random = looks(seedOf(part), part.lookId());
+        int homes = Houses.homeKinds(seedOf(part));
         if (mode == HexBuild.ORCHARD) {
             return switch (part.kind()) {
-                case HOME -> Houses.anchor(frame, ground, heights, random);
+                case HOME -> Houses.anchor(frame, ground, heights, random, homes);
                 case HOUSE -> random.nextFloat() < 0.18F ? Orchard.meadow(frame, ground, heights, random, occupied)
                         : Orchard.plot(frame, ground, heights, random, occupied);
                 case SQUARE -> Orchard.farmyard(frame, part.width(), part.depth(), ground, heights, random);
@@ -2079,12 +2154,14 @@ public final class HexTown {
             };
         }
         return switch (part.kind()) {
-            case HOME -> Houses.anchor(frame, ground, heights, random);
+            case HOME -> Houses.anchor(frame, ground, heights, random, homes);
             case HOUSE -> cutThrough ? Houses.garden(frame, ground, heights, random) : lot(part, frame, ground, heights, random);
             case SQUARE -> Streets.square(frame, part.width(), part.depth(), ground, heights, random);
-            case STREET -> Streets.street(frame, part.width(), ground, heights, 0);
+            case STREET -> Streets.street(frame, part.width(), ground, heights, meet(part, frame, -1, ground, levelOf),
+                    meet(part, frame, part.width(), ground, levelOf), 0);
             case CROSSING -> Streets.crossing(frame, ground, heights);
-            case CROSS_STREET -> Streets.street(frame, part.width(), ground, heights, part.width() / 2);
+            case CROSS_STREET -> Streets.street(frame, part.width(), ground, heights, meet(part, frame, -1, ground, levelOf),
+                    meet(part, frame, part.width(), ground, levelOf), part.width() / 2);
         };
     }
 

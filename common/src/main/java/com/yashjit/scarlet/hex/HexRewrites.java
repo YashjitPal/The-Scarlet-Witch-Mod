@@ -44,7 +44,8 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <p>Only what comes in is rewritten: what is thrown or shot inside a Hex stays as it is, and so does what leaves it.
- * Tridents, wind charges and fireworks pass in untouched.
+ * Tridents, wind charges and fireworks pass in untouched, and so does anything that comes in through where its caster has
+ * parted the wall.
  */
 public final class HexRewrites {
 
@@ -97,6 +98,10 @@ public final class HexRewrites {
                 continue;
             }
             Vec3 through = HexRipples.crossing(hex.center, wall, from, to);
+            if (through != null && Hexes.inOpening(hex, wall, through)) {
+                // in through where the wall stands parted, nothing of the wall touches it
+                return;
+            }
             rewrite(level, hex, entity, kind, through);
             return;
         }

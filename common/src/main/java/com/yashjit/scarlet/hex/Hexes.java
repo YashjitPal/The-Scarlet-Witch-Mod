@@ -82,6 +82,8 @@ public final class Hexes {
     private static final int REWIND_REST_TICKS = 60;
     /** How near where their home stood a caster must cast over a town of theirs again for it to rise around them there. */
     public static final double HOME_RECALL = 16.0;
+    /** How many of a caster's last homes a home raised somewhere new is a different house from. */
+    private static final int RECENT_HOMES = 3;
     /** How far off a caster can raise their home again inside their Hex, as far as they can aim. */
     public static final double HOME_PLACE_REACH = 160.0;
     /**
@@ -227,6 +229,10 @@ public final class Hexes {
         if (build != HexBuild.NOTHING) {
             List<TownMemory> remembered = data.towns(player.getUUID(), build, center, MAX_RADIUS);
             long seed = player.getUUID().getLeastSignificantBits() ^ now * 31L;
+            if (back == null) {
+                // somewhere new, a home unlike the last few they had
+                seed = HexTown.freshSeed(seed, data.recentSeeds(player.getUUID(), RECENT_HOMES));
+            }
             town = back != null ? HexTown.recall(back, remembered, Era.FIFTIES) : HexTown.raise(build, center, facing, seed, remembered, Era.FIFTIES);
             OptionalInt standing = openLand ? town.foundingHeight(level, center) : OptionalInt.empty();
             if (standing.isPresent() && standing.getAsInt() != center.y) {
@@ -617,6 +623,30 @@ public final class Hexes {
         Vec3 along = new Vec3(-normal.z, 0.0, normal.x);
         double offset = hex.tearAt.subtract(hex.center).dot(along);
         return (float) Math.max(0.0, HexShape.halfSide(hex.radius) + Math.abs(offset) - PART_MARGIN);
+    }
+
+    /**
+     * Whether a point on a Hex's wall lies where its caster has parted it: on the side they took hold of, within
+     * {@code opening} blocks of where they took hold either way but never past that side's corners, from the ground as
+     * high as the wall goes. The same opening {@code post/hex.fsh} draws, without its jagged edges.
+     */
+    public static boolean inOpening(Vec3 center, float radius, @Nullable Vec3 tearAt, float opening, Vec3 point) {
+        if (tearAt == null || opening <= 0.0F) {
+            return false;
+        }
+        Vec3 held = HexShape.outward(center, tearAt);
+        if (HexShape.outward(center, point).dot(held) < 0.99) {
+            return false;
+        }
+        Vec3 along = new Vec3(-held.z, 0.0, held.x);
+        double fromMiddle = tearAt.subtract(center).dot(along);
+        double offset = point.subtract(tearAt).dot(along);
+        double toCorner = HexShape.halfSide(radius) + (offset < 0.0 ? fromMiddle : -fromMiddle) - PART_MARGIN;
+        return Math.abs(offset) < Math.max(0.0, Math.min(opening, toCorner));
+    }
+
+    public static boolean inOpening(Hex hex, float wall, Vec3 point) {
+        return inOpening(hex.center, wall, hex.tearAt, hex.opening, point);
     }
 
     /**

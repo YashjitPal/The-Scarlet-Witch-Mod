@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.hex.town;
 
+import static com.yashjit.scarlet.hex.town.Houses.AIR;
 import static com.yashjit.scarlet.hex.town.Houses.FENCE;
 import static com.yashjit.scarlet.hex.town.Houses.FLOWER;
 import static com.yashjit.scarlet.hex.town.Houses.FULL;
@@ -10,6 +11,7 @@ import static com.yashjit.scarlet.hex.town.Houses.slab;
 import static com.yashjit.scarlet.hex.town.Houses.stairs;
 
 import com.yashjit.scarlet.hex.town.Blueprint.Frame;
+import java.util.Arrays;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -38,28 +40,82 @@ public final class Streets {
     }
 
     /**
-     * A stretch of street, running across the part: its grid's b crosses the street.
+     * A stretch of street, running across the part: its grid's b crosses the street. Where the road it runs on into
+     * is laid higher or lower, its end climbs or steps down to meet it in a flight of steps the color of the road and
+     * the sidewalk, rather than leaving a ledge to climb.
      *
-     * @param lamps where along the stretch its lamps stand
+     * @param before where the road past its first column is laid; its own ground for level with it
+     * @param after  and past its last
+     * @param lamps  where along the stretch its lamps stand
      */
-    public static Blueprint street(Frame frame, int length, int ground, Houses.Heights heights, int... lamps) {
+    public static Blueprint street(Frame frame, int length, int ground, Houses.Heights heights, int before, int after, int... lamps) {
         Blueprint blueprint = new Blueprint(frame, STREET_TICKS);
         Houses.level(blueprint, length, TownPlan.STREET_WIDTH, ground, heights);
         int last = TownPlan.STREET_WIDTH - 1;
         int middle = last / 2;
+        // how high each column along it is laid, and which way it climbs if it is a step; each end has half to climb in
+        int[] levels = new int[length];
+        Direction[] climbs = new Direction[length];
+        Arrays.fill(levels, ground);
+        int reach = Math.max(1, length / 2);
+        steps(levels, climbs, ground, before, reach, 0, 1, frame.left(), frame.right());
+        steps(levels, climbs, ground, after, reach, length - 1, -1, frame.right(), frame.left());
         for (int a = 0; a < length; a++) {
+            int y = levels[a];
+            if (climbs[a] != null) {
+                for (int b = 0; b <= last; b++) {
+                    boolean side = b == 0 || b == last;
+                    if (y > ground) {
+                        blueprint.fill(a, a, b, b, ground + 1, y - 1, side ? Role.SIDEWALK : Role.ROAD, FULL, PAVE);
+                    } else {
+                        blueprint.fill(a, a, b, b, y + 1, ground, Role.CLEAR, AIR, PAVE);
+                    }
+                    blueprint.set(a, b, y, side ? Role.SIDEWALK_STEP : Role.ROAD_STEP, stairs(climbs[a], Half.BOTTOM), PAVE);
+                    blueprint.fill(a, a, b, b, y + 1, y + 2, Role.CLEAR, AIR, PAVE);
+                }
+                if (y <= ground) {
+                    continue;
+                }
+            }
             blueprint.set(a, 0, ground, Role.SIDEWALK, FULL, PAVE);
             blueprint.set(a, last, ground, Role.SIDEWALK, FULL, PAVE);
             for (int b = 1; b < last; b++) {
-                boolean line = b == middle && Math.floorMod(along(frame, a), 4) < 2;
+                boolean line = climbs[a] == null && b == middle && Math.floorMod(along(frame, a), 4) < 2;
                 blueprint.set(a, b, ground, line ? Role.ROAD_LINE : Role.ROAD, FULL, PAVE);
             }
         }
         for (int a : lamps) {
-            lamp(blueprint, a, 0, ground);
-            lamp(blueprint, a, last, ground);
+            int y = levels[Math.clamp(a, 0, length - 1)];
+            lamp(blueprint, a, 0, y);
+            lamp(blueprint, a, last, y);
         }
         return blueprint;
+    }
+
+    /**
+     * Lays a flight of steps into one end of a stretch of street, from its own ground to where the road past that end
+     * is laid, as far as it has room for.
+     *
+     * @param end  the column at that end
+     * @param in   which way along the stretch inward is, from it
+     * @param out  the way out past that end
+     * @param back the way back in from it
+     */
+    private static void steps(int[] levels, Direction[] climbs, int ground, int meet, int reach, int end, int in, Direction out,
+                              Direction back) {
+        int rise = Math.clamp(meet - ground, -reach, reach);
+        for (int k = 0; k < Math.abs(rise); k++) {
+            int a = end + in * k;
+            if (rise > 0) {
+                // up to the road past the end, the step at the very end the highest
+                levels[a] = ground + rise - k;
+                climbs[a] = out;
+            } else {
+                // down to it, the step at the very end the lowest, and climbing back in
+                levels[a] = ground + rise + 1 + k;
+                climbs[a] = back;
+            }
+        }
     }
 
     /**

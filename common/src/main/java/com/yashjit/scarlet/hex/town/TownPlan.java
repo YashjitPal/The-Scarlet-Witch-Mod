@@ -49,6 +49,8 @@ public final class TownPlan {
     private static final int OFF_GRID = 0xFF << 16 | 0xFF << 8;
     /** Where on its grid a town's own home lot is, in its id, for a home raised off it to look just the same. */
     private static final int HOME_LOT = 64 << 16 | 64 << 8 | 8 << 1;
+    /** What a town's home looks like is drawn from this, wherever it stands. */
+    static final int HOME_LOOK = Kind.HOME.ordinal() << 24 | HOME_LOT;
 
     /**
      * A town's grid: where it is laid out from, which way its main street runs, and the seed its lots are drawn from.
@@ -411,7 +413,7 @@ public final class TownPlan {
          * lot, so it looks just the same wherever it is raised.
          */
         public int lookId() {
-            return offGrid() ? Kind.HOME.ordinal() << 24 | HOME_LOT : gridId();
+            return offGrid() ? HOME_LOOK : gridId();
         }
 
         public int width() {

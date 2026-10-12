@@ -19,6 +19,8 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -30,9 +32,10 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A refrigerator, two blocks tall like a door: put down whole, gone whole, both halves always in the same era.
+ * A refrigerator, two blocks tall like a door: put down whole, gone whole, both halves always in the same era. It keeps
+ * as much as a chest, in its lower half, opened from either.
  */
-public class RefrigeratorBlock extends DecorBlock {
+public class RefrigeratorBlock extends DecorBlock implements EntityBlock {
 
     public static final EnumProperty<DoubleBlockHalf> HALF = BlockStateProperties.DOUBLE_BLOCK_HALF;
 
@@ -102,10 +105,18 @@ public class RefrigeratorBlock extends DecorBlock {
     }
 
     @Override
+    public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return state.getValue(HALF) == DoubleBlockHalf.LOWER ? new RefrigeratorBlockEntity(pos, state) : null;
+    }
+
+    @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        // a peek inside: the door's seal, the hum of the motor
-        level.playSound(player, pos, SoundEvents.BARREL_OPEN, SoundSource.BLOCKS, 0.5F, 1.4F);
-        level.playSound(player, pos, SoundEvents.BARREL_CLOSE, SoundSource.BLOCKS, 0.45F, 1.25F);
+        BlockPos lower = state.getValue(HALF) == DoubleBlockHalf.LOWER ? pos : pos.below();
+        if (!level.isClientSide() && level.getBlockEntity(lower) instanceof RefrigeratorBlockEntity fridge) {
+            // the door coming off its seal, and the light inside
+            level.playSound(null, pos, SoundEvents.BARREL_OPEN, SoundSource.BLOCKS, 0.5F, 1.4F);
+            player.openMenu(fridge);
+        }
         return InteractionResult.SUCCESS;
     }
 

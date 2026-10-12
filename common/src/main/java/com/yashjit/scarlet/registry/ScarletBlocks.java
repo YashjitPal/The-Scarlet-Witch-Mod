@@ -3,6 +3,7 @@ package com.yashjit.scarlet.registry;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.decor.CarBodyBlock;
 import com.yashjit.scarlet.decor.ChimeDecorBlock;
+import com.yashjit.scarlet.decor.ClockBlock;
 import com.yashjit.scarlet.decor.CouchBlock;
 import com.yashjit.scarlet.decor.DecorBlock;
 import com.yashjit.scarlet.decor.EraDecor;
@@ -90,7 +91,7 @@ public final class ScarletBlocks {
                     box(4, 0, 6, 12.75, 5.75, 10), box(3.5, 0, 6, 13.25, 5, 10), box(4, 0, 5.9, 12.75, 5, 10.1), box(4, 0, 5.6, 12.75, 5.5, 10),
                     box(3, 0, 4.8, 13.75, 6, 11), box(4, 0, 5.8, 12.75, 6, 10)), ChimeDecorBlock.Kind.TOASTER),
             decor(MapColor.METAL, SoundType.METAL), false);
-    public static final Supplier<Block> WALL_CLOCK = register("wall_clock", p -> new WallDecorBlock(p, DecorBlock.byEra(
+    public static final Supplier<Block> WALL_CLOCK = register("wall_clock", p -> new ClockBlock(p, DecorBlock.byEra(
                     box(0, 0, 14.75, 16, 16, 16), box(0, 0, 14.75, 16, 16, 16), box(3.5, 1, 13.5, 12.5, 15.5, 16), box(3, 3, 15, 13, 13, 16),
                     box(3, 3, 15, 13, 13, 16), box(1.5, 1.5, 15, 14.5, 14.5, 16))),
             decor(MapColor.WOOD, SoundType.WOOD).noCollision(), false);

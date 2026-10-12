@@ -9,6 +9,7 @@ import com.yashjit.scarlet.client.costume.CostumeModels;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.darkhold.DreamwalkClient;
 import com.yashjit.scarlet.client.dev.Showcase;
+import com.yashjit.scarlet.client.entity.CarEngine;
 import com.yashjit.scarlet.client.entity.ChaosBoltRenderer;
 import com.yashjit.scarlet.client.entity.ClientDreamBody;
 import com.yashjit.scarlet.client.fx.BoltFx;
@@ -210,6 +211,7 @@ public final class ScarletClient {
         TitleCard.tick(minecraft);
         LaughTrack.tick(minecraft);
         RadioMusic.tick(minecraft);
+        CarEngine.tick(minecraft);
         EraAudio.tick(minecraft);
         SpellWheel.tick(minecraft);
         CastInput.tick(minecraft);

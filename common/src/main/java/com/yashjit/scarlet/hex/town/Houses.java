@@ -54,6 +54,16 @@ public final class Houses {
     static final int[] STAGE_TICKS = {8, 10, 16, 26, 22, 12, 10, 12};
     /** The caster's home takes its time: some fifteen seconds from the ground up to the last lamp inside. */
     static final int[] ANCHOR_TICKS = {30, 26, 44, 66, 52, 30, 24, 28};
+    /** Kinds of home a caster's can be. */
+    private static final int HOMES = 8;
+    /** Kinds of home there were at first, which towns raised then still draw theirs from. */
+    private static final int FIRST_HOMES = 5;
+    /**
+     * Towns raised since there were {@link #HOMES} kinds of home carry this in the top of their seed, which leaves the
+     * rest to draw from, so a town remembered from before still raises the home it had.
+     */
+    private static final long HOMES_MARK = 0x5CA1L << 48;
+    private static final long SEED_BITS = (1L << 48) - 1;
     private static final int[] GARDEN_TICKS = {8, 10, 12};
     /** Leveling around a building that stays, a while for it to be made over, then the yard. */
     private static final int[] AROUND_TICKS = {8, 30, 12};
@@ -162,9 +172,9 @@ public final class Houses {
      * stage at a time, while they float in its living room pouring out the magic it is made of. Which house it is
      * comes from their town, so the same town always raises the same home.
      */
-    public static Blueprint anchor(Frame frame, int ground, Heights heights, RandomSource random) {
+    public static Blueprint anchor(Frame frame, int ground, Heights heights, RandomSource random, int kinds) {
         Paint paint = Paint.pick(random);
-        Design design = switch (random.nextInt(5)) {
+        Design design = switch (random.nextInt(kinds)) {
             // a colonial, its door under a portico, shuttered windows either side
             case 0 -> new Design(13, 9, 2, Roof.SIDE_GABLE, Porch.PORTICO, 0, paint);
             // a farmhouse with a porch across its whole front
@@ -174,9 +184,38 @@ public final class Houses {
             // its gable to the street, a porch wrapping round one side
             case 3 -> new Design(11, 11, 2, Roof.FRONT_GABLE, Porch.WRAP, 0, paint);
             // wide and grand under a hipped roof
-            default -> new Design(15, 9, 2, Roof.HIP, Porch.PORTICO, 0, paint);
+            case 4 -> new Design(15, 9, 2, Roof.HIP, Porch.PORTICO, 0, paint);
+            // a ranch, long and low under a hipped roof, a porch across its front
+            case 5 -> new Design(15, 9, 1, Roof.HIP, Porch.FULL, 0, paint);
+            // a bungalow, its gable to the street over a porch across its front
+            case 6 -> new Design(11, 11, 1, Roof.FRONT_GABLE, Porch.FULL, 0, paint);
+            // a cottage under a side gable, its porch wrapping round one side
+            default -> new Design(13, 9, 1, Roof.SIDE_GABLE, Porch.WRAP, 0, paint);
         };
         return build(frame, ground, heights, design, ANCHOR_TICKS);
+    }
+
+    /**
+     * Which of the kinds of home {@link #anchor} raises from the same draws, which it must make just as that does.
+     */
+    static int homeKind(RandomSource random, int kinds) {
+        Paint.pick(random);
+        return random.nextInt(kinds);
+    }
+
+    /**
+     * How many kinds of home a town's seed draws its home from: towns raised before there were {@link #HOMES} of them
+     * keep the home they had.
+     */
+    static int homeKinds(long seed) {
+        return (seed & ~SEED_BITS) == HOMES_MARK ? HOMES : FIRST_HOMES;
+    }
+
+    /**
+     * A seed marked as drawing its home from all {@link #HOMES} kinds.
+     */
+    static long marked(long seed) {
+        return seed & SEED_BITS | HOMES_MARK;
     }
 
     /**
@@ -1096,7 +1135,8 @@ public final class Houses {
             case ROOF, ROOF_SLAB, ROOF_RIDGE -> ROOF;
             case PORCH_POST, CHIMNEY, SHUTTER, AWNING, SIGN, LAMP_POST -> EXTERIOR;
             case WALKWAY, PICKET, GATE, HEDGE, FLOWER, MAILBOX, MAILBOX_POST, TREE_LOG, TREE_LEAVES, ORCHARD_LEAVES, ORCHARD_BLOSSOM,
-                 SIDEWALK, ROAD, ROAD_LINE, PLAZA, GAZEBO_POST, BENCH, HAY, PLAY_FRAME, SLIDE, CHAIN, BELL, PRESERVE -> YARD;
+                 SIDEWALK, ROAD, ROAD_LINE, ROAD_STEP, SIDEWALK_STEP, PLAZA, GAZEBO_POST, BENCH, HAY, PLAY_FRAME, SLIDE, CHAIN, BELL,
+                 PRESERVE -> YARD;
             case RUG, COUCH, TABLE, SHELF, FRIDGE, COUNTER, SINK, PLANT, LAMP, BED, TELEVISION, RADIO, TELEPHONE, STOVE, TOASTER, ARMCHAIR,
                  TABLE_LAMP, CLOCK, PICTURE, POSTER -> INTERIOR;
         };

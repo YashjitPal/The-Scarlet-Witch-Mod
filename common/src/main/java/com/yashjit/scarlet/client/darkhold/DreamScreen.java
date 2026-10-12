@@ -168,7 +168,7 @@ public final class DreamScreen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 0 && destinations != null) {
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && destinations != null) {
             layout();
             for (int i = 0; i < cards.size(); i++) {
                 if (cards.get(i).contains((int) event.x(), (int) event.y())) {

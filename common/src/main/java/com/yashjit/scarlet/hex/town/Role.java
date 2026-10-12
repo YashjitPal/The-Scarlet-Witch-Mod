@@ -91,7 +91,10 @@ public enum Role {
     TABLE_LAMP,
     CLOCK,
     PICTURE,
-    POSTER;
+    POSTER,
+    /** A flight of steps in the road, and in the sidewalk, where a street climbs to meet the next stretch of it. */
+    ROAD_STEP,
+    SIDEWALK_STEP;
 
     private static final Role[] VALUES = values();
 

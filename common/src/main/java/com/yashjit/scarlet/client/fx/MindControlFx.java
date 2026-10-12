@@ -5,6 +5,7 @@ import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
+import com.yashjit.scarlet.client.hex.ResidentsClient;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.magic.MindControlClient;
 import com.yashjit.scarlet.client.render.Glow;
@@ -443,7 +444,7 @@ public final class MindControlFx {
         Entity held = MindControlClient.insideOf();
         if (held instanceof LivingEntity living) {
             float shown = Ease.clamp01((float) (MindControlClient.sinceMoved(now) - 6.0) / 10.0F);
-            Component name = living.getDisplayName();
+            Component name = ResidentsClient.isResident(living) ? ResidentsClient.nameOf(living) : living.getDisplayName();
             int y = 14;
             graphics.centeredText(minecraft.font, name, width / 2, y, ARGB.color(0.95F * shown, dream ? 0xD9425E : ScarletPalette.BRIGHT_SCARLET));
             float health = Math.clamp(living.getHealth() / Math.max(1.0F, living.getMaxHealth()), 0.0F, 1.0F);

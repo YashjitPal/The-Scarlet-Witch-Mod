@@ -32,6 +32,7 @@
     "client.EntityViewMixin",
     "client.FirstPersonHandsMixin",
     "client.GameRendererMixin",
+    "client.InventoryScreenMixin",
     "client.KeyboardHandlerMixin",
     "client.KeyboardInputMixin",
     "client.LevelExtractorMixin",

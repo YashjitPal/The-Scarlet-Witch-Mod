@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.client.hex;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.ScarletKeyMappings;
 import com.yashjit.scarlet.client.anim.Ease;
@@ -295,7 +296,7 @@ public final class ShowrunnerScreen extends Screen {
         double now = minecraft.level == null ? 0.0 : minecraft.level.getGameTime();
         float open = Ease.outCubic(Ease.clamp01((float) ((now - openedAt) / OPEN_TICKS)));
         int slide = Math.round((1.0F - open) * (HEIGHT * 0.6F));
-        if (event.button() == 0) {
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
             for (Key key : keys) {
                 if ((own() != null || !key.needsHex()) && key.contains((int) event.x(), (int) event.y() - slide)) {
                     if (key.action() == ShowrunnerPayload.REWIND) {
@@ -313,7 +314,7 @@ public final class ShowrunnerScreen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (event.button() == 0 && RewindClient.remoteHeld()) {
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && RewindClient.remoteHeld()) {
             RewindClient.holdRemote(false);
             return true;
         }

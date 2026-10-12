@@ -88,6 +88,11 @@ public final class EraStyle {
                 concrete(DyeColor.YELLOW), concrete(DyeColor.YELLOW));
         era(Role.SIDEWALK, Blocks.SMOOTH_STONE, Blocks.SMOOTH_STONE, Blocks.SMOOTH_STONE, Blocks.SMOOTH_STONE, concrete(DyeColor.LIGHT_GRAY),
                 Blocks.POLISHED_DIORITE);
+        // concrete has no steps, so the road's own are the nearest stone to it in color
+        era(Role.ROAD_STEP, Blocks.POLISHED_DEEPSLATE_STAIRS, Blocks.POLISHED_DEEPSLATE_STAIRS, Blocks.POLISHED_DEEPSLATE_STAIRS,
+                Blocks.POLISHED_DEEPSLATE_STAIRS, Blocks.POLISHED_DEEPSLATE_STAIRS, Blocks.BLACKSTONE_STAIRS);
+        era(Role.SIDEWALK_STEP, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_STAIRS,
+                Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_DIORITE_STAIRS);
         era(Role.LAMP_POST, Blocks.NETHER_BRICK_FENCE, Blocks.NETHER_BRICK_FENCE, Blocks.DARK_OAK_FENCE, Blocks.NETHER_BRICK_FENCE,
                 Blocks.NETHER_BRICK_FENCE, Blocks.NETHER_BRICK_FENCE);
         era(Role.LAMP, Blocks.LANTERN, Blocks.LANTERN, Blocks.LANTERN, Blocks.SOUL_LANTERN, Blocks.LANTERN,

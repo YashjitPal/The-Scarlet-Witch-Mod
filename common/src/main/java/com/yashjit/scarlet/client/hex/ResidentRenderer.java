@@ -8,6 +8,7 @@ import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
@@ -45,6 +46,14 @@ public final class ResidentRenderer extends LivingEntityRenderer<LivingEntity, A
     @Override
     public Identifier getTextureLocation(AvatarRenderState state) {
         return state.skin.body().texturePath();
+    }
+
+    /**
+     * Over their heads, the name they go by in the sitcom rather than what they really are.
+     */
+    @Override
+    protected Component getNameTag(LivingEntity entity) {
+        return ResidentsClient.nameOf(entity);
     }
 
     @Override

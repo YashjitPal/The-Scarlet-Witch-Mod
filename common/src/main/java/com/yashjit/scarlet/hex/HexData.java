@@ -192,6 +192,19 @@ public final class HexData extends SavedData {
     }
 
     /**
+     * The seeds of the last few towns a caster's fallen Hexes left, whatever they built, newest first.
+     */
+    List<Long> recentSeeds(UUID caster, int most) {
+        List<Long> found = new ArrayList<>();
+        for (int k = towns.size() - 1; k >= 0 && found.size() < most; k--) {
+            if (towns.get(k).caster().equals(caster)) {
+                found.add(towns.get(k).seed());
+            }
+        }
+        return found;
+    }
+
+    /**
      * Those of them a Hex of the given size around a point could come over, oldest first.
      */
     List<TownMemory> towns(UUID caster, HexBuild mode, Vec3 center, float radius) {
