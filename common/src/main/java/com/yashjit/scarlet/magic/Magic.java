@@ -353,6 +353,15 @@ public final class Magic {
         runPending(player, now);
         Telekinesis.tick(player, now);
         MagicState state = state(player);
+        if (player.isCreative() && CrownItem.isWearingCrown(player)) {
+            // magic in creative never runs dry, as its blocks never run out; topped up a little short of full, so a
+            // channel's drain doesn't send the state every tick
+            float max = maxEnergy(player);
+            if (energy(state, now, max) < max - 2.0F) {
+                state = state.withEnergy(max, now);
+                Services.PLAYER_DATA.setMagic(player, state);
+            }
+        }
         if (player.tickCount % 20 == 0 && state.selectedSpell().darkhold() && !state.channeling() && !Darkhold.carries(player)) {
             // the book's spells go with the book
             state = state.withSelected(Spell.WHEEL.getFirst().ordinal());

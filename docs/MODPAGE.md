@@ -13,6 +13,7 @@ Every clip on this page is recorded in game. See every power in motion on [GitHu
 - **Two crowns, the same powers:** the Scarlet Witch's tiara and the Scarlet Warlock's crown. Whoever wears one has the magic; take it off and the magic goes with it.
 - Worn in the helmet slot, a crown protects like a diamond helmet and never breaks. A crown alone in the crafting grid turns into the other one, keeping everything on it.
 - **Mastery** grows as you cast and is stored on the crown, so a stolen crown carries everything its owner learned.
+- **In creative**, a crown has every power at once, at full strength, and its magic never runs dry. Mastery only grows in survival.
 - **Suit up** with G: scarlet threads spiral up from your feet and the costume weaves on, the cape unfurling and the crown flaring last. Press it again and it burns away into embers.
 
 ## Spells

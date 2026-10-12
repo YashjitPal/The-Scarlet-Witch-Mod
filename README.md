@@ -38,6 +38,7 @@ Chaos magic inspired by the Scarlet Witch, for Minecraft 26.3 on Fabric and NeoF
 
 - Worn in the helmet slot, a crown protects like a diamond helmet and never breaks. A crown alone in the crafting grid turns into the other one, keeping everything on it.
 - **Mastery** grows as you cast and is stored on the crown, so a stolen crown carries everything its owner learned.
+- **In creative**, a crown has every power at once, at full strength, and its magic never runs dry. Mastery only grows in survival.
 
 ## Chaos magic
 

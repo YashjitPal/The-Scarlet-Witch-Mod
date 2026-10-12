@@ -21,6 +21,7 @@ import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.hex.Sitcom;
 import com.yashjit.scarlet.magic.Magic;
+import com.yashjit.scarlet.magic.Mastery;
 import com.yashjit.scarlet.magic.Spell;
 import com.yashjit.scarlet.network.CastPayload;
 import com.yashjit.scarlet.network.SelectSpellPayload;
@@ -30,6 +31,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.serialization.Lifecycle;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -62,6 +64,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.decoration.Mannequin;
@@ -2420,6 +2423,36 @@ public final class Showcase {
                     .jumpTap().jumpTap().then(minecraft -> {
                     }, 50)
                     .command("gamemode creative @a");
+            case "creative" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("spreadplayers 900 900 0 1 false @a").then(minecraft -> {
+                    }, 40)
+                    .command("time set noon")
+                    .command("gamemode creative @a")
+                    // a crown straight from the creative inventory, with no mastery on it at all
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute as @a at @s run tp @s ~ ~ ~ 0 0")
+                    .ensureUnsuited().face(0, 0).logMastery("creative")
+                    // every spell on the wheel, the Hex too
+                    .playerCamera().hideHud(false).wheel(true).wheelCursor(30, -30).shot("creative_wheel", 6).wheel(false)
+                    // a Rune Trap, a seventh-rank spell, written onto the ground ahead
+                    .select(Spell.RUNE_TRAP).face(0, 35).tap().shot("creative_rune_a", 4).shot("creative_rune_b", 14)
+                    .logMastery("creative, after a rune trap")
+                    // eight chaos bolts back to back, and the magic never runs dry
+                    .select(Spell.CHAOS_BOLT).face(0, 0).tap().tap().tap().tap().tap().tap().tap().tap()
+                    .logMastery("creative, after eight chaos bolts")
+                    // in survival the same crown is a beginner's again: what it casts costs energy and earns mastery
+                    .command("gamemode survival @a").then(minecraft -> {
+                    }, 10)
+                    .logMastery("survival").wheel(true).wheelCursor(30, -30).shot("survival_wheel", 6).wheel(false)
+                    .tap().then(minecraft -> {
+                    }, 10)
+                    .logMastery("survival, after a chaos bolt")
+                    .hideHud(true)
+                    .command("gamemode creative @a");
             case "hexfx" -> s
                     .land()
                     .dispelHexes()
@@ -3436,6 +3469,29 @@ public final class Showcase {
          */
         Scene hold(boolean down) {
             return then(minecraft -> minecraft.options.keyUse.setDown(down), 0);
+        }
+
+        /**
+         * Writes down in the log the rank of the crown the player wears, as this client and the server each see it, and
+         * the mastery stored on it.
+         */
+        Scene logMastery(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                int here = Mastery.rank(minecraft.player);
+                UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(id);
+                    if (player != null) {
+                        Scarlet.LOG.info("Showcase: {}: the crown's rank is {} here and {} on the server, with {} mastery on it and {} of {} energy",
+                                when, here, Mastery.rank(player), Mastery.xp(player.getItemBySlot(EquipmentSlot.HEAD)),
+                                Math.round(Magic.energy(player, player.level().getGameTime())), Math.round(Magic.maxEnergy(player)));
+                    }
+                });
+            }, 2);
         }
 
         /**

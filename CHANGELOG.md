@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- **Every power in creative.** A crown worn in creative mode has every power at once, at full strength, and its magic never runs dry; cooldowns still pace the spells. Casting in creative adds nothing to the crown's mastery, so back in survival it holds only what it earned there. Darkhold spells still need the book.
+
 ## 0.1.1
 
 - **Magic leaves from her hand.** A cast now leaves the caster's palm once the strike has their arm at full reach, where the blast itself comes from, instead of at the end of the wind-up while the hand is still drawn back low at their side.

@@ -136,6 +136,8 @@ if ($Modrinth) {
         Write-Output "Modrinth: added $order gallery images"
         $project = Invoke-Api GET "$api/project/$($project.id)" $null $auth
     }
+    # the page always says what docs/MODPAGE.md says now
+    Invoke-Api PATCH "$api/project/$($project.id)" (New-Json @{ body = [IO.File]::ReadAllText("$root\docs\MODPAGE.md", [Text.Encoding]::UTF8) }) $auth | Out-Null
     $existing = @(Invoke-Api GET "$api/project/$($project.id)/version" $null $auth)
     foreach ($loader in $loaders.Keys) {
         $number = "$version+$loader"

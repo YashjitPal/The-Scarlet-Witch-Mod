@@ -120,6 +120,8 @@ G = gold ingot   R = redstone dust   A = amethyst shard
 | 8–9 | Strength, range and energy growth |
 | 10 | The Hex |
 
+- **In creative**, a worn crown counts as fully mastered, so every power is there at once at full strength, and its energy never runs dry (cooldowns still pace the spells). Casting in creative adds no mastery to the crown, so back in survival it holds only what it earned there. Darkhold spells still need the book.
+
 ### Crown spells
 
 | Spell | What it does |

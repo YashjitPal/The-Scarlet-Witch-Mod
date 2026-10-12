@@ -4,6 +4,7 @@ import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.registry.ScarletDataComponents;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -46,14 +47,25 @@ public final class Mastery {
     }
 
     /**
-     * The rank of the crown the entity wears, or 0 without one.
+     * The rank of the crown the entity wears, or 0 without one. In creative a crown has every power at once, as the
+     * creative inventory has every block.
      */
     public static int rank(LivingEntity entity) {
         ItemStack head = entity.getItemBySlot(EquipmentSlot.HEAD);
-        return head.getItem() instanceof CrownItem ? rankForXp(xp(head)) : 0;
+        if (!(head.getItem() instanceof CrownItem)) {
+            return 0;
+        }
+        return entity instanceof Player player && player.isCreative() ? MAX_RANK : rankForXp(xp(head));
     }
 
+    /**
+     * Mastery won by casting. None is won in creative, where every power is there already, so a crown taken back to
+     * survival holds only what was earned in it.
+     */
     public static void grant(LivingEntity entity, int amount) {
+        if (entity instanceof Player player && player.isCreative()) {
+            return;
+        }
         ItemStack head = entity.getItemBySlot(EquipmentSlot.HEAD);
         if (head.getItem() instanceof CrownItem) {
             head.set(ScarletDataComponents.MASTERY.get(), xp(head) + amount);
