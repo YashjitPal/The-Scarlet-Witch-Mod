@@ -79,6 +79,7 @@ import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -1124,6 +1125,38 @@ public final class Showcase {
                     }, 60)
                     .hold(true).shot("eject_outside_held", 14)
                     .hold(false).shot("eject_arc_a", 3).shot("eject_arc_b", 3).shot("eject_crossing", 2).shot("eject_after", 3).shot("eject_landed", 16)
+                    .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                    }, 90)
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("difficulty peaceful");
+            case "ejectcrash" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("difficulty easy")
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-30 ~ ~-30 ~30 ~10 ~30 minecraft:air")
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX)
+                    .tap().then(minecraft -> {
+                    }, 90)
+                    // someone in a room of planks open toward the caster, and a wall of stone bricks beyond it
+                    .anchor()
+                    .command("execute at @a run fill ~-3 ~ ~4 ~3 ~4 ~9 minecraft:oak_planks hollow")
+                    .command("execute at @a run fill ~-2 ~1 ~4 ~2 ~3 ~4 minecraft:air")
+                    .command("execute at @a run fill ~-5 ~ ~13 ~5 ~9 ~14 minecraft:stone_bricks")
+                    .command("execute at @a run summon minecraft:zombie ~ ~1 ~6.5 {PersistenceRequired:1b,Rotation:[180f,0f],"
+                            + "equipment:{head:{id:\"minecraft:leather_helmet\",count:1}}}")
+                    .view(15.0, 5.0, 8.0, 0.0, 3.0, 10.0).logStanding("built").shot("crash_before", 6)
+                    .hold(true).shot("crash_held", 14)
+                    // flung out, through the back of the room and the wall beyond
+                    .hold(false).shot("crash_a", 1).shot("crash_b", 2).shot("crash_c", 2).shot("crash_d", 3).shot("crash_e", 6)
+                    .logStanding("thrown through")
+                    // the Hex mends it all, from the edges in
+                    .shot("crash_mending", 60).shot("crash_mended", 200)
+                    .logStanding("mended")
                     .command("execute as @a run scarlet hex dispel").then(minecraft -> {
                     }, 90)
                     .command("kill @e[type=!minecraft:player]")
@@ -3469,6 +3502,35 @@ public final class Showcase {
          */
         Scene hold(boolean down) {
             return then(minecraft -> minecraft.options.keyUse.setDown(down), 0);
+        }
+
+        /**
+         * Writes down in the log how much of the crash scene's room of planks and wall of stone bricks stands.
+         */
+        Scene logStanding(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                BlockPos origin = BlockPos.containing(anchor);
+                server.execute(() -> {
+                    ServerLevel level = server.overworld();
+                    int planks = 0;
+                    for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-3, 0, 4), origin.offset(3, 4, 9))) {
+                        if (level.getBlockState(pos).is(Blocks.OAK_PLANKS)) {
+                            planks++;
+                        }
+                    }
+                    int bricks = 0;
+                    for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-5, 0, 13), origin.offset(5, 9, 14))) {
+                        if (level.getBlockState(pos).is(Blocks.STONE_BRICKS)) {
+                            bricks++;
+                        }
+                    }
+                    Scarlet.LOG.info("Showcase: {}: {} of 135 planks and {} of 220 stone bricks stand", when, planks, bricks);
+                });
+            }, 2);
         }
 
         /**

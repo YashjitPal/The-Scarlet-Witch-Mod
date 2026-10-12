@@ -42,7 +42,7 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 
 ![The same street through the sitcom eras, from the 1950s to the present day](https://raw.githubusercontent.com/YashjitPal/The-Scarlet-Witch-Mod/main/docs/media/features/hex-eras.webp)
 
-- A hexagonal wall of static spreads out from you and stays where you cast it. Anyone can walk in; you can kick them out.
+- A hexagonal wall of static spreads out from you and stays where you cast it. Anyone can walk in; you can throw them out, and they crash straight through whatever stands in their way, which the Hex mends like any blast.
 - **Inside, the world is a sitcom.** Six eras, from 1950s black and white through 70s film color and 80s videotape to the present day, each with title cards and a note-block theme, era clothes for everyone inside, sound like an old television's speaker and a laugh track.
 - **It builds Westview:** your home, or a whole suburb with streets, lawns and picket fences, made over from whatever already stands rather than torn down. When the Hex falls, everything goes back the way it was.
 - **Hostile mobs become townspeople** who sit on couches, switch on the television, chat with their hands and wave as you pass.

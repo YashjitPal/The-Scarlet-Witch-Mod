@@ -256,7 +256,7 @@ The centerpiece. Inspired by Westview.
 
 ### Reality warping
 
-- **Anyone can enter.** Walking through the wall, person or creature, flares it red where they pass, the red soaking out through it around them as rings run out across it, as a chaos blast striking it does, a little gentler. The caster can **kick** someone out: they get flung out through the wall, Monica-style, with a spectacular animation (the wall bulges and ripples, sparks, a boom). They can walk back in.
+- **Anyone can enter.** Walking through the wall, person or creature, flares it red where they pass, the red soaking out through it around them as rings run out across it, as a chaos blast striking it does, a little gentler. The caster can **kick** someone out: they get flung out through the wall, Monica-style, with a spectacular animation (the wall bulges and ripples, sparks, a boom). Whatever stands in their way inside the wall they crash straight through, bursting it open in a crater as wide as a creeper's blast, which the Hex mends like any blast; outside the wall they break nothing. They can walk back in.
 - **Residents:** every hostile mob inside (zombies, skeletons, creepers, spiders and so on) is rewritten into a townsperson in era clothes. Animals stay animals. Bosses resist the hex.
   - They are the same mobs underneath, so nothing is ever lost or duplicated.
   - They follow **sitcom routines**: wander, chat, sit on couches, watch the era TV, wave at players.

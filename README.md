@@ -142,6 +142,7 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 </tr>
 </table>
 
+- **Throw someone out** the way Wanda throws Monica out of Westview: they crash straight through whatever stands in their way, bursting it open like a creeper's blast, and the Hex mends it like any blast.
 - Creatures and players walk back the way they came, wounds close, broken blocks return and the fallen get back up. Nothing can be duplicated with the rewind: what someone has already picked up stays picked up.
 - The remote also chooses what the next Hex builds.
 - **Era furniture:** a television, radio, telephone, fridge, stove, toaster, couch, armchair, lamp, wall clock, picture frames, posters and a parked car, each changing with the era. All craftable.

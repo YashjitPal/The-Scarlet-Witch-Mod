@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- **Crashing out of the Hex.** Someone thrown out of a Hex crashes straight through whatever stands in their way inside it, bursting it open in a crater as wide as a creeper's blast, and the Hex mends it the way it mends any blast, closing in from the edges over about ten seconds. Outside the wall they break nothing.
+
 ## 0.1.2
 
 - **Every power in creative.** A crown worn in creative mode has every power at once, at full strength, and its magic never runs dry; cooldowns still pace the spells. Casting in creative adds nothing to the crown's mastery, so back in survival it holds only what it earned there. Darkhold spells still need the book.

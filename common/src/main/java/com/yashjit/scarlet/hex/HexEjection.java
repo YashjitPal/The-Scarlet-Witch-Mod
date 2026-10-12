@@ -5,22 +5,29 @@ import com.yashjit.scarlet.network.EjectPayload;
 import com.yashjit.scarlet.platform.Services;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.LevelEvent;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
@@ -37,6 +44,9 @@ import org.jspecify.annotations.Nullable;
  * out through the wall, which bursts in a great ripple of red with a boom as they go through it, landing them on the
  * ground well outside. Nothing keeps them out: they can walk back in.
  *
+ * <p>Whatever stands in their way inside the wall, they crash straight through: it bursts open around them in a crater as
+ * wide as a creeper's blast, and the Hex mends it the way it mends any blast. Outside the wall they break nothing.
+ *
  * <p>The throw follows one curve, worked out the same way everywhere: the server carries a creature along it, and a
  * player's own game carries them.
  */
@@ -49,6 +59,11 @@ public final class HexEjection {
     /** How far past the wall they land. */
     private static final double BEYOND = 12.0;
     private static final float CROSSING_RIPPLE = 1.8F;
+    /** How far around a body crashing through something it bursts open, how often along its way it looks, and how many
+     * things one throw can crash through. */
+    private static final double CRASH_RADIUS = 2.6;
+    private static final double CRASH_STEP = 0.4;
+    private static final int CRASHES = 6;
 
     private static final Map<UUID, Seize> SEIZED = new HashMap<>();
     /** Everything in flight, by entity id. */
@@ -188,6 +203,9 @@ public final class HexEjection {
                 play(level, at, SoundEvents.RESPAWN_ANCHOR_DEPLETE.value(), 1.6F, 0.6F);
             }
             entity.resetFallDistance();
+            if (t < 1.0F) {
+                crashThrough(level, flight, entity, t);
+            }
             if (flight.player) {
                 // their own game carries them; they only need sparing the landing
                 if (t >= 1.0F) {
@@ -211,6 +229,81 @@ public final class HexEjection {
             entity.setDeltaMovement(next.subtract(at));
             entity.syncVelocity = true;
         }
+    }
+
+    /**
+     * Bursts open whatever stands in the way of a body over its last tick of flight, while it is still inside the wall.
+     * The way is worked out along the throw's own curve, so a player, whose own game carries them, crashes through the
+     * same things as a creature.
+     */
+    private static void crashThrough(ServerLevel level, Flight flight, Entity entity, float t) {
+        if (flight.crashes >= CRASHES) {
+            return;
+        }
+        Vec3 from = position(flight.from, flight.to, Math.max(0.0F, t - 1.0F / flight.ticks));
+        Vec3 to = position(flight.from, flight.to, t);
+        int steps = Math.max(1, (int) Math.ceil(from.distanceTo(to) / CRASH_STEP));
+        double half = entity.getBbWidth() * 0.5;
+        double height = entity.getBbHeight();
+        for (int i = 1; i <= steps; i++) {
+            Vec3 at = from.lerp(to, i / (double) steps);
+            if (!HexMending.inside(level, at)) {
+                return;
+            }
+            // a hair smaller than the body, so the ground it lands on doesn't count as in its way
+            AABB body = new AABB(at.x - half, at.y, at.z - half, at.x + half, at.y + height, at.z + half).deflate(0.05);
+            if (blocked(level, body)) {
+                crash(level, at.add(0.0, height * 0.5, 0.0));
+                if (++flight.crashes >= CRASHES) {
+                    return;
+                }
+            }
+        }
+    }
+
+    private static boolean blocked(ServerLevel level, AABB body) {
+        for (BlockPos pos : BlockPos.betweenClosed(BlockPos.containing(body.minX, body.minY, body.minZ), BlockPos.containing(body.maxX, body.maxY, body.maxZ))) {
+            BlockState state = level.getBlockState(pos);
+            if (!state.isAir() && breakable(level, pos, state) && !state.getCollisionShape(level, pos).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * What a blast would break: not bedrock, obsidian or anything else nothing breaks.
+     */
+    private static boolean breakable(ServerLevel level, BlockPos pos, BlockState state) {
+        return state.getDestroySpeed(level, pos) >= 0.0F && state.getBlock().getExplosionResistance() < 1200.0F;
+    }
+
+    /**
+     * A body crashing through: everything breakable in a ragged ball around it bursts, and the Hex takes it whole to mend.
+     */
+    private static void crash(ServerLevel level, Vec3 center) {
+        List<BlockPos> burst = new ArrayList<>();
+        int reach = (int) Math.ceil(CRASH_RADIUS);
+        BlockPos middle = BlockPos.containing(center);
+        RandomSource random = level.getRandom();
+        for (BlockPos pos : BlockPos.betweenClosed(middle.offset(-reach, -reach, -reach), middle.offset(reach, reach, reach))) {
+            double radius = CRASH_RADIUS * (0.7 + 0.3 * random.nextDouble());
+            BlockState state = level.getBlockState(pos);
+            if (Vec3.atCenterOf(pos).distanceToSqr(center) <= radius * radius && !state.isAir() && breakable(level, pos, state)) {
+                burst.add(pos.immutable());
+            }
+        }
+        int debris = 0;
+        for (BlockPos pos : burst) {
+            if (debris < 12 && HexMending.inside(level, Vec3.atCenterOf(pos))) {
+                level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, pos, Block.getId(level.getBlockState(pos)));
+                debris++;
+            }
+        }
+        // what lies inside the wall goes, to come back; what lies outside it stays where it is
+        HexMending.blast(level, center, burst);
+        level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, center.x, center.y, center.z, 1, 0.0, 0.0, 0.0, 0.0);
+        level.playSound(null, center.x, center.y, center.z, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 2.0F, 0.85F);
     }
 
     /**
@@ -322,6 +415,7 @@ public final class HexEjection {
         final Vec3 crossing;
         final boolean player;
         boolean crossed;
+        int crashes;
 
         Flight(ServerLevel level, Vec3 from, Vec3 to, long start, int ticks, float crossingAt, Vec3 crossing, boolean player) {
             this.level = level;
