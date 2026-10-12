@@ -45,11 +45,14 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 - A hexagonal wall of static spreads out from you and stays where you cast it. Anyone can walk in; you can throw them out, and they crash straight through whatever stands in their way, which the Hex mends like any blast.
 - **Inside, the world is a sitcom.** Six eras, from 1950s black and white through 70s film color and 80s videotape to the present day, each with title cards and a note-block theme, era clothes for everyone inside, sound like an old television's speaker and a laugh track.
 - **It builds Westview:** your home, or a whole suburb with streets, lawns and picket fences, made over from whatever already stands rather than torn down. When the Hex falls, everything goes back the way it was.
-- **Hostile mobs become townspeople** who sit on couches, switch on the television, chat with their hands and wave as you pass.
+- **Hostile mobs become townspeople** with sitcom names, who sit on couches, switch on the television, chat with their hands and wave as you pass.
 - **Blasts mend themselves:** whatever a creeper or TNT breaks inside comes back, chests and all.
 - **Rewind the scene:** hold rewind and the last ten seconds inside run backward. Creatures and players walk back the way they came, wounds close, broken blocks return and the fallen get back up, all shown the way that era's set would show it: film juddering back through a 1950s projector, a VHS tape whining back with "REW" in the corner, a smooth scrub in the present day. Nothing can be duplicated with it: what someone has already picked up stays picked up.
 - **The Showrunner remote** (H): change the era, the time of day and the weather, start a new episode every morning, name your Hex, move your home, choose what the next Hex builds, and hold its rewind button.
-- **Era furniture:** a television, radio, telephone, fridge, stove, toaster, couch, armchair, lamp, wall clock, picture frames, posters and a parked car, each changing with the era. All craftable.
+- **A different home** each time a Hex is cast somewhere new, out of eight; a town you raised before comes back just as it was. Streets climb hills in flights of steps in the road's own colors.
+- **Part the wall** and walk through where it stands open, with no wall there to cross. From outside, the rest of the Hex stands beyond the opening.
+- **Set dressing:** standing in your own Hex, a panel beside your inventory holds every piece of era furniture and the car. Click one to take it out of thin air for a little chaos energy.
+- **Era furniture that works:** drive the car with a friend beside you, keep food in the fridge, cook on the stove, sit on the couch, switch on the television, radio and lamp, and ask the wall clock the time. Each piece changes with the era, and all of it is craftable.
 
 ![Hostile mobs turned into townspeople in era clothes](https://raw.githubusercontent.com/YashjitPal/The-Scarlet-Witch-Mod/main/docs/media/features/townspeople.webp)
 

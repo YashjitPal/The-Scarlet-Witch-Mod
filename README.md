@@ -117,7 +117,7 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 <tr>
 <td width="50%" valign="top">
 <img src="docs/media/features/townspeople.webp" alt="Hostile mobs turned into townspeople in era clothes" width="100%">
-<p><b>Townspeople</b><br>Hostile mobs become townspeople who sit on couches, switch on the television, chat with their hands and wave as you pass.</p>
+<p><b>Townspeople</b><br>Hostile mobs become townspeople with sitcom names who sit on couches, switch on the television, chat with their hands and wave as you pass.</p>
 </td>
 <td width="50%" valign="top">
 <img src="docs/media/features/mending.webp" alt="TNT blasts a house, and the blocks fly back into place" width="100%">
@@ -144,8 +144,11 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 
 - **Throw someone out** the way Wanda throws Monica out of Westview: they crash straight through whatever stands in their way, bursting it open like a creeper's blast, and the Hex mends it like any blast.
 - Creatures and players walk back the way they came, wounds close, broken blocks return and the fallen get back up. Nothing can be duplicated with the rewind: what someone has already picked up stays picked up.
-- The remote also chooses what the next Hex builds.
-- **Era furniture:** a television, radio, telephone, fridge, stove, toaster, couch, armchair, lamp, wall clock, picture frames, posters and a parked car, each changing with the era. All craftable.
+- The remote also chooses what the next Hex builds, and a Hex cast somewhere new raises a different home each time, out of eight; a town you raised before comes back just as it was.
+- **Part the wall** and walk through where it stands open: there is no wall there to cross, so the picture doesn't roll over. From outside, the rest of the Hex stands beyond the opening.
+- **Streets climb hills** in flights of steps in the road's own colors, which change with the era like the rest of it.
+- **Set dressing:** standing in your own Hex, a panel beside your inventory holds every piece of era furniture and the car. Click one to take it out of thin air for a little chaos energy.
+- **Era furniture that works:** drive the car with a friend beside you, keep food in the fridge, cook on the stove, sit on the couch, switch on the television, radio and lamp, and ask the wall clock the time. Each piece changes with the era, and all of it is craftable.
 
 ## The Darkhold
 

@@ -256,8 +256,9 @@ The centerpiece. Inspired by Westview.
 
 ### Reality warping
 
+- **Where the caster has parted the wall, there is no wall.** Walking through the opening, nothing flares and the picture doesn't come through as it does crossing the wall; a chaos bolt flies on through, and what comes in there isn't rewritten. Seen from outside through the opening, the rest of the wall stands beyond it, as plainly as the near side.
 - **Anyone can enter.** Walking through the wall, person or creature, flares it red where they pass, the red soaking out through it around them as rings run out across it, as a chaos blast striking it does, a little gentler. The caster can **kick** someone out: they get flung out through the wall, Monica-style, with a spectacular animation (the wall bulges and ripples, sparks, a boom). Whatever stands in their way inside the wall they crash straight through, bursting it open in a crater as wide as a creeper's blast, which the Hex mends like any blast; outside the wall they break nothing. They can walk back in.
-- **Residents:** every hostile mob inside (zombies, skeletons, creepers, spiders and so on) is rewritten into a townsperson in era clothes. Animals stay animals. Bosses resist the hex.
+- **Residents:** every hostile mob inside (zombies, skeletons, creepers, spiders and so on) is rewritten into a townsperson in era clothes. Animals stay animals. Bosses resist the hex. Over their heads they go by sitcom names, first names fitting who they're dressed as and families with nods to the old shows, always the same for the same mob; one a player has named keeps that name.
   - They are the same mobs underneath, so nothing is ever lost or duplicated.
   - They follow **sitcom routines**: wander, chat, sit on couches, watch the era TV, wave at players.
     - They go looking for somewhere to sit, a couch or an armchair, best of all one facing a television, which they switch on if it is off. They sit as long as an episode's scene, a minute or so.
@@ -321,7 +322,7 @@ The Hex builds Westview.
   - While it goes up, the caster raises both arms to it and a stream of scarlet magic pours from each palm, jumping from block to block as they land.
   - It builds itself the way the house does in WandaVision: scarlet light traces the lot, the timber frame rises from the ground, then the walls, windows and roof close in, and the rooms furnish themselves.
   - When casting, the Hex can start from your home: the house builds first, written a block at a time around the caster as they float in the middle of it, each block glitching in as it lands; then they come down onto its floor and the Hex bursts out of them where they stand and spreads. Cast from a pillar, a hill or a hollow, the house still rises on the land its lot is leveled to, and the caster floats down or up to it.
-  - **It's never the same house twice.** Each town picks its home from five two-story designs: a colonial under a portico, a farmhouse with a porch across its front, a foursquare under a hipped roof, a front-gabled house with a porch wrapping round one side, and a wide house under a hipped roof. Its paint, shutters, chimney, flowers, hedge or picket fence and shade tree vary on top of that. A town the Hex remembers raises the same home again.
+  - **It's never the same house twice.** Each town picks its home from eight designs: five two-story (a colonial under a portico, a farmhouse with a porch across its front, a foursquare under a hipped roof, a front-gabled house with a porch wrapping round one side, and a wide house under a hipped roof) and three single-story (a long, low ranch under a hipped roof, a front-gabled bungalow, and a side-gabled cottage with a wraparound porch). Its paint, shutters, chimney, flowers, hedge or picket fence and shade tree vary on top of that. A town raised somewhere new never repeats the designs of its caster's last three homes; a town the Hex remembers raises the same home again. Towns from before there were eight designs are marked by their seed, so a remembered one keeps the home it had.
   - **Cast it by something standing and the home is made of it.** The Hex looks for a house, a ruin, a shell of walls or a bare foundation within about 10 blocks of the caster. It carries them inside, through the walls if it must, and lays the town out from its front door. Nothing of it is torn down: it keeps its shape, is made over in the era's look, and is finished around what stands.
     - Fallen walls close up with windows in them, a floor goes down where there is none, and a door goes in its front if it has none.
     - A ruin with no roof rises two stories under a new roof, with a stair up to a bedroom. One that still has its roof keeps its shape, recessed porches and all.
@@ -331,6 +332,7 @@ The Hex builds Westview.
   - **Real suburban sizes.** Lots are 17 by 19 blocks and stories 5 blocks tall. Every house is picked at random: long, low ranch houses (often with a garage and a driveway up to it), bungalows, colonials, foursquares and cottages, with stoops, porticos, full-width or wraparound porches, and bedrooms with beds. Civic buildings, parks and orchard plots sit centered on the same lots.
   - **It never tears down anything that was there.** Player builds and village houses keep their shape but are made over in the era's style, the way Westview's own buildings became sitcom houses: every block takes on the part it plays (wall, trim, roof, window, door, floor, fence) and that part's era look. A building that stays becomes what it was in the town: the library, the church, a shop, a barn. Farms become flower gardens. Chests, beds, furnaces, workbenches and the like are left just as they are. The town is laid out around everything else that isn't natural ground. In a village, the paths become streets and new houses fill the empty lots.
   - **Growing the Hex extends the town** as the wall moves out. Shrinking it takes down whatever ends up outside.
+  - **Streets climb hills.** Every stretch of street is leveled flat, so on a slope one stretch can sit blocks above the next. Where it does, the end of the lower stretch climbs to meet the higher one in a flight of steps across the road and both sidewalks, and a stretch meeting a crossing climbs or steps down to it, since a crossing joins four ways and stays level. The steps are the road's and the sidewalk's own colors, the nearest stone that comes as stairs, and change with the era like the rest of the street.
 - **Era makeovers:** homes, streets and furniture are built from era blocks that restyle with the era. That's picket-fence pastels in the 1950s, wood paneling and earth tones in the 1970s, bold colors in the 1980s, and beige modern in the 2000s. An era change sweeps through the town with a channel-change flicker.
 - **It exists only while the Hex stands.** Every block the Hex builds remembers what was there before. When the Hex collapses, the inward-moving wall takes the town down with it and leaves the land as it was. Only the caster's home outlasts it for a little while, glitching through the eras before it goes part by part (see the lifecycle above). Breaking a Hex-built block gives nothing, so the town can't be farmed for materials.
 - The caster chooses on the Showrunner remote what their next Hex builds: nothing, just their home, a whole town, or a farmhouse among orchards in blossom with country lanes and a red barn, every tree it covers turned into a fruit tree.
@@ -360,7 +362,17 @@ Blocks that change model with the hex's era, with a channel-change flicker. Hex 
 - **Living room:** couch, armchair, lamps
 - **Wall clock and picture frames**
 - **Posters** with a fake ad for each era
-- **A parked car** that changes model every era
+- **A car** that changes model every era
+
+They work, as far as the room they are in would:
+
+- **The car** drives. Get in and the driver takes the left front seat, with room for one beside them. Forward and back work the pedals and left and right turn the wheel, which turns it more the faster it goes and the other way when backing up. It climbs a step or a flight of stairs but not a wall, settles to the ground wherever it is left, and hums low, rising with its speed, for whoever rides in it. A town's own car is the Hex's: driven out past the wall, it goes the way the town does.
+- **The fridge** keeps as much as a chest, in its lower half, opened from either. Broken, or taken back by its Hex as the wall falls, it spills what it kept.
+- **The stove**, switched on, cooks whatever a campfire would that is held to it, there and then.
+- **The wall clock** tells whoever looks at it the time: the Hex's own hour if its caster has set one, or else the world's.
+- The television, radio and lamps switch on and off, the telephone rings, the toaster pops, and the couch and armchair seat you.
+
+**Set dressing.** A caster standing in their own Hex, wearing a crown that has mastered it, finds a panel beside their survival inventory with every decoration and the car in it. A click takes one out of thin air into their inventory, or at their feet if it is full, for a little chaos energy: 4 for a piece of furniture, 15 for the car. Outside their Hex, or someone else's, the panel isn't there, and the server checks the same before making anything.
 
 ---
 
