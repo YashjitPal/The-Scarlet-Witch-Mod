@@ -22,6 +22,8 @@ public final class ScarletSounds {
     public static final Supplier<SoundEvent> DARKHOLD_HEARTBEAT = register("darkhold.heartbeat");
     /** The darkness itself closing in. */
     public static final Supplier<SoundEvent> DARKHOLD_DREAD = register("darkhold.dread");
+    /** A note of a car's horn, sounded two at once a third apart. */
+    public static final Supplier<SoundEvent> CAR_HORN = register("car.horn");
 
     private ScarletSounds() {
     }

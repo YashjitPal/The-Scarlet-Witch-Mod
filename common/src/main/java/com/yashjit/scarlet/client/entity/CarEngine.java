@@ -1,44 +1,62 @@
 package com.yashjit.scarlet.client.entity;
 
 import com.yashjit.scarlet.entity.ParkedCar;
+import com.yashjit.scarlet.network.CarHornPayload;
+import com.yashjit.scarlet.platform.Services;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The rumble of a car's engine, heard by whoever sits in it: low while it idles, rising as it picks up speed.
+ * A car as whoever sits in it hears it: the rumble of its engine, low while it idles and rising as it picks up speed,
+ * and the road under its tires, louder the faster it goes. Its driver sounds its horn with the jump key.
  */
 public final class CarEngine {
 
-    private static @Nullable Rumble rumble;
+    private static @Nullable Loop engine;
+    private static @Nullable Loop road;
+    private static boolean jumpWasDown;
 
     private CarEngine() {
     }
 
     public static void tick(Minecraft minecraft) {
         LocalPlayer player = minecraft.player;
-        if (player != null && player.getVehicle() instanceof ParkedCar car && (rumble == null || rumble.isStopped())) {
-            rumble = new Rumble(car, player);
-            minecraft.getSoundManager().play(rumble);
+        ParkedCar car = player != null && player.getVehicle() instanceof ParkedCar riding ? riding : null;
+        if (car != null && (engine == null || engine.isStopped())) {
+            engine = new Loop(car, player, SoundEvents.MINECART_INSIDE, false);
+            minecraft.getSoundManager().play(engine);
         }
+        if (car != null && (road == null || road.isStopped())) {
+            road = new Loop(car, player, SoundEvents.MINECART_RIDING, true);
+            minecraft.getSoundManager().play(road);
+        }
+        boolean jump = car != null && car.getControllingPassenger() == player && minecraft.gui.screen() == null && minecraft.options.keyJump.isDown();
+        if (jump && !jumpWasDown) {
+            Services.NETWORK.sendToServer(new CarHornPayload());
+        }
+        jumpWasDown = jump;
     }
 
-    private static final class Rumble extends AbstractTickableSoundInstance {
+    private static final class Loop extends AbstractTickableSoundInstance {
 
         private final ParkedCar car;
         private final LocalPlayer rider;
+        private final boolean tires;
 
-        Rumble(ParkedCar car, LocalPlayer rider) {
-            super(SoundEvents.MINECART_INSIDE, SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
+        Loop(ParkedCar car, LocalPlayer rider, SoundEvent sound, boolean tires) {
+            super(sound, SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
             this.car = car;
             this.rider = rider;
+            this.tires = tires;
             this.looping = true;
             this.delay = 0;
-            this.volume = 0.05F;
+            this.volume = tires ? 0.0F : 0.05F;
             this.pitch = 0.5F;
             this.x = car.getX();
             this.y = car.getY();
@@ -54,9 +72,14 @@ public final class CarEngine {
             x = car.getX();
             y = car.getY();
             z = car.getZ();
-            float pace = Math.min(1.0F, Math.abs(car.speed()) / 0.55F);
-            volume = 0.06F + 0.4F * pace;
-            pitch = 0.5F + 0.45F * pace;
+            float pace = Math.min(1.0F, Math.abs(car.speed()) / 0.62F);
+            if (tires) {
+                volume = 0.32F * pace * pace;
+                pitch = 0.7F + 0.45F * pace;
+            } else {
+                volume = 0.08F + 0.34F * pace;
+                pitch = 0.45F + 0.55F * pace;
+            }
         }
     }
 }

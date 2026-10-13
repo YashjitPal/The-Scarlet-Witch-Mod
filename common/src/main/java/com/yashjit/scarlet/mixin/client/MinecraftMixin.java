@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.mixin.client;
 
 import com.llamalad7.mixinextras.sugar.Local;
+import com.yashjit.scarlet.client.entity.CarPicking;
 import com.yashjit.scarlet.client.hex.HomePlacement;
 import com.yashjit.scarlet.client.magic.CastInput;
 import com.yashjit.scarlet.client.magic.MindControlClient;
@@ -60,5 +61,10 @@ abstract class MinecraftMixin {
         if (TelekinesisClient.channeling() || MindControlClient.inside() || MindControlClient.held() || HomePlacement.holdsClick()) {
             ci.cancel();
         }
+    }
+
+    @Inject(method = "pick", at = @At("TAIL"))
+    private void scarlet$pickCarsWhole(float partialTick, CallbackInfo ci) {
+        CarPicking.pick((Minecraft) (Object) this, partialTick);
     }
 }

@@ -2017,6 +2017,64 @@ public final class Showcase {
                 }
                 s.view(4, 2.5, 13.5, 0, 0.8, 9).shot("cars_back", 4).playerCamera().inventory().shot("cars_inventory", 15);
             }
+            // sat in the driver's seat of a car of four eras, in a Hex: ahead over the hood and out to the side
+            case "carseats" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex build nothing")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-16 ~ ~-6 ~16 ~6 ~16 minecraft:air")
+                        .command("execute at @a run fill ~-16 ~-1 ~-6 ~16 ~-1 ~16 minecraft:grass_block")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().anchor()
+                        .tap().then(minecraft -> {
+                        }, 120)
+                        .command("execute at @a run summon scarlet:parked_car ~ ~ ~5 {Rotation:[0f,0f],paint:1}");
+                for (String era : new String[] {"1950s", "1970s", "1980s", "present"}) {
+                    s.command("execute as @a run scarlet hex era " + era).then(minecraft -> {
+                            }, 140)
+                            .face(0, 10).getInCar().then(minecraft -> {
+                            }, 10)
+                            .playerCamera().camera(CameraType.FIRST_PERSON).hideHud(true).face(0, 4).shot("carseat_" + era, 4)
+                            .face(-65, 8).shot("carseat_" + era + "_side", 4)
+                            .then(minecraft -> minecraft.options.keyShift.setDown(true), 4).then(minecraft -> minecraft.options.keyShift.setDown(false), 10);
+                }
+            }
+            // a car from the driver's seat and around it as it is driven: ahead, to each side, back and down at the dash from
+            // the seat, then from behind as it drives off and turns
+            case "carride" -> s
+                    .then(minecraft -> minecraft.gui.setScreen(null), 2)
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .command("time set noon")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-12 ~ ~-4 ~12 ~6 ~40 minecraft:air")
+                    .command("execute at @a run fill ~-12 ~-1 ~-4 ~12 ~-1 ~40 minecraft:smooth_stone")
+                    .anchor()
+                    .command("execute at @a run summon scarlet:parked_car ~ ~ ~4 {Rotation:[0f,0f],paint:1}").then(minecraft -> {
+                    }, 10)
+                    .face(0, 10).getInCar().then(minecraft -> {
+                    }, 10).logCar("got in")
+                    .playerCamera().camera(CameraType.FIRST_PERSON).hideHud(false).face(0, 5).shot("carride_ahead", 4)
+                    .face(-70, 5).shot("carride_left", 4).face(70, 5).shot("carride_right", 4).face(170, 5).shot("carride_back", 4)
+                    .face(0, 40).shot("carride_dash", 4)
+                    .face(0, 5).camera(CameraType.THIRD_PERSON_BACK).shot("carride_third", 4)
+                    .view(-5.0, 2.4, 1.0, 0.0, 0.9, 4.0).shot("carride_outside", 4).playerCamera().camera(CameraType.THIRD_PERSON_BACK)
+                    .walk(true).then(minecraft -> {
+                    }, 40).logCar("driving").shot("carride_driving", 2)
+                    .then(minecraft -> minecraft.options.keyLeft.setDown(true), 20).logCar("turning").shot("carride_turning", 2)
+                    .then(minecraft -> minecraft.options.keyLeft.setDown(false), 0).walk(false).then(minecraft -> {
+                    }, 40).logCar("stopped")
+                    .camera(CameraType.FIRST_PERSON)
+                    .then(minecraft -> minecraft.options.keyShift.setDown(true), 4).then(minecraft -> minecraft.options.keyShift.setDown(false), 10)
+                    .logCar("got out");
             // townspeople going about their days in a home: sitting down to the television, chatting, waving to the caster
             case "routines" -> {
                 s.land()

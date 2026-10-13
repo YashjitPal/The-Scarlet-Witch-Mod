@@ -31,7 +31,7 @@ public class ParkedCarItem extends Item {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos().above();
         Vec3 at = Vec3.atBottomCenterOf(pos);
-        if (!level.noCollision(new AABB(at.x - 1.0, at.y, at.z - 1.0, at.x + 1.0, at.y + 1.4, at.z + 1.0))) {
+        if (!level.noCollision(new AABB(at.x - 1.0, at.y, at.z - 1.0, at.x + 1.0, at.y + 1.6, at.z + 1.0))) {
             return InteractionResult.FAIL;
         }
         if (level instanceof ServerLevel server) {

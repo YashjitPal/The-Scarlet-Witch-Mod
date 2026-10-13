@@ -20,7 +20,7 @@ public final class ScarletEntities {
     public static final Supplier<EntityType<ChaosBolt>> CHAOS_BOLT = register("chaos_bolt",
             EntityType.Builder.<ChaosBolt>of(ChaosBolt::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(16).updateInterval(10));
     public static final Supplier<EntityType<ParkedCar>> PARKED_CAR = register("parked_car",
-            EntityType.Builder.<ParkedCar>of(ParkedCar::new, MobCategory.MISC).noLootTable().sized(2.2F, 1.4F).clientTrackingRange(10)
+            EntityType.Builder.<ParkedCar>of(ParkedCar::new, MobCategory.MISC).noLootTable().sized(2.2F, 1.6F).clientTrackingRange(10)
                     .updateInterval(3));
     public static final Supplier<EntityType<Seat>> SEAT = register("seat",
             EntityType.Builder.<Seat>of(Seat::new, MobCategory.MISC).noLootTable().noSummon().sized(0.0F, 0.0F)
