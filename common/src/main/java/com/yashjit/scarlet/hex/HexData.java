@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -38,14 +39,23 @@ public final class HexData extends SavedData {
             TownMemory.CODEC.listOf().optionalFieldOf("towns", List.of()).forGetter(data -> List.copyOf(data.towns)),
             HexPaint.BLOCKS_CODEC.optionalFieldOf("pending_paint", new Long2ObjectOpenHashMap<>()).forGetter(data -> data.pendingPaint),
             Codec.LONG_STREAM.xmap(LongStream::toArray, LongStream::of).optionalFieldOf("decor", new long[0])
-                    .forGetter(data -> data.decor.toLongArray())
+                    .forGetter(data -> data.decor.toLongArray()),
+            Conjured.CODEC.listOf().optionalFieldOf("conjured", List.of()).forGetter(HexData::conjuredToSave)
     ).apply(i, HexData::new));
 
     // saves from before towns held only the list of Hexes
     private static final Codec<HexData> CODEC = Codec.withAlternative(CURRENT,
             Hex.CODEC.listOf().xmap(hexes -> new HexData(hexes, new Long2ObjectOpenHashMap<>(), List.of(), List.of(), new Long2ObjectOpenHashMap<>(),
-                            new long[0]),
+                            new long[0], List.of()),
                     data -> List.copyOf(data.hexes.values())));
+
+    /** A decoration someone put down that their Hex made, which goes when they are outside it. */
+    record Conjured(long pos, UUID caster) {
+        static final Codec<Conjured> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.LONG.fieldOf("pos").forGetter(Conjured::pos),
+                UUIDUtil.CODEC.fieldOf("caster").forGetter(Conjured::caster)
+        ).apply(i, Conjured::new));
+    }
 
     /** Most towns remembered for each caster and build; past that, the oldest are forgotten. */
     private static final int MAX_TOWNS = 32;
@@ -67,6 +77,8 @@ public final class HexData extends SavedData {
     private final Long2ObjectOpenHashMap<HexPaint.Painted> pendingPaint;
     /** Era decorations people have put down inside Hexes here, which follow their Hex's era: see {@link HexDecor}. */
     private final LongOpenHashSet decor;
+    /** Decorations people have put down that a Hex made, by where they stand, and whose Hex: see {@link com.yashjit.scarlet.decor.HexMade}. */
+    private final Long2ObjectOpenHashMap<UUID> conjured;
     /** The homes fallen Hexes have left standing for a while, saved only as what is waiting to be put back. */
     private final List<HomeRemnant> remnants = new ArrayList<>();
     private final long instance = INSTANCES.incrementAndGet();
@@ -78,10 +90,11 @@ public final class HexData extends SavedData {
         this.towns = new ArrayList<>();
         this.pendingPaint = new Long2ObjectOpenHashMap<>();
         this.decor = new LongOpenHashSet();
+        this.conjured = new Long2ObjectOpenHashMap<>();
     }
 
     private HexData(List<Hex> loaded, Long2ObjectOpenHashMap<HexTown.Built> pending, List<HexTown.Kept> pendingKept, List<TownMemory> towns,
-                    Long2ObjectOpenHashMap<HexPaint.Painted> pendingPaint, long[] decor) {
+                    Long2ObjectOpenHashMap<HexPaint.Painted> pendingPaint, long[] decor, List<Conjured> conjured) {
         for (Hex hex : loaded) {
             hexes.put(hex.caster, hex);
         }
@@ -90,6 +103,23 @@ public final class HexData extends SavedData {
         this.towns = new ArrayList<>(towns);
         this.pendingPaint = new Long2ObjectOpenHashMap<>(pendingPaint);
         this.decor = new LongOpenHashSet(decor);
+        this.conjured = new Long2ObjectOpenHashMap<>();
+        for (Conjured entry : conjured) {
+            this.conjured.put(entry.pos(), entry.caster());
+        }
+    }
+
+    private List<Conjured> conjuredToSave() {
+        List<Conjured> all = new ArrayList<>(conjured.size());
+        for (var entry : conjured.long2ObjectEntrySet()) {
+            all.add(new Conjured(entry.getLongKey(), entry.getValue()));
+        }
+        return all;
+    }
+
+    /** The decorations people have put down that a Hex made, by where they stand, and whose Hex made each. */
+    public Long2ObjectOpenHashMap<UUID> conjured() {
+        return conjured;
     }
 
     public static HexData of(ServerLevel level) {

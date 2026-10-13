@@ -1,8 +1,10 @@
 package com.yashjit.scarlet.mixin;
 
+import com.yashjit.scarlet.decor.HexMade;
 import com.yashjit.scarlet.hex.HexData;
 import com.yashjit.scarlet.hex.HexPaint;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -37,6 +39,20 @@ abstract class BlockStateBaseMixin {
         BlockState self = (BlockState) (Object) this;
         if (painted != null && painted.after().getBlock() == self.getBlock()) {
             cir.setReturnValue(painted.before().getDrops(params));
+        }
+    }
+
+    /**
+     * A decoration a Hex made, broken, gives back the Hex's own again.
+     */
+    @Inject(method = "getDrops", at = @At("RETURN"))
+    private void scarlet$stillTheHexs(LootParams.Builder params, CallbackInfoReturnable<List<ItemStack>> cir) {
+        Vec3 origin = params.getOptionalParameter(LootContextParams.ORIGIN);
+        UUID maker = origin == null ? null : HexMade.madeAt(params.getLevel(), BlockPos.containing(origin));
+        if (maker != null) {
+            for (ItemStack drop : cir.getReturnValue()) {
+                HexMade.mark(drop, maker);
+            }
         }
     }
 }

@@ -25,7 +25,10 @@ public final class Showrunner {
             return;
         }
         if (payload.action() == ShowrunnerPayload.BUILD) {
-            Services.PLAYER_DATA.set(player, Services.PLAYER_DATA.get(player).withHexBuild(HexBuild.byIndex(payload.value())));
+            HexBuild build = HexBuild.byIndex(payload.value());
+            Services.PLAYER_DATA.set(player, Services.PLAYER_DATA.get(player).withHexBuild(build));
+            // a Hex standing now becomes it too
+            Hexes.rebuild(player, build);
             return;
         }
         if (payload.action() == ShowrunnerPayload.REWIND) {

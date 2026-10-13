@@ -7,8 +7,6 @@ import com.yashjit.scarlet.hex.HexData;
 import com.yashjit.scarlet.hex.HexShape;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.magic.Magic;
-import com.yashjit.scarlet.magic.Mastery;
-import com.yashjit.scarlet.magic.Spell;
 import com.yashjit.scarlet.registry.ScarletBlocks;
 import com.yashjit.scarlet.registry.ScarletItems;
 import java.util.ArrayList;
@@ -26,7 +24,8 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Set dressing: a caster standing in their own Hex can take any of its era decorations, or a car, out of thin air, for
- * a little of their chaos energy each. Their inventory shows them all beside it while they stand there.
+ * a little of their chaos energy each. Their inventory shows them all beside it while they stand there. What they take
+ * is the Hex's, and lasts only inside it (see {@link HexMade}); anyone can craft the same to keep.
  */
 public final class Props {
 
@@ -55,15 +54,14 @@ public final class Props {
     }
 
     /**
-     * Whether someone could take something now, given whether they stand in their own Hex: they wear a crown that has
-     * mastered the Hex.
+     * Whether someone could take something now, given whether they stand in their own Hex: they wear their crown.
      */
     public static boolean crowned(Player player) {
-        return CrownItem.isWearingCrown(player) && Mastery.rank(player) >= Spell.HEX.rank();
+        return CrownItem.isWearingCrown(player);
     }
 
     /**
-     * Whether a player stands in their own Hex, wearing a crown that has mastered it, while it stands.
+     * Whether a player stands in their own Hex, wearing their crown, while it stands.
      */
     public static boolean canDress(ServerPlayer player) {
         if (!crowned(player)) {
@@ -94,7 +92,9 @@ public final class Props {
             }
             Magic.spend(player, cost, now);
         }
-        player.getInventory().placeItemBackInInventory(new ItemStack(item), Prediction.SERVER_ONLY);
+        ItemStack made = new ItemStack(item);
+        HexMade.mark(made, player.getUUID());
+        player.getInventory().placeItemBackInInventory(made, Prediction.SERVER_ONLY);
         player.containerMenu.broadcastChanges();
         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 0.8F, 1.3F);
         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ILLUSIONER_CAST_SPELL, SoundSource.PLAYERS, 0.25F, 1.8F);

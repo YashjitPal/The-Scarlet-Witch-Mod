@@ -449,6 +449,40 @@ public final class Hexes {
     }
 
     /**
+     * The caster choosing on their remote what their Hex builds, while it stands: what it has built is made over into
+     * that (see {@link HexTown#rebuildAs}). A Hex that built nothing raises its home where it was cast, and the rest round
+     * it.
+     */
+    public static void rebuild(ServerPlayer player, HexBuild build) {
+        HexTape.offTape(() -> rebuildOffTape(player, build));
+    }
+
+    private static void rebuildOffTape(ServerPlayer player, HexBuild build) {
+        ServerLevel level = player.level();
+        HexData data = HexData.of(level);
+        Hex hex = data.byCaster(player.getUUID());
+        if (hex == null || hex.phase != Hex.Phase.STANDING) {
+            return;
+        }
+        long now = level.getGameTime();
+        BlockPos center = BlockPos.containing(hex.center);
+        if (hex.town == null) {
+            if (build == HexBuild.NOTHING) {
+                return;
+            }
+            long seed = HexTown.freshSeed(player.getUUID().getLeastSignificantBits() ^ now * 31L, data.recentSeeds(player.getUUID(), RECENT_HOMES));
+            hex.town = HexTown.raise(build, hex.center, player.getDirection(), seed, data.towns(player.getUUID(), build, hex.center, MAX_RADIUS), hex.era);
+            hex.town.raisedByCaster();
+        } else if (!hex.town.rebuildAs(build, center, now)) {
+            return;
+        }
+        data.setDirty();
+        play(level, hex.center, SoundEvents.BEACON_POWER_SELECT, 2.5F, 0.7F);
+        play(level, hex.center, SoundEvents.ILLUSIONER_MIRROR_MOVE, 2.0F, 0.6F);
+        play(level, player.position(), SoundEvents.RESPAWN_ANCHOR_CHARGE, 0.8F, 0.8F);
+    }
+
+    /**
      * The next morning's episode: the next era on, or after the present, back to the 1950s for a new season.
      */
     private static void nextEpisode(ServerLevel level, Hex hex) {

@@ -13,6 +13,7 @@ import com.yashjit.scarlet.darkhold.Dreamwalk;
 import com.yashjit.scarlet.entity.DreamBody;
 import com.yashjit.scarlet.hex.HexSky;
 import com.yashjit.scarlet.network.DreamPayload;
+import com.yashjit.scarlet.hex.HexBuild;
 import com.yashjit.scarlet.network.ShowrunnerPayload;
 import com.yashjit.scarlet.client.magic.SpellWheel;
 import com.yashjit.scarlet.client.magic.TelekinesisClient;
@@ -1400,6 +1401,80 @@ public final class Showcase {
                     .command("gamemode creative @a")
                     .command("execute as @a run scarlet hex dispel").then(minecraft -> {
                     }, 20);
+            // what a caster takes out of thin air in their Hex: carried out past its wall and back in before it goes;
+            // carried out and kept out until it goes; dropped outside it; and a refrigerator put down inside, then
+            // broken, and another left standing as the Hex falls
+            case "hexmade" -> s
+                    .land()
+                    .dispelHexes()
+                    .command("kill @e[type=!minecraft:player]")
+                    .command("gamemode survival @a")
+                    .command("clear @a")
+                    .command("execute as @a run scarlet hex build nothing")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                    .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                    .command("execute at @a run fill ~-4 ~ ~-4 ~4 ~4 ~6 minecraft:air")
+                    .command("execute at @a run fill ~-4 ~-1 ~-4 ~4 ~-1 ~6 minecraft:stone")
+                    .anchor()
+                    .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                    .tap().then(minecraft -> {
+                    }, 120)
+                    .inventory().then(minecraft -> {
+                    }, 10)
+                    .clickProp(0).then(minecraft -> {
+                    }, 10)
+                    .clickProp(0).then(minecraft -> {
+                    }, 10)
+                    .logHexMade("two televisions taken").shot("hexmade_inside", 4)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    .command("execute as @a at @s run tp @s ~ ~ ~100").then(minecraft -> {
+                    }, 12)
+                    .logHexMade("a moment past the wall").shot("hexmade_glitching", 1)
+                    .command("execute as @a at @s run tp @s ~ ~ ~-100").then(minecraft -> {
+                    }, 20)
+                    .logHexMade("back inside in time")
+                    .command("execute as @a at @s run tp @s ~ ~ ~100").then(minecraft -> {
+                    }, 60)
+                    .logHexMade("kept outside")
+                    .command("execute as @a at @s run tp @s ~ ~ ~-100").then(minecraft -> {
+                    }, 10)
+                    // one thrown down outside the wall
+                    .inventory().then(minecraft -> {
+                    }, 10)
+                    .clickProp(0).then(minecraft -> {
+                    }, 10)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    .command("execute as @a at @s run tp @s ~ ~ ~100").then(minecraft -> {
+                    }, 2)
+                    .dropHeld().then(minecraft -> {
+                    }, 4)
+                    .logHexMade("thrown down outside")
+                    .then(minecraft -> {
+                    }, 20)
+                    .logHexMade("a moment after")
+                    .command("execute as @a at @s run tp @s ~ ~ ~-100").then(minecraft -> {
+                    }, 10)
+                    // a refrigerator put down inside and broken, then another put down and left as the Hex falls
+                    .inventory().then(minecraft -> {
+                    }, 10)
+                    .clickProp(6).then(minecraft -> {
+                    }, 10)
+                    .clickProp(6).then(minecraft -> {
+                    }, 10)
+                    .then(minecraft -> minecraft.gui.setScreen(null), 4)
+                    .face(0, 30).useBlock(0, -1, 3).then(minecraft -> {
+                    }, 10)
+                    .logHexMade("a refrigerator put down")
+                    .command("execute at @a run setblock ~ ~ ~3 minecraft:air destroy").then(minecraft -> {
+                    }, 10)
+                    .logHexMade("that refrigerator broken")
+                    .command("kill @e[type=minecraft:item]")
+                    .useBlock(0, -1, 3).then(minecraft -> {
+                    }, 10)
+                    .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                    }, 260)
+                    .logHexMade("the Hex fallen")
+                    .command("gamemode creative @a");
             // a refrigerator that keeps things and spills them when broken, a range that cooks, a clock that tells the
             // time, and a car driven off over a step and round, then got out of
             case "appliances" -> s
@@ -1608,6 +1683,40 @@ public final class Showcase {
                         }, 60).logRemnants("grown back while it still stood")
                         .then(minecraft -> {
                         }, 400).logRemnants("up again")
+                        .dispelHexes()
+                        .command("execute as @a run scarlet hex forget");
+            }
+            // a standing Hex made over from its remote: a town into an orchard, then just its home, then nothing, and a
+            // town again
+            case "livemode" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -48; x <= 48; x += 12) {
+                    s.command("execute at @a run fill ~" + x + " ~ ~-48 ~" + Math.min(48, x + 11) + " ~14 ~48 minecraft:air");
+                }
+                s.command("execute at @a run fill ~-48 ~-1 ~-48 ~48 ~-1 ~48 minecraft:grass_block")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 520).logHexSize("a town")
+                        .view(0.0, 62.0, 1.0, 0.0, 0.0, 0.0).shot("livemode_town", 30).playerCamera()
+                        .remote(ShowrunnerPayload.BUILD, HexBuild.ORCHARD.ordinal()).then(minecraft -> {
+                        }, 420).logHexSize("made over into an orchard").logRemnants("its home through it")
+                        .view(0.0, 62.0, 1.0, 0.0, 0.0, 0.0).shot("livemode_orchard", 30).playerCamera()
+                        .remote(ShowrunnerPayload.BUILD, HexBuild.HOME.ordinal()).then(minecraft -> {
+                        }, 300).logHexSize("just its home")
+                        .view(0.0, 62.0, 1.0, 0.0, 0.0, 0.0).shot("livemode_home", 30).playerCamera()
+                        .remote(ShowrunnerPayload.BUILD, HexBuild.NOTHING.ordinal()).then(minecraft -> {
+                        }, 240).logHexSize("nothing")
+                        .remote(ShowrunnerPayload.BUILD, HexBuild.TOWN.ordinal()).then(minecraft -> {
+                        }, 560).logHexSize("a town again")
+                        .view(0.0, 62.0, 1.0, 0.0, 0.0, 0.0).shot("livemode_town_again", 30).playerCamera()
                         .dispelHexes()
                         .command("execute as @a run scarlet hex forget");
             }
@@ -4223,6 +4332,58 @@ public final class Showcase {
                     Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, %s; homes left standing:%s", when,
                             hex == null ? "no Hex" : String.format(java.util.Locale.ROOT, "the Hex %s at %.0f blocks, its wall at %.1f", hex.phase(),
                                     hex.radius(), Hexes.wallRadius(hex, now)), home, left.isEmpty() ? " none" : left));
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log what a Hex made the player carries, how far each is through glitching out and whether
+         * it says so, what lies dropped near them, and what stands three blocks ahead of the anchor.
+         */
+        Scene logHexMade(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || minecraft.level == null || server == null) {
+                    return;
+                }
+                long now = minecraft.level.getGameTime();
+                StringBuilder carried = new StringBuilder();
+                var inventory = minecraft.player.getInventory();
+                for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+                    ItemStack stack = inventory.getItem(slot);
+                    if (com.yashjit.scarlet.decor.HexMade.maker(stack) != null) {
+                        boolean says = stack.getTooltipLines(net.minecraft.world.item.Item.TooltipContext.of(minecraft.level), minecraft.player,
+                                net.minecraft.world.item.TooltipFlag.NORMAL).stream().anyMatch(line -> line.getString().contains("Hex"));
+                        carried.append(String.format(java.util.Locale.ROOT, " %s %s%s;", BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath(),
+                                com.yashjit.scarlet.decor.HexMade.fading(stack, now) < 0 ? "whole" : String.format(java.util.Locale.ROOT, "glitching %.2f",
+                                        com.yashjit.scarlet.decor.HexMade.fading(stack, now)), says ? "" : ", saying nothing"));
+                    }
+                }
+                Vec3 at = minecraft.player.position();
+                server.execute(() -> {
+                    ServerLevel level = server.overworld();
+                    var near = level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(at, at).inflate(8.0));
+                    long hexs = near.stream().filter(item -> com.yashjit.scarlet.decor.HexMade.maker(item.getItem()) != null).count();
+                    BlockState ahead = level.getBlockState(BlockPos.containing(anchor.add(0.0, 0.0, 3.0)));
+                    Scarlet.LOG.info("Showcase: {}: carrying{}; {} lying near, {} of them the Hex's; three ahead {}", when,
+                            carried.isEmpty() ? " nothing the Hex made" : carried, near.size(), hexs, name(ahead));
+                });
+            }, 2);
+        }
+
+        /** The player throws down whatever they hold, as the drop key would. */
+        Scene dropHeld() {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    ServerPlayer player = server.getPlayerList().getPlayer(id);
+                    if (player != null) {
+                        player.drop(true);
+                    }
                 });
             }, 2);
         }

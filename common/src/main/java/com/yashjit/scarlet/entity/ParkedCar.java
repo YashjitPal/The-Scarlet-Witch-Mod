@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.entity;
 
+import com.yashjit.scarlet.decor.HexMade;
 import com.yashjit.scarlet.hex.Era;
 import com.yashjit.scarlet.hex.Hex;
 import com.yashjit.scarlet.hex.HexData;
@@ -8,6 +9,8 @@ import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.registry.ScarletEntities;
 import com.yashjit.scarlet.registry.ScarletItems;
 import com.yashjit.scarlet.registry.ScarletSounds;
+import java.util.UUID;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -28,6 +31,7 @@ import net.minecraft.world.entity.LinearInterpolationHandler;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
@@ -85,6 +89,8 @@ public class ParkedCar extends Entity {
 
     /** Whether the town parked it, so it goes with the town. */
     private boolean town;
+    /** Whose Hex made it out of thin air, if one did: it goes the moment it is outside that Hex. */
+    private @Nullable UUID madeBy;
     /** Whether anyone has driven it, so it settles to the ground wherever it is left. */
     private boolean driven;
     /** Its speed along the way it faces, in blocks a tick, while it is driven here. */
@@ -131,6 +137,10 @@ public class ParkedCar extends Entity {
 
     public Era era() {
         return Era.byIndex(entityData.get(ERA));
+    }
+
+    public void madeBy(@Nullable UUID caster) {
+        madeBy = caster;
     }
 
     public CarShape shape() {
@@ -216,7 +226,9 @@ public class ParkedCar extends Entity {
             return;
         }
         Hex hex = hexAround(level, position());
-        if (town && hex == null) {
+        // the town's own, never driven off, goes with the lot it was parked on when that is taken back
+        boolean lotGone = town && !driven && hex != null && hex.town() != null && !hex.town().isBuilt(blockPosition().below().asLong());
+        if (town && hex == null || lotGone || madeBy != null && !HexMade.inside(level, madeBy, position())) {
             vanish(level);
             return;
         }
@@ -449,7 +461,11 @@ public class ParkedCar extends Entity {
             return false;
         }
         if (!town && !player.isCreative()) {
-            spawnAtLocation(level, ScarletItems.PARKED_CAR.get());
+            ItemStack item = new ItemStack(ScarletItems.PARKED_CAR.get());
+            if (madeBy != null) {
+                HexMade.mark(item, madeBy);
+            }
+            spawnAtLocation(level, item);
         }
         level.playSound(null, getX(), getY(), getZ(), SoundEvents.IRON_DOOR_CLOSE, SoundSource.NEUTRAL, 0.8F, 0.8F);
         discard();
@@ -477,6 +493,7 @@ public class ParkedCar extends Entity {
         entityData.set(ERA, Math.clamp(input.getIntOr("era", Era.PRESENT.ordinal()), 0, Era.values().length - 1));
         town = input.getBooleanOr("town", false);
         driven = input.getBooleanOr("driven", false);
+        madeBy = input.read("made_by", UUIDUtil.CODEC).orElse(null);
     }
 
     @Override
@@ -485,5 +502,6 @@ public class ParkedCar extends Entity {
         output.putInt("era", entityData.get(ERA));
         output.putBoolean("town", town);
         output.putBoolean("driven", driven);
+        output.storeNullable("made_by", UUIDUtil.CODEC, madeBy);
     }
 }

@@ -3,6 +3,7 @@ package com.yashjit.scarlet.event;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.darkhold.Darkhold;
 import com.yashjit.scarlet.darkhold.Dreamwalk;
+import com.yashjit.scarlet.decor.HexMade;
 import com.yashjit.scarlet.hex.HexEjection;
 import com.yashjit.scarlet.hex.HexMending;
 import com.yashjit.scarlet.hex.HexRipples;
@@ -77,6 +78,7 @@ public final class ScarletEvents {
             });
             HexEjection.tick(level);
             RuneTraps.tick(level);
+            HexMade.tickPlaced(level);
         }
         Telekinesis.sweep(server);
         MindControl.sweep(server);
@@ -93,5 +95,6 @@ public final class ScarletEvents {
         Hexes.syncIfNeeded(player);
         Residents.syncIfNeeded(player);
         HexRipples.watch(player);
+        HexMade.tick(player);
     }
 }

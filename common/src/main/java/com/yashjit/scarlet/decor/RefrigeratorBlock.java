@@ -66,6 +66,7 @@ public class RefrigeratorBlock extends DecorBlock implements EntityBlock {
         level.setBlockAndUpdate(pos.above(), state.setValue(HALF, DoubleBlockHalf.UPPER));
         if (level instanceof ServerLevel server) {
             HexDecor.placed(server, pos);
+            HexMade.placed(server, pos, stack, pos.above());
         }
     }
 

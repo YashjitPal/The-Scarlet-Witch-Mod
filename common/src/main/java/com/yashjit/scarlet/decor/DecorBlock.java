@@ -60,6 +60,7 @@ public class DecorBlock extends HorizontalDirectionalBlock {
         super.setPlacedBy(level, pos, state, by, stack);
         if (level instanceof ServerLevel server) {
             HexDecor.placed(server, pos);
+            HexMade.placed(server, pos, stack);
         }
     }
 

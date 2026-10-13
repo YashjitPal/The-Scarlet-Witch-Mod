@@ -214,7 +214,7 @@ public final class HexTown {
         ).apply(i, Recall::new));
     }
 
-    private final HexBuild mode;
+    private HexBuild mode;
     private final Direction forward;
     private final long seed;
     private final Long2ObjectOpenHashMap<Built> built = new Long2ObjectOpenHashMap<>();
@@ -549,6 +549,49 @@ public final class HexTown {
         homeRaised = true;
         changed = true;
         return HomeRaise.RAISED;
+    }
+
+    /**
+     * Makes over what the town has built into another build while its Hex stands, its caster having chosen it on their
+     * remote: everything the new build doesn't have dissolves, and what it does goes up in its place once that is all
+     * down. Between a town and an orchard the home stays and all round it changes; to just the home everything else goes;
+     * to nothing, everything goes; from nothing or just the home, the rest goes up round it.
+     *
+     * @return whether anything changes
+     */
+    public boolean rebuildAs(HexBuild build, BlockPos center, long now) {
+        if (build == mode) {
+            return false;
+        }
+        Part home = home(center);
+        IntOpenHashSet going = new IntOpenHashSet();
+        for (Part part : plan(center).parts()) {
+            int id = part.id();
+            boolean standing = finished.contains(id) || builds.containsKey(id) || started.containsKey(id);
+            boolean kept = part.equals(home) && build != HexBuild.NOTHING;
+            if (standing && !kept) {
+                going.add(id);
+            }
+        }
+        boolean homeStands = home != null && (finished.contains(home.id()) || builds.containsKey(home.id()) || started.containsKey(home.id()));
+        if (!going.isEmpty()) {
+            makeWay(going, now);
+            makingWay = true;
+        }
+        if (build != HexBuild.NOTHING && !homeStands) {
+            // the home rises again as its caster chose, their magic reaching out for it
+            homeRaised = true;
+            homeLeft = false;
+        }
+        skipped.clear();
+        mode = build;
+        changed = true;
+        return true;
+    }
+
+    /** The home going up next is raised by its caster, who reaches out for it. */
+    public void raisedByCaster() {
+        homeRaised = true;
     }
 
     /**
