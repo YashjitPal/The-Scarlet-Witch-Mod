@@ -784,7 +784,12 @@ public final class Hexes {
                     hex.town.slip(level, BlockPos.containing(hex.center), hex.unrest(now), now);
                 }
                 hex.town.tick(level, hex.center, wallRadius(hex, now), hex.radius, hex.era, eraFront(hex.radius, now - hex.eraSince),
-                        hex.phase == Hex.Phase.COLLAPSING, hex.phase == Hex.Phase.FOUNDING ? hex.caster : null, now);
+                        hex.phase == Hex.Phase.COLLAPSING, hex.caster, hex.phase == Hex.Phase.FOUNDING ? hex.caster : null, now);
+                // drawn in over the caster's home, the wall lets it go to stand alone, as it does when the Hex falls
+                HomeRemnant released = hex.town.takeReleased();
+                if (released != null) {
+                    data.addRemnant(released);
+                }
                 if (hex.town.takeChanged()) {
                     data.setDirty();
                 }
@@ -914,8 +919,9 @@ public final class Hexes {
     }
 
     /**
-     * The homes fallen Hexes have left standing, glitching and then going a part at a time. One a Hex is cast over, or
-     * spreads out over, goes back all at once, so a new town never builds over what is left of an old one.
+     * The homes fallen Hexes have left standing, or Hexes drawn in past them, glitching and then going a part at a time.
+     * One a Hex is cast over, or spreads out over, goes back all at once, so a new town never builds over what is left of
+     * an old one; one its own Hex is grown back over all of, the same, for its home to go up again.
      */
     private static void tickRemnants(ServerLevel level, HexData data, long now) {
         if (data.remnants().isEmpty()) {
@@ -924,8 +930,12 @@ public final class Hexes {
         for (HomeRemnant remnant : List.copyOf(data.remnants())) {
             boolean covered = false;
             for (Hex hex : data.all()) {
-                if (hex.phase != Hex.Phase.COLLAPSING
-                        && HexShape.level(hex.center, 1.0F, remnant.center()) <= wallRadius(hex, now) + remnant.reach() + 2.0F) {
+                if (hex.phase == Hex.Phase.COLLAPSING) {
+                    continue;
+                }
+                float wall = wallRadius(hex, now);
+                boolean own = remnant.caster().equals(hex.caster) && remnant.center().distanceToSqr(hex.center) < 1.0;
+                if (own ? remnant.fitsIn(hex.center, wall) : HexShape.level(hex.center, 1.0F, remnant.center()) <= wall + remnant.reach() + 2.0F) {
                     covered = true;
                     break;
                 }

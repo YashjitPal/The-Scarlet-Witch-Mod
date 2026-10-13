@@ -2,6 +2,7 @@ package com.yashjit.scarlet.hex.town;
 
 import com.yashjit.scarlet.hex.Era;
 import com.yashjit.scarlet.hex.HexPaint;
+import com.yashjit.scarlet.hex.HexShape;
 import com.yashjit.scarlet.hex.RemnantSnapshot;
 import com.yashjit.scarlet.network.RemnantBlocksPayload;
 import com.yashjit.scarlet.network.TownUnformPayload;
@@ -194,6 +195,20 @@ public final class HomeRemnant {
         double dx = Math.max(Math.abs(min.getX() - center.x), Math.abs(max.getX() + 1 - center.x));
         double dz = Math.max(Math.abs(min.getZ() - center.z), Math.abs(max.getZ() + 1 - center.z));
         return (float) Math.sqrt(dx * dx + dz * dz);
+    }
+
+    /**
+     * Whether all of it stands inside a Hex this far out from the middle given.
+     */
+    public boolean fitsIn(Vec3 hexCenter, float radius) {
+        for (int corner = 0; corner < 4; corner++) {
+            double x = (corner & 1) == 0 ? min.getX() : max.getX() + 1;
+            double z = (corner & 2) == 0 ? min.getZ() : max.getZ() + 1;
+            if (HexShape.level(hexCenter, 1.0F, new Vec3(x, ground, z)) > radius) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public RemnantSnapshot snapshot() {

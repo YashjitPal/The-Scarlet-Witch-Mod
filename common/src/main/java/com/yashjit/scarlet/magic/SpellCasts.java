@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class SpellCasts {
 
-    private static final double AIM_RANGE = 64.0;
+    private static final double AIM_RANGE = 256.0;
     public static final double SHOCKWAVE_RADIUS = 8.0;
     public static final double MIST_RANGE = 12.0;
 

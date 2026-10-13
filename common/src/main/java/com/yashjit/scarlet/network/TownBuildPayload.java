@@ -17,7 +17,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * @param clearTop   the height of the highest block of what stood there, dissolving first
  * @param clearTicks ticks the dissolving takes before it builds; 0 if the land was open
  * @param front      which way it faces, out toward its street, as a {@link net.minecraft.core.Direction} 2D data value
- * @param ownHome    whether it is its caster's own home, rather than one of a town their Hex brings back
+ * @param ownHome    whether it is its caster's own home, raised by them, rather than a part coming up by itself
  */
 public record TownBuildPayload(int kind, int minX, int minZ, int maxX, int maxZ, int ground, int height, long start, int duration, int clearTop,
                                int clearTicks, int front, boolean ownHome) implements CustomPacketPayload {

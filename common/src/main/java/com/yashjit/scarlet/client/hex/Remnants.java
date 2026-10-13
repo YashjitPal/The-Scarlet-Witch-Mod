@@ -6,6 +6,9 @@ import com.yashjit.scarlet.client.fx.ScarletFx;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.hex.Era;
+import com.yashjit.scarlet.hex.Hex;
+import com.yashjit.scarlet.hex.HexShape;
+import com.yashjit.scarlet.hex.HexSnapshot;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.RemnantSnapshot;
 import com.yashjit.scarlet.hex.town.EraStyle;
@@ -253,7 +256,7 @@ public final class Remnants {
      * otherwise 0.
      */
     public static float worn(Player player, double now) {
-        RemnantSnapshot remnant = wornBy(player);
+        RemnantSnapshot remnant = wornBy(player, now);
         return remnant == null ? 0.0F : remnant.glitch(now);
     }
 
@@ -261,11 +264,20 @@ public final class Remnants {
      * Where the home someone's clothes turn with is in stepping back through the eras, or null.
      */
     public static @Nullable Phase wornPhase(Player player, double now) {
-        RemnantSnapshot remnant = wornBy(player);
+        RemnantSnapshot remnant = wornBy(player, now);
         return remnant == null || remnant.glitch(now) <= 0.0F ? null : phase(remnant, now);
     }
 
-    private static @Nullable RemnantSnapshot wornBy(Player player) {
+    /**
+     * The home someone's clothes are caught up with: one they left near them, unless a Hex standing around them, as one
+     * drawn in past their home does, dresses them in its own era.
+     */
+    private static @Nullable RemnantSnapshot wornBy(Player player, double now) {
+        for (HexSnapshot hex : Hexes.clientHexes()) {
+            if (hex.phaseValue() != Hex.Phase.COLLAPSING && HexShape.contains(hex.center(), Hexes.wallRadius(hex, now), player.position())) {
+                return null;
+            }
+        }
         for (RemnantSnapshot remnant : Hexes.clientRemnants()) {
             if (remnant.caster().equals(player.getUUID()) && remnant.middle().distanceToSqr(player.position()) < WORN_NEAR * WORN_NEAR) {
                 return remnant;

@@ -17,7 +17,6 @@ import com.mojang.renderpearl.api.textures.FilterMode;
 import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.client.anim.Ease;
-import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.hex.Era;
 import com.yashjit.scarlet.hex.Hex;
@@ -42,7 +41,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
-import org.joml.Vector4f;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -66,7 +64,6 @@ public final class HexScreen {
                     .withUniform("InSampler", UniformType.COMBINED_IMAGE_SAMPLER)
                     .withUniform("DepthSampler", UniformType.COMBINED_IMAGE_SAMPLER)
                     .withUniform("HandDepthSampler", UniformType.COMBINED_IMAGE_SAMPLER)
-                    .withUniform("MagicSampler", UniformType.COMBINED_IMAGE_SAMPLER)
                     .withUniform("HexView", UniformType.UNIFORM_BUFFER)
                     .build())
             .withColorTargetState(ColorTargetState.DEFAULT)
@@ -91,9 +88,7 @@ public final class HexScreen {
     private static final Matrix4f PROJECTION = new Matrix4f();
     private static final Matrix4f VIEW_ROTATION = new Matrix4f();
     private static Vec3 cameraPos = Vec3.ZERO;
-    private static final Vector4f NO_MAGIC = new Vector4f(0.0F, 0.0F, 0.0F, 0.0F);
     private static @Nullable TextureTarget copy;
-    private static @Nullable TextureTarget magic;
     private static @Nullable MappableRingBuffer uniforms;
     private static boolean broken;
     private static boolean wanted;
@@ -135,14 +130,6 @@ public final class HexScreen {
     }
 
     public static void render(RenderTarget main, RenderTarget hand) {
-        try {
-            draw(main, hand);
-        } finally {
-            GlowPass.endFrame();
-        }
-    }
-
-    private static void draw(RenderTarget main, RenderTarget hand) {
         Minecraft minecraft = Minecraft.getInstance();
         long nanos = Util.getNanos();
         float seconds = lastNanos == 0 ? 0.0F : Math.min(0.1F, (nanos - lastNanos) / 1.0E9F);
@@ -184,7 +171,6 @@ public final class HexScreen {
         int width = main.width;
         int height = main.height;
         copy = sized(copy, "Scarlet hex", width, height);
-        magic = sized(magic, "Scarlet magic", width, height);
         if (uniforms == null) {
             uniforms = new MappableRingBuffer(() -> "Scarlet hex view", GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_MAP_WRITE, UNIFORM_SIZE);
         }
@@ -192,11 +178,6 @@ public final class HexScreen {
 
         CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
         encoder.copyTextureToTexture(main.getColorTexture(), copy.getColorTexture(), 0, 0, 0, 0, 0, width, height);
-        encoder.clearColorTexture(magic.getColorTexture(), NO_MAGIC);
-        if (inside > 0.0F || crossingNow || !remnants.isEmpty()) {
-            // the magic's own light, so it can stay scarlet while the era drains the world around it
-            GlowPass.drawMagic(magic.getColorTextureView(), main.getDepthTextureView(), PROJECTION, VIEW_ROTATION);
-        }
         GpuSampler nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         GpuSampler linear = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR);
         try (RenderPass pass = encoder.createRenderPass(() -> "Scarlet hex", main.getColorTextureView(), Optional.empty())) {
@@ -206,7 +187,6 @@ public final class HexScreen {
             pass.setUniform("InSampler", copy.getColorTextureView(), linear);
             pass.setUniform("DepthSampler", main.getDepthTextureView(), nearest);
             pass.setUniform("HandDepthSampler", hand.getDepthTextureView(), nearest);
-            pass.setUniform("MagicSampler", magic.getColorTextureView(), nearest);
             pass.draw(3, 1, 0, 0);
         }
         uniforms.rotate();

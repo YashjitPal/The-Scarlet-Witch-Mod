@@ -1564,6 +1564,85 @@ public final class Showcase {
                         }, 700).logHexSize("its home gone too")
                         .command("execute as @a run scarlet hex forget");
             }
+            // the Hex drawn in through its caster's home, in a town and in an orchard: the home let go to step back through
+            // the eras on its own and come apart, none of it raised again while the wall stands across its lot, and the
+            // home back up once the Hex is grown back over it, whether it had all gone or still stood
+            case "shrinkhome", "shrinkorchard" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build " + (name.equals("shrinkorchard") ? "orchard" : "town"))
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -48; x <= 48; x += 12) {
+                    s.command("execute at @a run fill ~" + x + " ~ ~-48 ~" + Math.min(48, x + 11) + " ~14 ~48 minecraft:air");
+                }
+                s.command("execute at @a run fill ~-48 ~-1 ~-48 ~48 ~-1 ~48 minecraft:grass_block")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 520).logRemnants("cast")
+                        .view(-17.0, 10.0, -17.0, 0.0, 3.0, 0.0).shot(name + "_cast", 10).playerCamera()
+                        // magic in the Hex, in its era like everything else
+                        .select(Spell.CHAOS_SHIELD).look(3.4, 35, 6, 1.3).hold(true).shot(name + "_magic", 14).hold(false).playerCamera()
+                        .select(Spell.HEX)
+                        .command("execute as @a run scarlet hex size 10").then(minecraft -> {
+                        }, 40).logRemnants("drawn in through its home")
+                        .view(-17.0, 10.0, -17.0, 0.0, 3.0, 0.0).shot(name + "_let_go", 10).shot(name + "_eras_a", 40).shot(name + "_eras_b", 40)
+                        .shot(name + "_eras_c", 40).then(minecraft -> {
+                        }, 60).logRemnants("the wall settled across its lot")
+                        .shot(name + "_going", 60).then(minecraft -> {
+                        }, 160).logRemnants("going part by part").shot(name + "_gone", 140).logRemnants("gone")
+                        .playerCamera()
+                        .command("execute as @a run scarlet hex size 72").then(minecraft -> {
+                        }, 120).logRemnants("grown back over its lot")
+                        .then(minecraft -> {
+                        }, 400).logRemnants("its home back up")
+                        .view(-17.0, 10.0, -17.0, 0.0, 3.0, 0.0).shot(name + "_back", 10).playerCamera()
+                        // drawn in over it again, then grown back over it before it has gone
+                        .command("execute as @a run scarlet hex size 10").then(minecraft -> {
+                        }, 120).logRemnants("drawn in again")
+                        .command("execute as @a run scarlet hex size 72").then(minecraft -> {
+                        }, 60).logRemnants("grown back while it still stood")
+                        .then(minecraft -> {
+                        }, 400).logRemnants("up again")
+                        .dispelHexes()
+                        .command("execute as @a run scarlet hex forget");
+            }
+            // chaos bolts: one struck on the ground a step from a husk, one on a wall with a husk close behind it, one at
+            // the caster's own feet, and one fired off over open land, as far as it flies
+            case "boltsplash" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("difficulty easy")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-10 ~ ~-4 ~10 ~8 ~16 minecraft:air")
+                        .command("execute at @a run fill ~-10 ~-1 ~-4 ~10 ~-1 ~16 minecraft:stone")
+                        .command("execute at @a run fill ~3 ~ ~12 ~7 ~2 ~12 minecraft:stone_bricks")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.CHAOS_BOLT).command("gamemode survival @a")
+                        .summonAt("minecraft:husk", 0.0, 0.0, 6.0, "{NoAI:1b,PersistenceRequired:1b,Silent:1b}")
+                        .summonAt("minecraft:husk", 5.0, 0.0, 13.3, "{NoAI:1b,PersistenceRequired:1b,Silent:1b}")
+                        .then(minecraft -> {
+                        }, 10).logHealth("before")
+                        .aimAt(1.1, 0.0, 6.0).tap().then(minecraft -> {
+                        }, 20).logHealth("struck on the ground a step from the first")
+                        .aimAt(5.0, 0.6, 12.0).tap().then(minecraft -> {
+                        }, 20).logHealth("struck on the wall before the second")
+                        .face(0, 90).tap().then(minecraft -> {
+                        }, 20).logHealth("struck at the caster's own feet")
+                        .command("kill @e[type=minecraft:husk]")
+                        .face(180, -8).tap().logBolts("fired off");
+                for (int t = 20; t <= 220; t += 20) {
+                    s.then(minecraft -> {
+                    }, 20).logBolts(t + " ticks after");
+                }
+                s.command("gamemode creative @a");
+            }
             // a refrigerator broken from below and another from above: what each leaves lying, piece by piece
             case "fridgebreak" -> s
                     .land()
@@ -4041,6 +4120,96 @@ public final class Showcase {
                             size, server.getAverageTickTimeNanos() / 1.0E6, longest / 1.0E6));
                 });
             }, 2);
+        }
+
+        /**
+         * Writes down in the log how the player's Hex stands, how much of its home's lot stands built, and the homes left
+         * standing on their own, how far each has got.
+         */
+        Scene logRemnants(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                UUID id = minecraft.player.getUUID();
+                StringBuilder left = new StringBuilder();
+                long seen = minecraft.level == null ? 0 : minecraft.level.getGameTime();
+                for (var shown : Hexes.clientRemnants()) {
+                    left.append(String.format(java.util.Locale.ROOT, " one %d ticks on, glitching %.2f;", seen - shown.start(), shown.glitch(seen)));
+                }
+                server.execute(() -> {
+                    ServerLevel level = server.overworld();
+                    HexData data = HexData.of(level);
+                    long now = level.getGameTime();
+                    Hex hex = data.byCaster(id);
+                    String home = "no home";
+                    if (hex != null && hex.town() != null) {
+                        var part = hex.town().home(BlockPos.containing(hex.center()));
+                        if (part != null) {
+                            int standing = 0;
+                            int ground = (int) Math.floor(anchor.y);
+                            for (int x = part.minX(); x <= part.maxX(); x++) {
+                                for (int z = part.minZ(); z <= part.maxZ(); z++) {
+                                    for (int y = ground; y < ground + 14; y++) {
+                                        if (!level.getBlockState(new BlockPos(x, y, z)).isAir()) {
+                                            standing++;
+                                        }
+                                    }
+                                }
+                            }
+                            home = String.format(java.util.Locale.ROOT, "%d blocks standing on its home's lot, %s", standing,
+                                    hex.town().isHomeFinished(BlockPos.containing(hex.center())) ? "not going up" : "going up");
+                        }
+                    }
+                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, %s; homes left standing:%s", when,
+                            hex == null ? "no Hex" : String.format(java.util.Locale.ROOT, "the Hex %s at %.0f blocks, its wall at %.1f", hex.phase(),
+                                    hex.radius(), Hexes.wallRadius(hex, now)), home, left.isEmpty() ? " none" : left));
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log the health of the player and of everything alive near the anchor, measured from it.
+         */
+        Scene logHealth(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                server.execute(() -> {
+                    StringBuilder found = new StringBuilder();
+                    for (var living : server.overworld().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                            new net.minecraft.world.phys.AABB(anchor, anchor).inflate(20.0))) {
+                        Vec3 at = living.position().subtract(anchor);
+                        found.append(String.format(java.util.Locale.ROOT, " %s at %.1f %.1f %.1f with %.1f;", BuiltInRegistries.ENTITY_TYPE.getKey(living.getType()).getPath(),
+                                at.x, at.y, at.z, living.getHealth()));
+                    }
+                    Scarlet.LOG.info("Showcase: {}:{}", when, found);
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log every chaos bolt in flight, how far from the anchor and how long it has flown.
+         */
+        Scene logBolts(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                server.execute(() -> {
+                    StringBuilder found = new StringBuilder();
+                    for (Entity entity : server.overworld().getAllEntities()) {
+                        if (entity instanceof com.yashjit.scarlet.entity.ChaosBolt bolt) {
+                            found.append(String.format(java.util.Locale.ROOT, " one %.0f blocks off, %d ticks out;", bolt.position().distanceTo(anchor), bolt.tickCount));
+                        }
+                    }
+                    Scarlet.LOG.info("Showcase: {}:{}", when, found.isEmpty() ? " no bolt" : found);
+                });
+            }, 1);
         }
 
         /**

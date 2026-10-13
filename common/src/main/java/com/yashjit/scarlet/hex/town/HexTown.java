@@ -295,10 +295,17 @@ public final class HexTown {
      * lot, or what stood where it went, saved before it was all down.
      */
     private boolean swept;
-    /** Whether the falling wall has reached the caster's home and let it go on its own. */
+    /**
+     * Whether the wall, falling or drawn in, has reached the caster's home and let it go on its own. Drawn in over it,
+     * the Hex raises it again once it is grown back over all of it.
+     */
     private boolean homeLeft;
     /** How far out the outermost block of the caster's home stands, once worked out as the Hex falls. */
     private float homeReach = -1.0F;
+    /** The home the wall let go of as it was drawn in, for the Hex to hand on to stand alone. */
+    private @Nullable HomeRemnant released;
+    /** Whether the home going up next is raised by its caster, who reaches out for it, rather than coming back by itself. */
+    private boolean homeRaised;
 
     private HexTown(HexBuild mode, Direction forward, long seed, Era era, int homeShift, @Nullable BlockPos origin, @Nullable Vec3 home, float reach,
                     List<TownMemory> remembered, TownPlan.@Nullable HomeLot homeLot) {
@@ -539,6 +546,7 @@ public final class HexTown {
         makeWay(going, level.getGameTime());
         skipped.clear();
         makingWay = true;
+        homeRaised = true;
         changed = true;
         return HomeRaise.RAISED;
     }
@@ -592,10 +600,11 @@ public final class HexTown {
      * @param wall     how far the Hex's wall has spread, or is falling inward
      * @param radius   the Hex's size now, which what is built must fit inside
      * @param eraFront how far out from the middle its era has spread since it last changed
+     * @param caster   whose Hex it is
      * @param aloft    the caster, while they float in the middle of their rising home
      */
-    public void tick(ServerLevel level, Vec3 hexCenter, float wall, float radius, Era era, float eraFront, boolean falling, @Nullable UUID aloft,
-                     long now) {
+    public void tick(ServerLevel level, Vec3 hexCenter, float wall, float radius, Era era, float eraFront, boolean falling, UUID caster,
+                     @Nullable UUID aloft, long now) {
         BlockPos center = BlockPos.containing(hexCenter);
         this.aloft = aloft;
         float seen = seen(wall, now);
@@ -630,7 +639,9 @@ public final class HexTown {
         cutBack(level, hexCenter, seen, now);
         if (now % TRIGGER_INTERVAL == 0) {
             // while the wall spreads or grows, what is built needs only fit the Hex it is growing into
-            shrinkTo(level, center, hexCenter, Math.max(seen, radius), now);
+            float holds = Math.max(seen, radius);
+            drawnIn(level, hexCenter, holds, caster, now);
+            shrinkTo(level, center, hexCenter, holds, now);
             trigger(level, center, hexCenter, seen, radius, now);
         }
         if (now % RETRY_SKIPPED == 0) {
@@ -784,7 +795,8 @@ public final class HexTown {
             }
             float clip = WHOLE;
             if (!TownPlan.fits(part, hexCenter, wall, center.getY())) {
-                if (!settled || !TownPlan.touches(part, hexCenter, wall, center.getY())) {
+                // the caster's home goes up whole or not at all, never cut off at the wall
+                if (!settled || part.kind() == Kind.HOME || !TownPlan.touches(part, hexCenter, wall, center.getY())) {
                     continue;
                 }
                 clip = wall;
@@ -966,7 +978,15 @@ public final class HexTown {
             partial.remove(part.id());
         }
         changed = true;
-        TownEvents.started(level, part, survey.ground(), now, duration, top, clearTicks);
+        boolean ownHome = part.kind() == Kind.HOME && part.layer() == 0;
+        boolean raisedByCaster = ownHome && (founding || homeRaised);
+        if (ownHome) {
+            // up again, for the wall to let go of again
+            homeRaised = false;
+            homeLeft = false;
+            homeReach = -1.0F;
+        }
+        TownEvents.started(level, part, survey.ground(), now, duration, top, clearTicks, raisedByCaster);
         return build;
     }
 
@@ -1487,7 +1507,8 @@ public final class HexTown {
     /**
      * Gives up what of the town no longer fits inside the Hex, what lay past the wall having already gone back as the
      * wall passed. A house the wall cuts into goes altogether, dissolving from the wall inward, and its lot becomes a
-     * garden once the wall settles; a street, the square or a garden just ends at the wall.
+     * garden once the wall settles; a street, the square or a garden just ends at the wall. The caster's home is let go
+     * of instead, to stand alone (see {@link #drawnIn}).
      */
     private void shrinkTo(ServerLevel level, BlockPos center, Vec3 hexCenter, float radius, long now) {
         if (finished.isEmpty() && builds.isEmpty()) {
@@ -1496,7 +1517,7 @@ public final class HexTown {
         for (Part part : plan(center).parts()) {
             int id = part.id();
             boolean standing = finished.contains(id) || builds.containsKey(id) || started.containsKey(id);
-            if (!standing) {
+            if (!standing || part.kind() == Kind.HOME) {
                 continue;
             }
             boolean cutThrough = partial.containsKey(id);
@@ -1616,6 +1637,48 @@ public final class HexTown {
         if (wall > homeReach + 1.0F) {
             return null;
         }
+        return release(level, hexCenter, home, caster, now);
+    }
+
+    /**
+     * As the wall is drawn in over the caster's home, lets it go the way the falling wall does, rather than taking it
+     * down with the houses it cuts into: it holds on alone, glitching through the eras, then goes the way it went up,
+     * backward. It goes up again once the Hex is grown back over all of it.
+     *
+     * @param radius how far the wall holds now
+     */
+    private void drawnIn(ServerLevel level, Vec3 hexCenter, float radius, UUID caster, long now) {
+        if (homeLeft || released != null || mode == HexBuild.NOTHING) {
+            return;
+        }
+        BlockPos center = BlockPos.containing(hexCenter);
+        Part home = home(center);
+        if (home == null) {
+            return;
+        }
+        int id = home.id();
+        boolean standing = finished.contains(id) || builds.containsKey(id) || started.containsKey(id);
+        if (standing && !TownPlan.fits(home, hexCenter, radius, levels.getOrDefault(id, center.getY()))) {
+            released = release(level, hexCenter, home, caster, now);
+        }
+    }
+
+    /**
+     * The home the wall let go of as it was drawn in, once.
+     */
+    public @Nullable HomeRemnant takeReleased() {
+        HomeRemnant left = released;
+        released = null;
+        return left;
+    }
+
+    /**
+     * Hands the caster's home over to stand on alone: its blocks, and what was taken up from its lot, to go the way they
+     * went up, backward.
+     */
+    private @Nullable HomeRemnant release(ServerLevel level, Vec3 hexCenter, Part home, UUID caster, long now) {
+        BlockPos center = BlockPos.containing(hexCenter);
+        int id = home.id();
         homeLeft = true;
         Long2ObjectOpenHashMap<Built> blocks = new Long2ObjectOpenHashMap<>();
         for (Long2ObjectMap.Entry<Built> entry : built.long2ObjectEntrySet()) {

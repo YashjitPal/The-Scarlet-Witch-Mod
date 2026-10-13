@@ -8,8 +8,6 @@
 uniform sampler2D InSampler;
 uniform sampler2D DepthSampler;
 uniform sampler2D HandDepthSampler;
-// the light of the magic in view on its own, drawn again over black: what of the picture is magic rather than world
-uniform sampler2D MagicSampler;
 
 layout(std140) uniform HexView {
     // clip space to camera-relative world space
@@ -714,27 +712,25 @@ vec3 crossingLook(vec3 color, vec2 uv, vec2 screenUv, vec2 pixel, float p, float
 // has it.
 const float REMNANT_UP = 0.18;
 
-// A home left standing after its Hex fell, stepping back through the eras one at a time with its blocks: each era
-// sweeps round the house and up it in turn, the picture turning over it texel by texel as an era spreads over a Hex, a
-// line of scarlet running round it ahead of the new era, and holds a moment before the next. Down to black and white,
-// it goes a block at a time. Grain crawls over it, and the magic on it keeps its own red. local: where the point is in
-// the box around it, size: the box's size, style: x the era it is leaving, y the era sweeping round it, z how far round
-// the sweep has come, w where round it the sweep set off from.
-vec3 remnantLook(vec3 color, vec3 magic, vec3 local, vec3 size, vec3 cell, vec2 uv, vec2 pixel, vec2 screen, float time, float amount, vec4 style) {
-    vec3 world = max(color - magic, vec3(0.0));
+// A home left standing after its Hex fell, or drawn in past, stepping back through the eras one at a time with its
+// blocks: each era sweeps round the house and up it in turn, the picture turning over it texel by texel as an era
+// spreads over a Hex, a line of scarlet running round it ahead of the new era, and holds a moment before the next. Down
+// to black and white, it goes a block at a time. Grain crawls over it. color: the picture as it really is, local: where
+// the point is in the box around it, size: the box's size, style: x the era it is leaving, y the era sweeping round it,
+// z how far round the sweep has come, w where round it the sweep set off from.
+vec3 remnantLook(vec3 color, vec3 local, vec3 size, vec3 cell, vec2 uv, vec2 pixel, vec2 screen, float time, float amount, vec4 style) {
     vec3 fromMiddle = local - size * 0.5;
     float around = fract((atan(fromMiddle.z, fromMiddle.x) - style.w) / 6.2831853);
     float up = clamp(local.y / max(size.y, 1.0), 0.0, 1.0);
     float reached = style.z - (around * (1.0 - REMNANT_UP) + up * REMNANT_UP);
     float k = clamp(reached / 0.06, 0.0, 1.0);
-    vec3 look = eraChange(world, int(style.x + 0.5), int(style.y + 0.5), k, cell, uv, screen, time);
+    vec3 look = eraChange(color, int(style.x + 0.5), int(style.y + 0.5), k, cell, uv, screen, time);
     // the line of scarlet running round it ahead of the new era, glittering texel by texel
     float edge = exp(-reached * reached / 0.0007) * step(style.z, 0.999);
     float glitter = hash12(cell.xy + cell.z * 61.0 + floor(time * 14.0) * vec2(5.0, 9.0));
     look += vec3(1.0, 0.16, 0.24) * edge * (0.12 + 0.6 * step(0.8, glitter));
     float grain = hash12(floor(pixel / 2.0) + floor(time * 30.0) * vec2(7.0, 3.0));
-    look = mix(look, vec3(grain), 0.04 * amount);
-    return look + magic;
+    return mix(look, vec3(grain), 0.04 * amount);
 }
 
 vec4 over(vec4 below, vec4 above) {
@@ -876,11 +872,9 @@ void main() {
 
     vec3 color = scene;
     if (insideAmount > 0.0) {
-        // magic keeps its own color in any era, scarlet in a black and white world: the world is drained around the
-        // magic's light, and the light laid back over it. Out through where the wall stands open, the world is seen as it
-        // really is.
-        vec3 magic = texture(MagicSampler, uv).rgb;
-        vec3 world = max(scene - magic, vec3(0.0));
+        // everything in a Hex is in its era, magic and all: grey in a black and white world, its colors the era's own in
+        // the rest. Out through where the wall stands open, the world is seen as it really is.
+        vec3 front = vec3(0.0);
         vec3 inEra;
         if (around >= 0 && EraChange.w > 0.5) {
             // a new era spreading out from the middle: how far it has come in here, the sky last of all, over the last
@@ -892,25 +886,26 @@ void main() {
             float ahead = EraChange.y - level;
             float k = clamp(ahead / EraChange.z, 0.0, 1.0);
             vec3 cell = texelCell(position, dir, normal, dist * pixelAngle, pixel, hand || sky);
-            inEra = eraChange(world, int(EraChange.x + 0.5), insideEra, k, cell, uv, screen, time);
-            // the front itself is her magic: a thin line of scarlet running out over the ground and everything on it,
-            // glittering texel by texel
+            inEra = eraChange(scene, int(EraChange.x + 0.5), insideEra, k, cell, uv, screen, time);
+            // the front itself is the Hex at work, between one era and the next: a thin line of scarlet running out over
+            // the ground and everything on it, glittering texel by texel
             if (!sky) {
                 float edge = exp(-ahead * ahead / 0.9);
                 float glitter = hash12(cell.xy + cell.z * 61.0 + floor(time * 14.0) * vec2(5.0, 9.0));
-                magic += vec3(1.0, 0.16, 0.24) * edge * (0.06 + 0.55 * step(0.91, glitter));
+                front = vec3(1.0, 0.16, 0.24) * edge * (0.06 + 0.55 * step(0.91, glitter));
             }
         } else {
-            inEra = eraLook(world, insideEra, uv, screen, time);
+            inEra = eraLook(scene, insideEra, uv, screen, time);
         }
-        color = mix(color, inEra + magic, insideAmount * (1.0 - throughTear));
+        color = mix(color, inEra + front, insideAmount * (1.0 - throughTear));
     }
     // changing era: the picture drops into static for a moment, like a set changing channels
     float channel = around >= 0 ? Styles[around].w * insideAmount : 0.0;
     if (channel > 0.0) {
         color = mix(color, channelStatic(uv, pixel, time), channel * 0.9);
     }
-    // the homes fallen Hexes have left standing, wherever they are seen from
+    // the homes fallen Hexes have left standing, or Hexes drawn in past them, wherever they are seen from: each in its
+    // own eras, whatever era the Hex still standing around it is in
     if (!hand && dist < 1.0e8) {
         for (int i = 0; i < 2; i++) {
             float amount = RemnantLow[i].w;
@@ -918,8 +913,8 @@ void main() {
                 continue;
             }
             vec3 cell = texelCell(position, dir, normal, dist * pixelAngle, pixel, false);
-            color = remnantLook(color, texture(MagicSampler, uv).rgb, position - RemnantLow[i].xyz, RemnantHigh[i].xyz - RemnantLow[i].xyz, cell, uv,
-                    pixel, screen, time, amount, RemnantStyle[i]);
+            color = remnantLook(scene, position - RemnantLow[i].xyz, RemnantHigh[i].xyz - RemnantLow[i].xyz, cell, uv, pixel, screen, time, amount,
+                    RemnantStyle[i]);
         }
     }
     color = mix(color, wall.rgb, wall.a);

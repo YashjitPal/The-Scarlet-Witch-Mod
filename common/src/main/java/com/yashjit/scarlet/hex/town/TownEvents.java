@@ -26,11 +26,11 @@ final class TownEvents {
     /**
      * @param clearTop   the height of the highest block of what stood there before
      * @param clearTicks how long that takes to dissolve, before the part builds; 0 if the land was open
+     * @param ownHome    whether it is its caster's own home, raised by them, rather than any other part coming up by itself
      */
-    static void started(ServerLevel level, Part part, int ground, long now, int duration, int clearTop, int clearTicks) {
+    static void started(ServerLevel level, Part part, int ground, long now, int duration, int clearTop, int clearTicks, boolean ownHome) {
         TownBuildPayload payload = new TownBuildPayload(part.kind().ordinal(), part.minX(), part.minZ(), part.maxX(), part.maxZ(), ground,
-                part.kind().height(), now, duration, clearTop, clearTicks, part.front().get2DDataValue(),
-                part.kind() == TownPlan.Kind.HOME && part.layer() == 0);
+                part.kind().height(), now, duration, clearTop, clearTicks, part.front().get2DDataValue(), ownHome);
         for (ServerPlayer player : level.players()) {
             if (player.distanceToSqr(part.centerX(), ground, part.centerZ()) < REACH * REACH) {
                 Services.NETWORK.sendToPlayer(player, payload);
