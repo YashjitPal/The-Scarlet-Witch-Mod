@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.7
+
+- **Cars rebuilt.** Every era's car is new: a body with wheel arches, doors, trim and lamps that glow; a cabin you can see out of, with seats, a dash with its gauges and a steering wheel that turns as you steer; wheels that roll and steer; and a body that tips to the slope it's on and leans out of its turns. It turns smoothly however fast the game draws, the wheel comes round as you hold it, it picks up speed quickly and coasts further, and its nose and tail stop at walls instead of going through them while it still climbs steps and stairs. Click anywhere on it to get in. The view from behind stands back to take it all in, and the jump key sounds its horn.
+- **Streets run along the land, and bridge what they can't.** Each stretch of street now climbs or falls evenly to meet the next, a step at a time, instead of lying flat and leaving a ledge or a cliff where it can't reach. Where the land drops away under it or it meets a river, it carries on over a bridge on piers, railed both sides, in the era's colors. An orchard's lanes do the same, up steps the color of the earth and over timber bridges.
+- **What the Hex makes, the Hex keeps.** Set dressing taken out of thin air is the Hex's own, and says so. Carried out past its wall, or left outside as the wall is drawn in or falls, it glitches in its slot and is gone, from your pockets, an open chest, a box you carry, or the ground; get back inside in time and it stays. Put down inside, it goes when it's outside, and broken there it gives back the Hex's own again. Anyone can still craft the same things to keep. The panel now shows for any caster in their own Hex wearing their crown.
+- **Change what a standing Hex builds.** Choosing on the remote what your Hex builds now makes over the one standing: a town into an orchard and back again, keeping your home; just your home; or nothing. From nothing, your home rises where you cast the Hex, and the rest around it.
+- **Drawing the Hex in past your home** no longer takes it down at once and raises it again, cut off at the wall, with your magic reaching for it: it's let go, steps back through the eras on its own and comes apart the way it went up, as when the Hex falls. Grow the Hex back over it and it rises again whole. The same goes for an orchard's farmhouse.
+- **Chaos Bolt** hurts whatever is within a block of where it strikes, not only what it hits, and flies five times as far before it fizzles out.
+- **Magic takes the Hex's era** like everything else in it: a bolt or a shield is grey in black and white.
+
 ## 0.1.6
 
 - **Bigger Hexes.** A Hex now spreads 72 blocks out when cast, three times as far as before, and holding the cast grows it as far as 576, three times the old limit. A big Hex falls and changes era a little more slowly so its town still goes block by block, and someone thrown out of one flies no faster than before, however far they have to go.

@@ -144,11 +144,12 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 
 - **Throw someone out** the way Wanda throws Monica out of Westview: they crash straight through whatever stands in their way, bursting it open like a creeper's blast, and the Hex mends it like any blast.
 - Creatures and players walk back the way they came, wounds close, broken blocks return and the fallen get back up. Nothing can be duplicated with the rewind: what someone has already picked up stays picked up.
-- The remote also chooses what the next Hex builds. **Your home always rises where you stand**, a different one each time you cast somewhere new, out of eight; cast standing in a home you raised before and that one comes back, its town with it.
+- The remote also chooses what your Hex builds, and **makes over the one standing**: a town into an orchard and back, just your home, or nothing. **Your home always rises where you stand**, a different one each time you cast somewhere new, out of eight; cast standing in a home you raised before and that one comes back, its town with it.
 - **Part the wall** and walk through where it stands open: there is no wall there to cross, so the picture doesn't roll over. From outside, the rest of the Hex stands beyond the opening.
-- **Streets climb hills** in flights of steps in the road's own colors, which change with the era like the rest of it.
-- **Set dressing:** standing in your own Hex, a panel beside your inventory holds every piece of era furniture and the car. Click one to take it out of thin air for a little chaos energy.
+- **Streets run along the land**, climbing in steps in the road's own colors and crossing drops and rivers on bridges, which change with the era like the rest of it. Orchard lanes cross on timber bridges.
+- **Set dressing:** standing in your own Hex, a panel beside your inventory holds every piece of era furniture and the car. Click one to take it out of thin air for a little chaos energy. It's the Hex's, though: carry it outside and it glitches away.
 - **Era furniture that works:** drive the car with a friend beside you, keep food in the fridge, cook on the stove, sit on the couch, switch on the television, radio and lamp, and ask the wall clock the time. Each piece changes with the era, and all of it is craftable.
+- **Cars you can drive properly:** every era's car has a cabin to see out of, a dash and a steering wheel that turns, wheels that roll and steer, and a body that leans into the road. Honk with the jump key.
 
 ## The Darkhold
 

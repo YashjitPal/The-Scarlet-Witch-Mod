@@ -48,11 +48,12 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 - **Hostile mobs become townspeople** with sitcom names, who sit on couches, switch on the television, chat with their hands and wave as you pass.
 - **Blasts mend themselves:** whatever a creeper or TNT breaks inside comes back, chests and all.
 - **Rewind the scene:** hold rewind and the last ten seconds inside run backward. Creatures and players walk back the way they came, wounds close, broken blocks return and the fallen get back up, all shown the way that era's set would show it: film juddering back through a 1950s projector, a VHS tape whining back with "REW" in the corner, a smooth scrub in the present day. Nothing can be duplicated with it: what someone has already picked up stays picked up.
-- **The Showrunner remote** (H): change the era, the time of day and the weather, start a new episode every morning, name your Hex, move your home, choose what the next Hex builds, and hold its rewind button.
-- **Your home rises where you stand**, a different one each time you cast somewhere new, out of eight; cast standing in a home you raised before and that one comes back, its town with it. Streets climb hills in flights of steps in the road's own colors.
+- **The Showrunner remote** (H): change the era, the time of day and the weather, start a new episode every morning, name your Hex, move your home, choose what your Hex builds (and make over the one standing: a town into an orchard and back, just your home, or nothing), and hold its rewind button.
+- **Your home rises where you stand**, a different one each time you cast somewhere new, out of eight; cast standing in a home you raised before and that one comes back, its town with it. Streets run along the land, climbing in steps in the road's own colors and crossing drops and rivers on bridges.
 - **Part the wall** and walk through where it stands open, with no wall there to cross. From outside, the rest of the Hex stands beyond the opening.
-- **Set dressing:** standing in your own Hex, a panel beside your inventory holds every piece of era furniture and the car. Click one to take it out of thin air for a little chaos energy.
+- **Set dressing:** standing in your own Hex, a panel beside your inventory holds every piece of era furniture and the car. Click one to take it out of thin air for a little chaos energy. It's the Hex's, though: carry it outside and it glitches away.
 - **Era furniture that works:** drive the car with a friend beside you, keep food in the fridge, cook on the stove, sit on the couch, switch on the television, radio and lamp, and ask the wall clock the time. Each piece changes with the era, and all of it is craftable.
+- **Cars you can drive properly:** every era's car has a cabin to see out of, a dash and a steering wheel that turns, wheels that roll and steer, and a body that leans into the road. Honk with the jump key.
 
 ![Hostile mobs turned into townspeople in era clothes](https://raw.githubusercontent.com/YashjitPal/The-Scarlet-Witch-Mod/main/docs/media/features/townspeople.webp)
 
