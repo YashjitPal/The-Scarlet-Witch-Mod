@@ -94,7 +94,16 @@ public enum Role {
     POSTER,
     /** A flight of steps in the road, and in the sidewalk, where a street climbs to meet the next stretch of it. */
     ROAD_STEP,
-    SIDEWALK_STEP;
+    SIDEWALK_STEP,
+    /** The piers a street's bridge stands on, and the railings along its sidewalks. */
+    BRIDGE_PIER,
+    BRIDGE_RAIL,
+    /** A country lane's steps up a slope, and its bridge: the boards and steps of it, the posts under them and the rails along them. */
+    LANE_STEP,
+    LANE_DECK,
+    LANE_PIER,
+    LANE_RAIL,
+    LANE_DECK_STEP;
 
     private static final Role[] VALUES = values();
 

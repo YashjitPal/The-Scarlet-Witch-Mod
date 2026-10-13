@@ -15,8 +15,10 @@ import java.util.Arrays;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The streets of the town, and its square. A street is a {@value TownPlan#STREET_WIDTH}-wide strip: a sidewalk each
@@ -35,8 +37,152 @@ public final class Streets {
     private static final int GAZEBO_ROOF = 3;
     private static final int GARDEN = 4;
     private static final int[] SQUARE_TICKS = {8, 10, 14, 16, 14};
+    private static final int[] LANE_TICKS = {6, 10, 8};
+    /** How far apart along a bridge its piers stand. */
+    private static final int PIER_EVERY = 5;
 
     private Streets() {
+    }
+
+    /**
+     * How a stretch of street runs along the land, column by column: how high each column of it is laid, and which of
+     * them it carries over a drop or water on a bridge.
+     *
+     * @param from how high the road past its start is laid, where it meets it
+     * @param to   and past its far end
+     */
+    record Profile(int[] levels, boolean[] bridged, int from, int to) {
+    }
+
+    /**
+     * A stretch of street laid along the land as its profile has it: a step up in the road and both sidewalks, each in
+     * its own color, wherever it climbs a block, and over a drop or water a bridge, its deck on piers down to the ground
+     * every few blocks and at either end, railed along both sides.
+     *
+     * @param lamps where along the stretch its lamps stand
+     */
+    static Blueprint graded(Frame frame, int length, Profile profile, Houses.Heights heights, int... lamps) {
+        Blueprint blueprint = new Blueprint(frame, STREET_TICKS);
+        int last = TownPlan.STREET_WIDTH - 1;
+        int middle = last / 2;
+        for (int a = 0; a < length; a++) {
+            int y = profile.levels()[a];
+            Direction climb = climb(frame, profile, a);
+            boolean bridge = profile.bridged()[a];
+            for (int b = 0; b <= last; b++) {
+                boolean side = b == 0 || b == last;
+                ground(blueprint, a, b, y, heights.at(a, b), bridge);
+                if (climb != null) {
+                    blueprint.set(a, b, y, side ? Role.SIDEWALK_STEP : Role.ROAD_STEP, stairs(climb, Half.BOTTOM), PAVE);
+                } else if (side) {
+                    blueprint.set(a, b, y, Role.SIDEWALK, FULL, PAVE);
+                } else {
+                    boolean line = b == middle && Math.floorMod(along(frame, a), 4) < 2;
+                    blueprint.set(a, b, y, line ? Role.ROAD_LINE : Role.ROAD, FULL, PAVE);
+                }
+            }
+            if (bridge) {
+                bridge(blueprint, profile, a, y, heights, Role.BRIDGE_RAIL, Role.BRIDGE_PIER, FULL, contains(lamps, a));
+            }
+        }
+        for (int a : lamps) {
+            int y = profile.levels()[Math.clamp(a, 0, length - 1)];
+            lamp(blueprint, a, 0, y);
+            lamp(blueprint, a, last, y);
+        }
+        return blueprint;
+    }
+
+    /**
+     * A country lane laid along the land the same way: packed earth down the middle, climbing in steps the color of it,
+     * grass either side, and over a drop or water a timber bridge on posts, railed both sides.
+     */
+    static Blueprint lane(Frame frame, int length, Profile profile, Houses.Heights heights) {
+        Blueprint blueprint = new Blueprint(frame, LANE_TICKS);
+        int last = TownPlan.STREET_WIDTH - 1;
+        for (int a = 0; a < length; a++) {
+            int y = profile.levels()[a];
+            Direction climb = climb(frame, profile, a);
+            boolean bridge = profile.bridged()[a];
+            for (int b = 0; b <= last; b++) {
+                ground(blueprint, a, b, y, heights.at(a, b), bridge);
+                boolean path = b >= 2 && b <= 4;
+                if (bridge) {
+                    blueprint.set(a, b, y, climb != null ? Role.LANE_DECK_STEP : Role.LANE_DECK, climb != null ? stairs(climb, Half.BOTTOM) : FULL, PAVE);
+                } else if (path) {
+                    blueprint.set(a, b, y, climb != null ? Role.LANE_STEP : Role.LANE, climb != null ? stairs(climb, Half.BOTTOM) : FULL, PAVE);
+                } else {
+                    blueprint.set(a, b, y, Role.LAWN, FULL, PAVE);
+                }
+            }
+            if (bridge) {
+                bridge(blueprint, profile, a, y, heights, Role.LANE_RAIL, Role.LANE_PIER, pillar(Direction.Axis.Y), false);
+            }
+        }
+        return blueprint;
+    }
+
+    /**
+     * Which way a column of a stretch climbs, if it is a step: toward the column after it if this one stands higher
+     * than the one before, or back toward the one before if it stands higher than the one after. The road past each end
+     * counts as a column at the height it meets it.
+     */
+    private static @Nullable Direction climb(Frame frame, Profile profile, int a) {
+        int[] levels = profile.levels();
+        int before = a > 0 ? levels[a - 1] : profile.from();
+        int after = a < levels.length - 1 ? levels[a + 1] : profile.to();
+        if (before < levels[a]) {
+            return frame.right();
+        }
+        if (after < levels[a]) {
+            return frame.left();
+        }
+        return null;
+    }
+
+    /** The land under a column of a street: cut down to it, filled up to it, or under a bridge's deck left as it is. */
+    private static void ground(Blueprint blueprint, int a, int b, int y, int natural, boolean bridge) {
+        if (natural > y) {
+            blueprint.fill(a, a, b, b, y + 1, natural + 2, Role.CLEAR, AIR, GROUND);
+            return;
+        }
+        blueprint.fill(a, a, b, b, y + 1, y + 2, Role.CLEAR, AIR, GROUND);
+        if (!bridge && natural < y) {
+            blueprint.fill(a, a, b, b, natural + 1, y - 1, Role.FILL, FULL, GROUND);
+        }
+    }
+
+    /** Along both sides of a column of a bridge: a railing, unless a lamp stands there; at its ends and every few blocks, piers down to the land. */
+    private static void bridge(Blueprint blueprint, Profile profile, int a, int y, Houses.Heights heights, Role rail, Role pier,
+                               BlockState pierShape, boolean lamp) {
+        int last = TownPlan.STREET_WIDTH - 1;
+        if (!lamp) {
+            blueprint.set(a, 0, y + 1, rail, FENCE, FURNISH);
+            blueprint.set(a, last, y + 1, rail, FENCE, FURNISH);
+        }
+        boolean[] bridged = profile.bridged();
+        int from = a;
+        while (from > 0 && bridged[from - 1]) {
+            from--;
+        }
+        boolean end = a == from || a == bridged.length - 1 || !bridged[a + 1];
+        if (end || (a - from) % PIER_EVERY == 0) {
+            for (int b : new int[] {0, last}) {
+                int floor = heights.at(a, b);
+                if (floor < y - 1) {
+                    blueprint.fill(a, a, b, b, floor + 1, y - 1, pier, pierShape, GROUND);
+                }
+            }
+        }
+    }
+
+    private static boolean contains(int[] values, int value) {
+        for (int v : values) {
+            if (v == value) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

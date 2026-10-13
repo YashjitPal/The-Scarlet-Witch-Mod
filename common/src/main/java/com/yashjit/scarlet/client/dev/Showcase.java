@@ -1686,6 +1686,44 @@ public final class Showcase {
                         .dispelHexes()
                         .command("execute as @a run scarlet hex forget");
             }
+            // a town, and then an orchard, on land with a cliff up to a plateau to the north and a river to the south: its
+            // streets laid along the land, climbing the cliff and bridging the river
+            case "bridges", "bridgelanes" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build " + (name.equals("bridgelanes") ? "orchard" : "town"))
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -64; x <= 64; x += 8) {
+                    int x1 = Math.min(64, x + 7);
+                    s.command("execute at @a run fill ~" + x + " ~ ~-64 ~" + x1 + " ~24 ~64 minecraft:air")
+                            .command("execute at @a run fill ~" + x + " ~-6 ~-64 ~" + x1 + " ~-2 ~64 minecraft:dirt")
+                            .command("execute at @a run fill ~" + x + " ~-1 ~-64 ~" + x1 + " ~-1 ~64 minecraft:grass_block")
+                            // the plateau, its cliff facing south
+                            .command("execute at @a run fill ~" + x + " ~ ~-64 ~" + x1 + " ~10 ~-26 minecraft:stone")
+                            .command("execute at @a run fill ~" + x + " ~11 ~-64 ~" + x1 + " ~11 ~-26 minecraft:grass_block")
+                            // the river, east to west
+                            .command("execute at @a run fill ~" + x + " ~-5 ~16 ~" + x1 + " ~-1 ~24 minecraft:water");
+                }
+                s.anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 700).logHexSize("built").logSteps("its streets")
+                        .command("execute as @a run scarlet hex era 1980s").then(minecraft -> {
+                        }, 200)
+                        .view(0.0, 80.0, 1.0, 0.0, 0.0, 0.0).shot(name + "_above", 40)
+                        .view(24.0, 9.0, 36.0, 0.0, -1.0, 20.0).shot(name + "_river", 20)
+                        .view(26.0, 14.0, -4.0, 0.0, 6.0, -26.0).shot(name + "_cliff", 20)
+                        // along the river, low, at a bridge either side
+                        .view(46.0, 1.5, 20.0, 29.0, 0.0, 20.0).shot(name + "_bridge_east", 20)
+                        .view(-46.0, 1.5, 20.0, -29.0, 0.0, 20.0).shot(name + "_bridge_west", 20)
+                        .playerCamera()
+                        .dispelHexes()
+                        .command("execute as @a run scarlet hex forget");
+            }
             // a standing Hex made over from its remote: a town into an orchard, then just its home, then nothing, and a
             // town again
             case "livemode" -> {

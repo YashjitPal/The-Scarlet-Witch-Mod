@@ -93,6 +93,10 @@ public final class EraStyle {
                 Blocks.POLISHED_DEEPSLATE_STAIRS, Blocks.POLISHED_DEEPSLATE_STAIRS, Blocks.BLACKSTONE_STAIRS);
         era(Role.SIDEWALK_STEP, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_STAIRS,
                 Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_ANDESITE_STAIRS, Blocks.POLISHED_DIORITE_STAIRS);
+        // a stone bridge with a parapet in the 1950s, concrete on piers since, its rails iron, and glass today
+        era(Role.BRIDGE_PIER, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, concrete(DyeColor.LIGHT_GRAY), concrete(DyeColor.LIGHT_GRAY),
+                concrete(DyeColor.LIGHT_GRAY), Blocks.POLISHED_ANDESITE);
+        era(Role.BRIDGE_RAIL, Blocks.STONE_BRICK_WALL, Blocks.IRON_BARS, Blocks.IRON_BARS, Blocks.IRON_BARS, Blocks.IRON_BARS, Blocks.GLASS_PANE);
         era(Role.LAMP_POST, Blocks.NETHER_BRICK_FENCE, Blocks.NETHER_BRICK_FENCE, Blocks.DARK_OAK_FENCE, Blocks.NETHER_BRICK_FENCE,
                 Blocks.NETHER_BRICK_FENCE, Blocks.NETHER_BRICK_FENCE);
         era(Role.LAMP, Blocks.LANTERN, Blocks.LANTERN, Blocks.LANTERN, Blocks.SOUL_LANTERN, Blocks.LANTERN,
@@ -148,6 +152,12 @@ public final class EraStyle {
         era(Role.ORCHARD_BLOSSOM, Blocks.FLOWERING_AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES,
                 Blocks.FLOWERING_AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES, Blocks.FLOWERING_AZALEA_LEAVES);
         era(Role.LANE, Blocks.DIRT_PATH, Blocks.DIRT_PATH, Blocks.DIRT_PATH, Blocks.DIRT_PATH, Blocks.DIRT_PATH, Blocks.DIRT_PATH);
+        // packed earth has no steps; mud brick is the nearest in color. Its bridges are timber
+        everyEra(Role.LANE_STEP, Blocks.MUD_BRICK_STAIRS);
+        everyEra(Role.LANE_DECK, Blocks.SPRUCE_PLANKS);
+        everyEra(Role.LANE_PIER, Blocks.SPRUCE_LOG);
+        everyEra(Role.LANE_RAIL, Blocks.SPRUCE_FENCE);
+        everyEra(Role.LANE_DECK_STEP, Blocks.SPRUCE_STAIRS);
         era(Role.HAY, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK, Blocks.HAY_BLOCK);
         era(Role.BARN_WALL, terracotta(DyeColor.RED), terracotta(DyeColor.RED), terracotta(DyeColor.RED), concrete(DyeColor.RED),
                 terracotta(DyeColor.RED), Blocks.DARK_OAK_PLANKS);

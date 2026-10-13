@@ -17,6 +17,7 @@ import com.yashjit.scarlet.network.TownGlitchPayload;
 import com.yashjit.scarlet.platform.Services;
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2LongMap;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -114,6 +115,8 @@ public final class HexTown {
     /** How far the town will cut a hill down, or fill a hollow in, to level a part. */
     private static final int MAX_CUT = 8;
     private static final int MAX_FILL = 6;
+    /** How far either way along a street the land is looked over to reckon where two stretches of it meet. */
+    private static final int MEETING_REACH = 12;
     /** Water deeper than this is a lake, a river or the sea, and the town leaves it be. */
     private static final int SHALLOW = 2;
     /** How far down through what stands on the land the town looks for the ground. */
@@ -194,23 +197,27 @@ public final class HexTown {
             // towns from before homes were raised around their casters were laid out from where they stood
             Codec.INT.optionalFieldOf("home_shift", 0).forGetter(town -> town.homeShift),
             Recall.CODEC.forGetter(town -> new Recall(Optional.ofNullable(town.origin), Optional.ofNullable(town.home), town.reach,
-                    town.remembered, Optional.ofNullable(town.homeLot)))
+                    town.remembered, Optional.ofNullable(town.homeLot), town.endsToSave()))
     ).apply(i, HexTown::load));
 
     /**
      * Where a town's grid is laid out from, where its home rose, how far out its wall has stood, the towns it gives way
-     * to and where its caster raised their home off its grid, saved with the rest; towns from before these were kept
-     * are laid out from their Hex's middle.
+     * to, where its caster raised their home off its grid, and where each stretch of street laid along the land meets
+     * the road past its ends, saved with the rest; towns from before these were kept are laid out from their Hex's
+     * middle.
+     *
+     * @param ends each stretch's id, then the heights it meets the road at past its start and past its far end
      */
     private record Recall(Optional<BlockPos> origin, Optional<Vec3> home, float reach, List<TownMemory> remembered,
-                          Optional<TownPlan.HomeLot> homeLot) {
+                          Optional<TownPlan.HomeLot> homeLot, int[] ends) {
 
         static final MapCodec<Recall> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 BlockPos.CODEC.optionalFieldOf("origin").forGetter(Recall::origin),
                 Vec3.CODEC.optionalFieldOf("home").forGetter(Recall::home),
                 Codec.FLOAT.optionalFieldOf("reach", 0.0F).forGetter(Recall::reach),
                 TownMemory.CODEC.listOf().optionalFieldOf("remembered", List.of()).forGetter(Recall::remembered),
-                TownPlan.HomeLot.CODEC.optionalFieldOf("home_lot").forGetter(Recall::homeLot)
+                TownPlan.HomeLot.CODEC.optionalFieldOf("home_lot").forGetter(Recall::homeLot),
+                INTS.optionalFieldOf("street_ends", new int[0]).forGetter(Recall::ends)
         ).apply(i, Recall::new));
     }
 
@@ -220,6 +227,11 @@ public final class HexTown {
     private final Long2ObjectOpenHashMap<Built> built = new Long2ObjectOpenHashMap<>();
     /** The ground level each part was laid at, from when it was begun. */
     private final Int2IntOpenHashMap levels = new Int2IntOpenHashMap();
+    /**
+     * Where each stretch of street laid along the land meets the road past its start and past its far end, packed, for
+     * the stretches either side of it to meet it there.
+     */
+    private final Int2LongOpenHashMap ends = new Int2LongOpenHashMap();
     private final IntOpenHashSet finished = new IntOpenHashSet();
     /** Parts being built, and when they began. */
     private final Int2LongOpenHashMap started = new Int2LongOpenHashMap();
@@ -392,7 +404,26 @@ public final class HexTown {
         for (int id : adopted) {
             town.adopted.add(id);
         }
+        int[] ends = recall.ends();
+        for (int k = 0; k + 2 < ends.length; k += 3) {
+            town.ends.put(ends[k], pack(ends[k + 1], ends[k + 2]));
+        }
         return town;
+    }
+
+    private int[] endsToSave() {
+        int[] saved = new int[ends.size() * 3];
+        int k = 0;
+        for (Int2LongMap.Entry entry : ends.int2LongEntrySet()) {
+            saved[k++] = entry.getIntKey();
+            saved[k++] = (int) (entry.getLongValue() >> 32);
+            saved[k++] = (int) entry.getLongValue();
+        }
+        return saved;
+    }
+
+    private static long pack(int from, int to) {
+        return (long) from << 32 | to & 0xFFFFFFFFL;
     }
 
     public HexBuild mode() {
@@ -611,7 +642,7 @@ public final class HexTown {
             finished.remove(id);
             builds.remove(id);
             started.remove(id);
-            levels.remove(id);
+            forgetLevel(id);
             partial.remove(id);
             adopted.remove(id);
         }
@@ -1015,6 +1046,9 @@ public final class HexTown {
         builds.put(part.id(), build);
         started.put(part.id(), now);
         levels.put(part.id(), survey.ground());
+        if (survey.profile() != null) {
+            ends.put(part.id(), pack(survey.profile().from(), survey.profile().to()));
+        }
         if (clip != WHOLE) {
             partial.put(part.id(), clip);
         } else {
@@ -1578,7 +1612,7 @@ public final class HexTown {
             finished.remove(id);
             builds.remove(id);
             started.remove(id);
-            levels.remove(id);
+            forgetLevel(id);
             partial.remove(id);
             adopted.remove(id);
             LongArrayList blocks = new LongArrayList();
@@ -1749,7 +1783,7 @@ public final class HexTown {
         finished.remove(id);
         started.remove(id);
         builds.remove(id);
-        levels.remove(id);
+        forgetLevel(id);
         partial.remove(id);
         changed = true;
         // the way it went up, to go the same way backward; a home made of what stood there can't be worked out again,
@@ -2131,8 +2165,17 @@ public final class HexTown {
     }
 
     private boolean isLoaded(ServerLevel level, Part part) {
-        return level.hasChunkAt(new BlockPos(part.minX(), 0, part.minZ())) && level.hasChunkAt(new BlockPos(part.maxX(), 0, part.maxZ()))
+        boolean loaded = level.hasChunkAt(new BlockPos(part.minX(), 0, part.minZ())) && level.hasChunkAt(new BlockPos(part.maxX(), 0, part.maxZ()))
                 && level.hasChunkAt(new BlockPos(part.minX(), 0, part.maxZ())) && level.hasChunkAt(new BlockPos(part.maxX(), 0, part.minZ()));
+        if (!loaded || !graded(part)) {
+            return loaded;
+        }
+        // and the land round either end of a stretch of street, that where it meets the next is reckoned from
+        Frame frame = new Frame(part.origin(), part.front());
+        int far = part.width() + MEETING_REACH - 1;
+        int across = TownPlan.STREET_WIDTH - 1;
+        return level.hasChunkAt(frame.at(-MEETING_REACH, 0, 0)) && level.hasChunkAt(frame.at(-MEETING_REACH, across, 0))
+                && level.hasChunkAt(frame.at(far, 0, 0)) && level.hasChunkAt(frame.at(far, across, 0));
     }
 
     /**
@@ -2167,14 +2210,23 @@ public final class HexTown {
                 }
             }
         }
+        boolean graded = graded(part);
         boolean forgiving = part.kind().isStreet() || clip != WHOLE;
-        if (count == 0 || !forgiving && count < inside) {
+        if (count == 0 && !graded || !forgiving && count < inside) {
             return null;
         }
         int[] sorted = Arrays.copyOf(land, count);
         Arrays.sort(sorted);
-        int ground = sorted[count / 2];
+        int ground = count == 0 ? BlockPos.containing(hexCenter).getY() : sorted[count / 2];
         boolean[] blocked = new boolean[columns.length];
+        if (graded) {
+            // laid along the land rather than level: what it can't be laid on is worked out with how it runs
+            for (int index = 0; index < columns.length; index++) {
+                blocked[index] = columns[index] == null;
+            }
+            Streets.Profile profile = profile(level, hexCenter, part, columns, blocked);
+            return profile == null ? null : new Survey(ground, columns, blocked, width, profile);
+        }
         int blockedCount = 0;
         for (int index = 0; index < columns.length; index++) {
             Terrain.Column column = columns[index];
@@ -2195,7 +2247,158 @@ public final class HexTown {
         if (blockedCount * 2 > inside) {
             return null;
         }
-        return new Survey(ground, columns, blocked, width);
+        return new Survey(ground, columns, blocked, width, null);
+    }
+
+    /** Whether a part is a stretch of street, or of a lane, laid along the land rather than level. */
+    private static boolean graded(Part part) {
+        return part.kind() == Kind.STREET || part.kind() == Kind.CROSS_STREET;
+    }
+
+    /**
+     * How a stretch of street runs along the land: from the height it meets the road past its start at to the height it
+     * meets the road past its far end at, evenly, a block at a time at most, and over a drop or water, where it can be
+     * met at both ends, on a bridge. The columns it can't be laid on, too far below it without a bridge to cross them,
+     * too high above it to cut down, or what can't be broken, are left out.
+     *
+     * @param blocked which of its columns it leaves out, filled in here
+     * @return null if it can't go there at all
+     */
+    private Streets.@Nullable Profile profile(ServerLevel level, Vec3 hexCenter, Part part, Terrain.@Nullable Column[] columns, boolean[] blocked) {
+        Frame frame = new Frame(part.origin(), part.front());
+        int length = part.width();
+        int depth = part.depth();
+        OptionalInt start = meeting(level, hexCenter, part, frame, -1, 0);
+        OptionalInt finish = meeting(level, hexCenter, part, frame, length, length);
+        if (start.isEmpty() && finish.isEmpty()) {
+            return null;
+        }
+        int from = start.isPresent() ? start.getAsInt() : finish.getAsInt();
+        int to = finish.isPresent() ? finish.getAsInt() : from;
+        int[] levels = new int[length];
+        for (int a = 0; a < length; a++) {
+            levels[a] = Math.round(from + (to - from) * (a + 0.5F) / length);
+            if (a > 0) {
+                // a block a column at most: too steep for that, its far end falls short of the road past it
+                levels[a] = Math.clamp(levels[a], levels[a - 1] - 1, levels[a - 1] + 1);
+            }
+        }
+        boolean met = start.isPresent() && finish.isPresent();
+        boolean[] bridged = new boolean[length];
+        for (int a = 0; a < length; a++) {
+            int cells = 0;
+            int deep = 0;
+            for (int b = 0; b < depth; b++) {
+                Terrain.Column column = columns[b * length + a];
+                if (column != null) {
+                    cells++;
+                    if (deep(column, levels[a])) {
+                        deep++;
+                    }
+                }
+            }
+            // most of the way across falls away under it, or is water
+            bridged[a] = met && cells > 0 && deep * 2 > cells;
+        }
+        int inside = 0;
+        int left = 0;
+        for (int b = 0; b < depth; b++) {
+            for (int a = 0; a < length; a++) {
+                int index = b * length + a;
+                Terrain.Column column = columns[index];
+                if (column == null) {
+                    continue;
+                }
+                inside++;
+                boolean deep = deep(column, levels[a]);
+                if (column.untouchable() || !deep && column.surface() - levels[a] > MAX_CUT || deep && !bridged[a]) {
+                    blocked[index] = true;
+                    left++;
+                }
+            }
+        }
+        if (inside == 0 || left * 2 > inside) {
+            return null;
+        }
+        return new Streets.Profile(levels, bridged, from, to);
+    }
+
+    /** Whether a column of land lies too far under a street laid at a height to be filled up to it, or under water. */
+    private static boolean deep(Terrain.Column column, int level) {
+        return !column.isLand(SHALLOW) || level - column.surface() > MAX_FILL;
+    }
+
+    /**
+     * The height a stretch of street meets the road past one of its ends at: a crossing's own level; where a stretch
+     * laid along the land already there ends, or the level an older stretch was laid flat at; or otherwise the lie of
+     * the land round where they meet, which each of them reckons alike.
+     *
+     * @param past     the column past that end, along the stretch
+     * @param boundary where along the stretch they meet: 0 at its start, its length at its far end
+     */
+    private OptionalInt meeting(ServerLevel level, Vec3 hexCenter, Part part, Frame frame, int past, int boundary) {
+        BlockPos beyond = frame.at(past, TownPlan.STREET_WIDTH / 2, 0);
+        Part other = streetAt(BlockPos.containing(hexCenter), beyond, part);
+        if (other != null) {
+            if (other.kind() == Kind.CROSSING) {
+                OptionalInt laid = levelOf(level, hexCenter, other);
+                if (laid.isPresent()) {
+                    return laid;
+                }
+            } else if (ends.containsKey(other.id())) {
+                // whichever of its ends faces this one
+                long packed = ends.get(other.id());
+                Frame theirs = new Frame(other.origin(), other.front());
+                double toStart = theirs.at(0, TownPlan.STREET_WIDTH / 2, 0).distSqr(beyond);
+                double toFinish = theirs.at(other.width() - 1, TownPlan.STREET_WIDTH / 2, 0).distSqr(beyond);
+                return OptionalInt.of(toStart <= toFinish ? (int) (packed >> 32) : (int) packed);
+            } else if (levels.containsKey(other.id())) {
+                return OptionalInt.of(levels.get(other.id()));
+            }
+        }
+        return lieOfTheLand(level, frame, boundary);
+    }
+
+    /** The street, crossing or stretch, in the plan at a column, other than the one given. */
+    private @Nullable Part streetAt(BlockPos center, BlockPos at, Part not) {
+        for (Part other : plan(center).parts()) {
+            if (other.id() != not.id() && other.kind().isStreet() && at.getX() >= other.minX() && at.getX() <= other.maxX()
+                    && at.getZ() >= other.minZ() && at.getZ() <= other.maxZ()) {
+                return other;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The middle height of the land round where two stretches of street meet: across the street's width, as far along
+     * it either way; empty if none of it is land.
+     */
+    private OptionalInt lieOfTheLand(ServerLevel level, Frame frame, int boundary) {
+        int[] heights = new int[2 * MEETING_REACH * TownPlan.STREET_WIDTH];
+        int count = 0;
+        for (int k = -MEETING_REACH; k < MEETING_REACH; k++) {
+            for (int b = 0; b < TownPlan.STREET_WIDTH; b++) {
+                BlockPos at = frame.at(boundary + k, b, 0);
+                if (!level.hasChunkAt(at)) {
+                    continue;
+                }
+                Terrain.Column column = column(level, at.getX(), at.getZ());
+                if (column.isLand(SHALLOW)) {
+                    heights[count++] = column.surface();
+                }
+            }
+        }
+        if (count == 0) {
+            return OptionalInt.empty();
+        }
+        Arrays.sort(heights, 0, count);
+        return OptionalInt.of(heights[count / 2]);
+    }
+
+    private void forgetLevel(int id) {
+        levels.remove(id);
+        ends.remove(id);
     }
 
     /**
@@ -2255,7 +2458,8 @@ public final class HexTown {
                 case HOUSE -> random.nextFloat() < 0.18F ? Orchard.meadow(frame, ground, heights, random, occupied)
                         : Orchard.plot(frame, ground, heights, random, occupied);
                 case SQUARE -> Orchard.farmyard(frame, part.width(), part.depth(), ground, heights, random);
-                case STREET, CROSS_STREET -> Orchard.lane(frame, part.width(), ground, heights);
+                case STREET, CROSS_STREET -> survey.profile() != null ? Streets.lane(frame, part.width(), survey.profile(), heights)
+                        : Orchard.lane(frame, part.width(), ground, heights);
                 case CROSSING -> Orchard.crossing(frame, ground, heights);
             };
         }
@@ -2263,11 +2467,12 @@ public final class HexTown {
             case HOME -> Houses.anchor(frame, ground, heights, random, homes);
             case HOUSE -> cutThrough ? Houses.garden(frame, ground, heights, random) : lot(part, frame, ground, heights, random);
             case SQUARE -> Streets.square(frame, part.width(), part.depth(), ground, heights, random);
-            case STREET -> Streets.street(frame, part.width(), ground, heights, meet(part, frame, -1, ground, levelOf),
-                    meet(part, frame, part.width(), ground, levelOf), 0);
+            case STREET -> survey.profile() != null ? Streets.graded(frame, part.width(), survey.profile(), heights, 0)
+                    : Streets.street(frame, part.width(), ground, heights, meet(part, frame, -1, ground, levelOf), meet(part, frame, part.width(), ground, levelOf), 0);
             case CROSSING -> Streets.crossing(frame, ground, heights);
-            case CROSS_STREET -> Streets.street(frame, part.width(), ground, heights, meet(part, frame, -1, ground, levelOf),
-                    meet(part, frame, part.width(), ground, levelOf), part.width() / 2);
+            case CROSS_STREET -> survey.profile() != null ? Streets.graded(frame, part.width(), survey.profile(), heights, part.width() / 2)
+                    : Streets.street(frame, part.width(), ground, heights, meet(part, frame, -1, ground, levelOf), meet(part, frame, part.width(), ground, levelOf),
+                    part.width() / 2);
         };
     }
 
@@ -2453,15 +2658,16 @@ public final class HexTown {
     /**
      * @param columns the land under each column, by b * width + a; null where the part isn't looked at
      * @param blocked columns to leave alone
+     * @param profile how a stretch of street runs along the land, for one; null for anything laid level
      */
-    private record Survey(int ground, Terrain.@Nullable Column[] columns, boolean[] blocked, int width) {
+    private record Survey(int ground, Terrain.@Nullable Column[] columns, boolean[] blocked, int width, Streets.@Nullable Profile profile) {
 
         static Survey flat(int ground, Part part) {
-            return new Survey(ground, new Terrain.Column[part.width() * part.depth()], new boolean[part.width() * part.depth()], part.width());
+            return new Survey(ground, new Terrain.Column[part.width() * part.depth()], new boolean[part.width() * part.depth()], part.width(), null);
         }
 
         Survey at(int ground) {
-            return new Survey(ground, columns, blocked, width);
+            return new Survey(ground, columns, blocked, width, profile);
         }
 
         /**
