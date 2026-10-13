@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+- **Your home always rises where you stand.** Casting on ground a town of yours stood on before, away from where its home was, no longer brings that old home back somewhere else instead of building yours: a new home rises around you, and the old town comes back around it where it stood, its old home now an ordinary house. Cast standing in a home you raised before and that one comes back. A house is made into your home only when you stand in it or at its door, not when it's just nearby.
+
 ## 0.1.4
 
 - **Set dressing.** Standing in your own Hex, a panel beside your inventory holds every piece of era furniture and the car. Click one to take it out of thin air: 4 chaos energy for furniture, 15 for the car.

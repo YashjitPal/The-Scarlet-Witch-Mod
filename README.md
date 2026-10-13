@@ -144,7 +144,7 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 
 - **Throw someone out** the way Wanda throws Monica out of Westview: they crash straight through whatever stands in their way, bursting it open like a creeper's blast, and the Hex mends it like any blast.
 - Creatures and players walk back the way they came, wounds close, broken blocks return and the fallen get back up. Nothing can be duplicated with the rewind: what someone has already picked up stays picked up.
-- The remote also chooses what the next Hex builds, and a Hex cast somewhere new raises a different home each time, out of eight; a town you raised before comes back just as it was.
+- The remote also chooses what the next Hex builds. **Your home always rises where you stand**, a different one each time you cast somewhere new, out of eight; cast standing in a home you raised before and that one comes back, its town with it.
 - **Part the wall** and walk through where it stands open: there is no wall there to cross, so the picture doesn't roll over. From outside, the rest of the Hex stands beyond the opening.
 - **Streets climb hills** in flights of steps in the road's own colors, which change with the era like the rest of it.
 - **Set dressing:** standing in your own Hex, a panel beside your inventory holds every piece of era furniture and the car. Click one to take it out of thin air for a little chaos energy.
