@@ -80,8 +80,8 @@ public final class Hexes {
     private static final float REWIND_COST = 0.15F;
     /** Ticks a rewind rests once it ends. */
     private static final int REWIND_REST_TICKS = 60;
-    /** How near where their home stood a caster must cast over a town of theirs again for it to rise around them there. */
-    public static final double HOME_RECALL = 16.0;
+    /** How near where their home stood a caster must cast again for it to rise around them there: inside it. */
+    public static final double HOME_RECALL = 6.0;
     /** How many of a caster's last homes a home raised somewhere new is a different house from. */
     private static final int RECENT_HOMES = 3;
     /** How far off a caster can raise their home again inside their Hex, as far as they can aim. */
@@ -202,19 +202,18 @@ public final class Hexes {
         int carried = 0;
         Direction facing = player.getDirection();
         if (founding) {
-            back = TownMemory.first(data.towns(player.getUUID(), build), center.x, center.z);
+            // standing at a home they raised before, that is the one that comes back, its town with it; anywhere else
+            // a new one rises around them where they stand
+            back = TownMemory.homeNear(data.towns(player.getUUID(), build), center.x, center.z, HOME_RECALL);
             if (back != null) {
                 openLand = false;
                 double away = back.home().subtract(center).horizontalDistance();
-                founding = away <= HOME_RECALL;
-                if (founding) {
-                    center = back.home();
-                    // their home waits for them to be carried over to where it stood: steadily, then easing in
-                    carried = away > 0.5 ? Mth.ceil(Math.max(0.0, away - DRIFT_EASE) / DRIFT_SPEED) + DRIFT_SETTLE : 0;
-                }
+                center = back.home();
+                // the few steps into its living room: steadily, then easing in
+                carried = away > 0.5 ? Mth.ceil(Math.max(0.0, away - DRIFT_EASE) / DRIFT_SPEED) + DRIFT_SETTLE : 0;
             } else {
-                // a house standing near them, or the ruin of one, is what their home is made of, and they are carried
-                // in to the middle of it as it is
+                // standing in a house, or the ruin of one, it is what their home is made of, and they are carried in
+                // to the middle of it as it is
                 Restyle.HomeSite site = Restyle.site(level, center, facing, key -> data.isBuilt(BlockPos.of(key)));
                 if (site != null) {
                     openLand = false;

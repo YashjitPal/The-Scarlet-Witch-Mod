@@ -72,8 +72,10 @@ public final class Restyle {
     private static final int REACH = 14;
     /** Lowest a block of a building's roof sits over the land around it. */
     private static final int ROOF_FROM = 4;
-    /** How far from a caster something standing can be for their home to be made of it. */
+    /** How far from a caster to look for something standing that they might be in, for their home to be made of it. */
     private static final int SITE_REACH = 10;
+    /** How far outside a building a caster can stand, at its door, and still be in it. */
+    private static final int AT_DOOR = 2;
     /** Furthest a front door can be set back into a building, in a porch, and still be its front door. */
     static final int MAX_DOOR_INSET = 2;
 
@@ -458,7 +460,7 @@ public final class Restyle {
             }
             LongArrayList found = follow(level, start, at.getX() - bounds, at.getZ() - bounds, at.getX() + bounds, at.getZ() + bounds, at.getY() - 6,
                     at.getY() + 24, seen, towns);
-            if (isHouseLike(level, found)) {
+            if (isHouseLike(level, found) && standsIn(found, at)) {
                 HomeSite site = fit(level, found, caster, facing);
                 if (site != null) {
                     return site;
@@ -466,6 +468,25 @@ public final class Restyle {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether a caster stands in a building, or at its door: their home is made of one only then, never of one along the
+     * street from them.
+     */
+    private static boolean standsIn(LongArrayList built, BlockPos caster) {
+        int minX = Integer.MAX_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (long key : built.toLongArray()) {
+            minX = Math.min(minX, BlockPos.getX(key));
+            minZ = Math.min(minZ, BlockPos.getZ(key));
+            maxX = Math.max(maxX, BlockPos.getX(key));
+            maxZ = Math.max(maxZ, BlockPos.getZ(key));
+        }
+        return caster.getX() >= minX - AT_DOOR && caster.getX() <= maxX + AT_DOOR && caster.getZ() >= minZ - AT_DOOR
+                && caster.getZ() <= maxZ + AT_DOOR;
     }
 
     /**

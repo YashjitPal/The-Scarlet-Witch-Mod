@@ -1289,7 +1289,7 @@ public final class Showcase {
                             .anchor().tap().then(minecraft -> {
                             }, 420)
                             .view(16.0, 9.0, -18.0, 0.0, 4.0, 0.0).shot("home_" + i, 6).playerCamera()
-                            .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                            .dispelHexes().then(minecraft -> {
                             }, 20);
                 }
             }
@@ -1325,7 +1325,7 @@ public final class Showcase {
                         }, 260)
                         .logSteps("present").view(10.0, 6.0, -30.0, 10.0, 0.0, 6.0).shot("slope_present", 40)
                         .playerCamera()
-                        .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                        .dispelHexes().then(minecraft -> {
                         }, 20);
             }
             // mobs inside a Hex, rewritten as townspeople, and the names over their heads
@@ -1462,6 +1462,70 @@ public final class Showcase {
                     .logCar("got out")
                     .command("gamemode creative @a")
                     .command("time set noon");
+            // where a caster's home rises: not a house along the street from them but the one they stand in; around them
+            // on open land; around them again on the ground that town stood on, away from its home; that new home back
+            // when cast at again; and the first one back when cast a few steps from it
+            case "homefeet" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -48; x <= 48; x += 12) {
+                    s.command("execute at @a run fill ~" + x + " ~ ~-48 ~" + Math.min(48, x + 11) + " ~14 ~48 minecraft:air");
+                }
+                s.command("execute at @a run fill ~-48 ~-1 ~-48 ~48 ~-1 ~48 minecraft:grass_block")
+                        // a little house of planks along the street from them, its door toward them
+                        .command("execute at @a run fill ~-14 ~ ~6 ~-8 ~4 ~12 minecraft:oak_planks hollow")
+                        .command("execute at @a run fill ~-8 ~ ~9 ~-8 ~1 ~9 minecraft:air")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera()
+                        .anchor().tap().then(minecraft -> {
+                        }, 120).logHome("a house along the street from them")
+                        .dispelHexes().then(minecraft -> {
+                        }, 40)
+                        .command("execute as @a run scarlet hex forget")
+                        .place(-11.0, 0.0, 9.0).face(90, 0).then(minecraft -> {
+                        }, 20)
+                        .anchor().tap().then(minecraft -> {
+                        }, 120).logHome("standing in that house")
+                        .dispelHexes().then(minecraft -> {
+                        }, 40)
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute at @a run fill ~-14 ~ ~6 ~-8 ~4 ~12 minecraft:air")
+                        // open land, then twenty blocks along on the ground that town stood on
+                        .place(11.0, 0.0, -9.0).face(0, 0).then(minecraft -> {
+                        }, 20)
+                        .anchor().tap().then(minecraft -> {
+                        }, 120).logHome("on open land").then(minecraft -> {
+                        }, 340)
+                        .dispelHexes().then(minecraft -> {
+                        }, 40)
+                        .place(20.0, 0.0, 0.0).face(0, 0).then(minecraft -> {
+                        }, 20)
+                        .anchor().tap().then(minecraft -> {
+                        }, 120).logHome("on that town's ground, twenty blocks from its home").then(minecraft -> {
+                        }, 340)
+                        .dispelHexes().then(minecraft -> {
+                        }, 40)
+                        .place(0.0, 0.0, 0.0).face(0, 0).then(minecraft -> {
+                        }, 20)
+                        .tap().then(minecraft -> {
+                        }, 120).logHome("there again").then(minecraft -> {
+                        }, 340)
+                        .dispelHexes().then(minecraft -> {
+                        }, 40)
+                        .place(-17.0, 0.0, 0.0).face(0, 0).then(minecraft -> {
+                        }, 20)
+                        .anchor().tap().then(minecraft -> {
+                        }, 120).logHome("three steps from the first home")
+                        .dispelHexes().then(minecraft -> {
+                        }, 40)
+                        .command("execute as @a run scarlet hex forget");
+            }
             // a refrigerator broken from below and another from above: what each leaves lying, piece by piece
             case "fridgebreak" -> s
                     .land()
@@ -3912,6 +3976,38 @@ public final class Showcase {
                                 when, here, Mastery.rank(player), Mastery.xp(player.getItemBySlot(EquipmentSlot.HEAD)),
                                 Math.round(Magic.energy(player, player.level().getGameTime())), Math.round(Magic.maxEnergy(player)));
                     }
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log where the player's Hex stands and where its home goes, measured from the anchor, which
+         * a scene marks where they stand to cast it.
+         */
+        Scene logHome(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                UUID id = minecraft.player.getUUID();
+                Vec3 cast = anchor;
+                server.execute(() -> {
+                    Hex hex = HexData.of(server.overworld()).byCaster(id);
+                    if (hex == null) {
+                        Scarlet.LOG.info("Showcase: {}: no Hex", when);
+                        return;
+                    }
+                    Vec3 at = hex.center().subtract(cast);
+                    String home = "no home";
+                    var part = hex.town() == null ? null : hex.town().home(BlockPos.containing(hex.center()));
+                    if (part != null) {
+                        boolean around = cast.x >= part.minX() && cast.x < part.maxX() + 1 && cast.z >= part.minZ() && cast.z < part.maxZ() + 1;
+                        home = String.format(java.util.Locale.ROOT, "its home's lot %s where they cast, its middle %.1f blocks off",
+                                around ? "takes in" : "misses", Math.hypot(part.centerX() - cast.x, part.centerZ() - cast.z));
+                    }
+                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: the Hex %s from %.1f %.1f off where they cast, %s", when,
+                            hex.phase(), at.x, at.z, home));
                 });
             }, 2);
         }

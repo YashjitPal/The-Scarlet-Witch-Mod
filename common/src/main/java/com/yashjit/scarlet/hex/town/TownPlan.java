@@ -127,7 +127,11 @@ public final class TownPlan {
      * What a Hex lays out: its own town, as far out as it could ever reach, except on ground a town its caster raised
      * before stood on, where that town comes back just as it was. On ground more than one stood on, the first of them
      * does. A lot or street that would straddle where one town gives way to another is left out, and the land there
-     * stays as it is. Wherever a caster raised their home off its grid, it stands there instead of whatever else would.
+     * stays as it is.
+     *
+     * <p>The caster's own home stands where it is, whatever stood on its ground before: anything of another town there
+     * gives way to it. The towns a Hex brings back come back without theirs, their homes' lots taking houses like any
+     * other, so there is only ever the one home, and it is the caster's.
      *
      * @param ownHome    where the Hex's own town has its home off its grid, if it does
      * @param remembered the towns its caster raised before with the same build, oldest first
@@ -135,14 +139,11 @@ public final class TownPlan {
      */
     public static TownPlan around(Grid own, @Nullable HomeLot ownHome, List<TownMemory> remembered, Vec3 focus, float maxRadius) {
         List<Grid> grids = new ArrayList<>();
-        List<HomeLot> homes = new ArrayList<>();
         grids.add(own);
-        homes.add(ownHome);
         for (TownMemory town : remembered) {
             Grid grid = town.grid();
             if (!grids.contains(grid) && grids.size() < MAX_LAYERS) {
                 grids.add(grid);
-                homes.add(town.homeLot().orElse(null));
             }
         }
         List<Part> laid = new ArrayList<>();
@@ -156,23 +157,24 @@ public final class TownPlan {
             double u = dx * right.getStepX() + dz * right.getStepZ();
             double v = dx * forward.getStepX() + dz * forward.getStepZ();
             int at = layer;
-            layOut(grid, layer, u, v, maxRadius, laid, remembered.isEmpty() ? part -> true : part -> belongs(part, at, grids, remembered),
-                    homes.get(layer) != null);
+            Predicate<Part> keep = remembered.isEmpty() ? part -> true
+                    : part -> at == 0 && part.kind() == Kind.HOME || belongs(part, at, grids, remembered);
+            layOut(grid, layer, u, v, maxRadius, laid, keep, layer > 0 || ownHome != null);
         }
-        List<Part> raised = new ArrayList<>();
-        for (int layer = 0; layer < grids.size(); layer++) {
-            HomeLot lot = homes.get(layer);
-            if (lot == null) {
-                continue;
-            }
-            Part home = home(grids.get(layer), layer, lot);
-            if (raised.stream().noneMatch(other -> overlaps(other, home))) {
-                raised.add(home);
+        Part home = ownHome != null ? home(own, 0, ownHome) : null;
+        if (home != null) {
+            laid.add(home);
+        } else {
+            for (Part part : laid) {
+                if (part.kind() == Kind.HOME && part.layer() == 0) {
+                    home = part;
+                    break;
+                }
             }
         }
-        if (!raised.isEmpty()) {
-            laid.removeIf(part -> raised.stream().anyMatch(home -> overlaps(part, home)));
-            laid.addAll(raised);
+        if (home != null) {
+            Part kept = home;
+            laid.removeIf(part -> part != kept && overlaps(part, kept));
         }
         laid.sort(Comparator.comparingDouble(part -> Mth.square(part.centerX() - focus.x) + Mth.square(part.centerZ() - focus.z)));
         return new TownPlan(grids, laid);

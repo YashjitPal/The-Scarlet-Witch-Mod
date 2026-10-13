@@ -68,6 +68,23 @@ public record TownMemory(UUID caster, HexBuild mode, BlockPos origin, Direction 
     }
 
     /**
+     * Of some towns, the one whose home stood nearest a point, if one stood within a distance of it.
+     */
+    public static @Nullable TownMemory homeNear(List<TownMemory> towns, double x, double z, double within) {
+        TownMemory nearest = null;
+        double best = within * within;
+        for (TownMemory town : towns) {
+            double dx = town.home.x - x;
+            double dz = town.home.z - z;
+            if (dx * dx + dz * dz <= best) {
+                best = dx * dx + dz * dz;
+                nearest = town;
+            }
+        }
+        return nearest;
+    }
+
+    /**
      * The first of some towns to stand on the ground at a point, given oldest first: the one that comes back there.
      */
     public static @Nullable TownMemory first(List<TownMemory> towns, double x, double z) {

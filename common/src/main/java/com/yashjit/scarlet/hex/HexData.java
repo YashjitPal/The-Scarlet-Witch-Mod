@@ -219,17 +219,26 @@ public final class HexData extends SavedData {
     }
 
     /**
-     * Remembers the town a Hex left behind, unless an older town of its caster's with the same build stood on all the
-     * ground it did: that one is what comes back there.
+     * Remembers the town a Hex left behind, for its home to come back where it stood and the town with it. The same town
+     * again is remembered once, for all the ground it has stood on; a new one is remembered even on ground an older
+     * one stood on, as its home is what comes back there.
      */
     void remember(TownMemory town) {
         List<TownMemory> theirs = towns(town.caster(), town.mode());
+        TownMemory kept = town;
         for (TownMemory old : theirs) {
-            if (old.holds(town)) {
-                return;
+            if (old.grid().equals(town.grid())) {
+                // the same town again: its home where it stands now, over the most ground it has stood on
+                if (old.holds(town)) {
+                    kept = new TownMemory(town.caster(), town.mode(), town.origin(), town.forward(), town.seed(), town.home(), old.center(),
+                            old.reach(), town.homeLot());
+                }
+                towns.remove(old);
+                theirs.remove(old);
+                break;
             }
         }
-        towns.add(town);
+        towns.add(kept);
         int over = theirs.size() + 1 - MAX_TOWNS;
         for (int k = 0; k < over; k++) {
             towns.remove(theirs.get(k));
