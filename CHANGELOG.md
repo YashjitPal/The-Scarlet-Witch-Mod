@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- **Bigger Hexes.** A Hex now spreads 72 blocks out when cast, three times as far as before, and holding the cast grows it as far as 576, three times the old limit. A big Hex falls and changes era a little more slowly so its town still goes block by block, and someone thrown out of one flies no faster than before, however far they have to go.
+
 ## 0.1.5
 
 - **Your home always rises where you stand.** Casting on ground a town of yours stood on before, away from where its home was, no longer brings that old home back somewhere else instead of building yours: a new home rises around you, and the old town comes back around it where it stood, its old home now an ordinary house. Cast standing in a home you raised before and that one comes back. A house is made into your home only when you stand in it or at its door, not when it's just nearby.

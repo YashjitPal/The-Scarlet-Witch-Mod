@@ -91,7 +91,7 @@ Every power is drawn as hard-edged pixel art in stepped shades of scarlet, match
 
 ## The Hex
 
-<img src="docs/media/icons/hex.png" width="20" align="absmiddle" alt=""> <sub>RANK 10</sub> &nbsp;A hexagonal wall of static spreads out from you and stays where you cast it. Anyone can walk in; you can kick them out. **Inside, the world is a sitcom.**
+<img src="docs/media/icons/hex.png" width="20" align="absmiddle" alt=""> <sub>RANK 10</sub> &nbsp;A hexagonal wall of static spreads 72 blocks out from you and stays where you cast it; hold the cast to grow it as far as 576. Anyone can walk in; you can kick them out. **Inside, the world is a sitcom.**
 
 <table>
 <tr>
