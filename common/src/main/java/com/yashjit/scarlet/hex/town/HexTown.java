@@ -96,8 +96,8 @@ public final class HexTown {
 
     /** Most blocks the town changes in a tick, building, restyling and taking down together. */
     private static final int BUDGET = 512;
-    /** Most blocks it puts back in a tick while the Hex falls. */
-    private static final int COLLAPSE_BUDGET = 2048;
+    /** Most blocks it puts back in a tick while the Hex falls, enough for the biggest town to go back as the wall passes. */
+    private static final int COLLAPSE_BUDGET = 4096;
     private static final int TRIGGER_INTERVAL = 4;
     private static final int STARTS_PER_TRIGGER = 3;
     private static final int RETRY_SKIPPED = 400;

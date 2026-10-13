@@ -1526,6 +1526,44 @@ public final class Showcase {
                         }, 40)
                         .command("execute as @a run scarlet hex forget");
             }
+            // a Hex cast at its new size, grown by holding the cast, then taken to its largest and let fall: how big it is,
+            // how much of its town stands, and how long the server's ticks take all the while
+            case "bighex" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -90; x <= 90; x += 19) {
+                    s.command("execute at @a run fill ~" + x + " ~ ~-90 ~" + Math.min(90, x + 18) + " ~9 ~90 minecraft:air");
+                }
+                s.command("execute at @a run fill ~-90 ~-1 ~-90 ~90 ~-1 ~90 minecraft:grass_block")
+                        .command("execute at @a run fill ~-90 ~-2 ~-90 ~90 ~-2 ~90 minecraft:dirt")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 520).logHexSize("cast")
+                        .view(0.0, 120.0, 1.0, 0.0, 0.0, 0.0).shot("bighex_cast", 40).playerCamera()
+                        .hold(true).then(minecraft -> {
+                        }, 60).hold(false).logHexSize("grown by holding the cast for three seconds")
+                        .command("execute as @a run scarlet hex size 576").then(minecraft -> {
+                        }, 200).logHexSize("at its largest")
+                        .then(minecraft -> {
+                        }, 400).logHexSize("its town going up").shot("bighex_hud", 4)
+                        .view(0.0, 220.0, 1.0, 0.0, 0.0, 0.0).shot("bighex_largest", 40).playerCamera()
+                        .command("execute as @a run scarlet hex dispel").then(minecraft -> {
+                        }, 240).logHexSize("falling")
+                        .then(minecraft -> {
+                        }, 240).logHexSize("falling further")
+                        .then(minecraft -> {
+                        }, 300).logHexSize("fallen")
+                        .then(minecraft -> {
+                        }, 700).logHexSize("its home gone too")
+                        .command("execute as @a run scarlet hex forget");
+            }
             // a refrigerator broken from below and another from above: what each leaves lying, piece by piece
             case "fridgebreak" -> s
                     .land()
@@ -3976,6 +4014,31 @@ public final class Showcase {
                                 when, here, Mastery.rank(player), Mastery.xp(player.getItemBySlot(EquipmentSlot.HEAD)),
                                 Math.round(Magic.energy(player, player.level().getGameTime())), Math.round(Magic.maxEnergy(player)));
                     }
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log how big the player's Hex is, how many blocks its town has put down, and how long the
+         * server's ticks have taken: on average, and the longest of the last hundred.
+         */
+        Scene logHexSize(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    Hex hex = HexData.of(server.overworld()).byCaster(id);
+                    long longest = 0;
+                    for (long nanos : server.getTickTimesNanos()) {
+                        longest = Math.max(longest, nanos);
+                    }
+                    String size = hex == null ? "no Hex" : String.format(java.util.Locale.ROOT, "the Hex %s at %.0f blocks, its wall at %.0f, its town %d blocks",
+                            hex.phase(), hex.radius(), Hexes.wallRadius(hex, server.overworld().getGameTime()), hex.town() == null ? 0 : hex.town().size());
+                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, ticks taking %.1f ms on average and %.1f at most", when,
+                            size, server.getAverageTickTimeNanos() / 1.0E6, longest / 1.0E6));
                 });
             }, 2);
         }

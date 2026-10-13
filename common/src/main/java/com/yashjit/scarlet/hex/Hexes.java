@@ -49,9 +49,9 @@ import org.jspecify.annotations.Nullable;
  */
 public final class Hexes {
 
-    public static final float CAST_RADIUS = 24.0F;
+    public static final float CAST_RADIUS = 72.0F;
     public static final float MIN_RADIUS = 6.0F;
-    public static final float MAX_RADIUS = 192.0F;
+    public static final float MAX_RADIUS = 576.0F;
     /** Blocks per tick while the caster holds the cast, for a small Hex. */
     public static final float RESIZE_SPEED = 0.35F;
     /** Share of its radius a big Hex grows or shrinks by each tick, so it takes seconds whatever its size. */
@@ -293,7 +293,7 @@ public final class Hexes {
      * Ticks a Hex takes to fall from a size: longer the bigger it is, so it comes down slowly enough to watch the town go.
      */
     public static float collapseTicks(float radius) {
-        return Math.clamp(120.0F + radius, 140.0F, 320.0F);
+        return Math.clamp(120.0F + radius, 140.0F, 720.0F);
     }
 
     /**
@@ -315,7 +315,7 @@ public final class Hexes {
      * Ticks a new era takes to spread over a Hex from its middle, out to the wall: longer the bigger the Hex.
      */
     public static float eraSweepTicks(float radius) {
-        return Math.clamp(70.0F + radius * 0.9F, 90.0F, 240.0F);
+        return Math.clamp(70.0F + radius * 0.9F, 90.0F, 600.0F);
     }
 
     /**

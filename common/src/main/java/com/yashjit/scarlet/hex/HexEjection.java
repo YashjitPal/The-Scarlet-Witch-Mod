@@ -58,6 +58,9 @@ public final class HexEjection {
     private static final int HOLD_TICKS = 60;
     /** How far past the wall they land. */
     private static final double BEYOND = 12.0;
+    /** Fastest they fly, in blocks a tick, thrown however far across a Hex, and highest their flight rises over it. */
+    private static final double TOP_SPEED = 5.0;
+    private static final double MAX_RISE = 48.0;
     private static final float CROSSING_RIPPLE = 1.8F;
     /** How far around a body crashing through something it bursts open, how often along its way it looks, and how many
      * things one throw can crash through. */
@@ -164,7 +167,8 @@ public final class HexEjection {
         double exit = exitDistance(hex.center, wall, from, away);
         Vec3 landing = ground(level, from.add(away.scale(exit + BEYOND)));
         double distance = Math.sqrt(landing.subtract(from).horizontalDistanceSqr());
-        int ticks = Mth.clamp((int) Math.round(distance / 1.5), 16, 40);
+        // longer the further, never so fast the land around them can't keep up
+        int ticks = Mth.clamp((int) Math.round(distance / 1.5), 16, Math.max(40, Mth.ceil(distance / TOP_SPEED)));
         Vec3 crossing = from.add(away.scale(exit));
         FLIGHTS.put(living.getId(), new Flight(level, from, landing, level.getGameTime(), ticks, (float) Mth.clamp(exit / distance, 0.0, 1.0),
                 crossing, living instanceof Player));
@@ -349,7 +353,7 @@ public final class HexEjection {
 
     private static double height(Vec3 from, Vec3 to, float u) {
         double distance = Math.sqrt(to.subtract(from).horizontalDistanceSqr());
-        double apex = Math.max(from.y, to.y) + Math.max(7.0, distance * 0.22);
+        double apex = Math.max(from.y, to.y) + Math.clamp(distance * 0.22, 7.0, MAX_RISE);
         // a quadratic arc through the apex, with its control point set so it peaks there
         double control = 2.0 * apex - 0.5 * (from.y + to.y);
         return (1.0 - u) * (1.0 - u) * from.y + 2.0 * u * (1.0 - u) * control + u * u * to.y;
