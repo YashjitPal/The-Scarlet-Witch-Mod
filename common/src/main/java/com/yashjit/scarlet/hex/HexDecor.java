@@ -2,6 +2,7 @@ package com.yashjit.scarlet.hex;
 
 import com.yashjit.scarlet.decor.EraDecor;
 import com.yashjit.scarlet.decor.RefrigeratorBlock;
+import com.yashjit.scarlet.hex.town.Terrain;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -62,7 +63,7 @@ public final class HexDecor {
         LongIterator positions = data.decor().iterator();
         while (positions.hasNext()) {
             BlockPos pos = BlockPos.of(positions.nextLong());
-            if (!level.hasChunkAt(pos)) {
+            if (!Terrain.isReady(level, pos)) {
                 continue;
             }
             BlockState state = level.getBlockState(pos);

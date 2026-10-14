@@ -2,6 +2,7 @@ package com.yashjit.scarlet.hex.town;
 
 import com.yashjit.scarlet.Scarlet;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -29,6 +30,18 @@ public final class Terrain {
     public static final int NO_GROUND = Integer.MIN_VALUE;
 
     private Terrain() {
+    }
+
+    /**
+     * Whether the chunk a block is in is loaded and ready to read: a level's own check only says one is meant to be,
+     * and reading a block in one still being made holds the server up until it is done.
+     */
+    public static boolean isReady(ServerLevel level, BlockPos pos) {
+        return isReady(level, SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
+    }
+
+    public static boolean isReady(ServerLevel level, int chunkX, int chunkZ) {
+        return level.getChunkSource().getChunkNow(chunkX, chunkZ) != null;
     }
 
     public static boolean isGround(BlockState state) {

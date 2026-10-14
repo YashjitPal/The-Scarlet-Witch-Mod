@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.hex;
 
+import com.yashjit.scarlet.hex.town.Terrain;
 import com.yashjit.scarlet.network.TownFormPayload;
 import com.yashjit.scarlet.platform.Services;
 import java.util.ArrayList;
@@ -154,7 +155,7 @@ public final class HexMending {
             }
             while (mend.next < mend.gaps.size() && mend.at[mend.next] <= now) {
                 Gap gap = mend.gaps.get(mend.next);
-                if (!level.hasChunkAt(gap.pos())) {
+                if (!Terrain.isReady(level, gap.pos())) {
                     break;
                 }
                 putBack(level, gap, now);
@@ -180,7 +181,7 @@ public final class HexMending {
             for (Mend mend : mends) {
                 for (int i = mend.next; i < mend.gaps.size(); i++) {
                     Gap gap = mend.gaps.get(i);
-                    if (level.hasChunkAt(gap.pos())) {
+                    if (Terrain.isReady(level, gap.pos())) {
                         putBack(level, gap, now);
                     }
                 }

@@ -193,7 +193,7 @@ public final class HexPaint {
     }
 
     private static boolean paintOne(ServerLevel level, ServerPlayer player, Hex hex, BlockPos pos, BlockState ink) {
-        if (!level.hasChunkAt(pos) || !hex.contains(Vec3.atCenterOf(pos)) || !level.mayInteract(player, pos)) {
+        if (!Terrain.isReady(level, pos) || !hex.contains(Vec3.atCenterOf(pos)) || !level.mayInteract(player, pos)) {
             return false;
         }
         BlockState current = level.getBlockState(pos);
@@ -277,7 +277,7 @@ public final class HexPaint {
             // the iterator's entry is reused once removed
             iterator.remove();
             any = true;
-            if (!level.hasChunkAt(pos)) {
+            if (!Terrain.isReady(level, pos)) {
                 data.pendingPaint().put(key, painted);
             } else if (putBack(level, pos, painted)) {
                 back.add(pos.getX());
@@ -302,7 +302,7 @@ public final class HexPaint {
         while (iterator.hasNext()) {
             Long2ObjectMap.Entry<Painted> entry = iterator.next();
             BlockPos pos = BlockPos.of(entry.getLongKey());
-            if (level.hasChunkAt(pos)) {
+            if (Terrain.isReady(level, pos)) {
                 putBack(level, pos, entry.getValue());
             } else {
                 data.pendingPaint().put(entry.getLongKey(), entry.getValue());
@@ -320,7 +320,7 @@ public final class HexPaint {
         while (iterator.hasNext()) {
             Long2ObjectMap.Entry<Painted> entry = iterator.next();
             BlockPos pos = BlockPos.of(entry.getLongKey());
-            if (level.hasChunkAt(pos)) {
+            if (Terrain.isReady(level, pos)) {
                 putBack(level, pos, entry.getValue());
                 iterator.remove();
                 data.setDirty();

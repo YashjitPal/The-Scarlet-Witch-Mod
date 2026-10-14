@@ -25,6 +25,7 @@ import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.block.state.properties.SlabType;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Sitcom houses, each on a {@value TownPlan#LOT_WIDTH} by {@value TownPlan#LOT_DEPTH} lot behind a picket fence or a
@@ -76,6 +77,9 @@ public final class Houses {
     private static final int GARAGE_DEPTH = 7;
     /** No door found on a building's front. */
     static final int NO_DOOR = Integer.MIN_VALUE;
+    /** How deep under a lot a hollow is filled in all the way; a deeper hole is only capped over, this thick. */
+    static final int FILL_DEEP = 6;
+    static final int CAP = 4;
 
     static final BlockState AIR = Blocks.AIR.defaultBlockState();
     static final BlockState FULL = Blocks.STONE.defaultBlockState();
@@ -158,13 +162,51 @@ public final class Houses {
     private record Box(int left, int right, int front, int back, int g, int top, int stories, int door) {
     }
 
+    /** Most rows of a lot's front that climb, or step down, to meet its sidewalk, so the porch step stays clear. */
+    static final int FRONT_RISE = 3;
+    static final int FRONT_DROP = 2;
+
+    /**
+     * How the front of a lot meets the sidewalk along its street where the lot is laid higher or lower: its lawn a block
+     * a row, and flights of steps where the walk and the driveway cross those rows, so the house can be come to from
+     * the street however the land lies.
+     *
+     * @param sidewalk how high the sidewalk past the front of the lot is laid, or {@link #UNKNOWN}
+     */
+    record Front(int sidewalk) {
+        static final int UNKNOWN = Integer.MIN_VALUE;
+        static final Front LEVEL = new Front(UNKNOWN);
+
+        /** How high a row of the lot, counted in from the sidewalk, is laid, for a lot laid at {@code g}. */
+        int row(int b, int g) {
+            if (sidewalk == UNKNOWN) {
+                return g;
+            }
+            int rise = Math.clamp(g - sidewalk, -FRONT_DROP, FRONT_RISE);
+            return rise > 0 && b < rise ? g - rise + 1 + b : rise < 0 && b < -rise ? g - rise - b : g;
+        }
+
+        /** Which way a row of the walk climbs, if it is a step: toward the house up to it, toward the street down to it. */
+        @Nullable Direction climb(int b, int g, Frame frame) {
+            if (sidewalk == UNKNOWN) {
+                return null;
+            }
+            int rise = Math.clamp(g - sidewalk, -FRONT_DROP, FRONT_RISE);
+            return rise > 0 && b < rise ? frame.back() : rise < 0 && b < -rise ? frame.front() : null;
+        }
+    }
+
     // ---------------------------------------------------------------- what goes up
 
     /**
      * A house along a street, so that no two streets, and no two Hexes, look alike.
      */
-    public static Blueprint house(Frame frame, int ground, Heights heights, RandomSource random) {
-        return build(frame, ground, heights, town(random, Paint.pick(random)), STAGE_TICKS);
+    /**
+     * @param sidewalk how high the sidewalk past each column of the lot's front is laid, for its front to meet it; null
+     *                 where that isn't known, and the front is laid level with the rest
+     */
+    public static Blueprint house(Frame frame, int ground, Heights heights, RandomSource random, int @Nullable [] sidewalk) {
+        return build(frame, ground, heights, town(random, Paint.pick(random)), STAGE_TICKS, sidewalk);
     }
 
     /**
@@ -192,7 +234,7 @@ public final class Houses {
             // a cottage under a side gable, its porch wrapping round one side
             default -> new Design(13, 9, 1, Roof.SIDE_GABLE, Porch.WRAP, 0, paint);
         };
-        return build(frame, ground, heights, design, ANCHOR_TICKS);
+        return build(frame, ground, heights, design, ANCHOR_TICKS, null);
     }
 
     /**
@@ -248,15 +290,17 @@ public final class Houses {
         return new Design(11, 9, 1, Roof.SIDE_GABLE, Porch.WRAP, 0, paint);
     }
 
-    private static Blueprint build(Frame frame, int g, Heights heights, Design design, int[] stageTicks) {
+    private static Blueprint build(Frame frame, int g, Heights heights, Design design, int[] stageTicks, int @Nullable [] sidewalk) {
         Blueprint blueprint = new Blueprint(frame, stageTicks);
-        level(blueprint, TownPlan.LOT_WIDTH, TownPlan.LOT_DEPTH, g, heights);
         Paint paint = design.paint();
         int total = design.width() + (design.garage() != 0 ? GARAGE_WIDTH : 0);
         int left = (TownPlan.LOT_WIDTH - total) / 2 + (design.garage() < 0 ? GARAGE_WIDTH : 0);
         int right = left + design.width() - 1;
         int back = FRONT + design.depth() - 1;
         Box box = new Box(left, right, FRONT, back, g, g + 1 + STORY * design.stories(), design.stories(), (left + right) / 2);
+        // its front meets the sidewalk where its walk comes out onto it
+        Front street = sidewalk == null ? Front.LEVEL : new Front(sidewalk[box.door()]);
+        level(blueprint, TownPlan.LOT_WIDTH, TownPlan.LOT_DEPTH, g, heights, street);
 
         foundation(blueprint, box);
         frame(blueprint, box);
@@ -282,11 +326,11 @@ public final class Houses {
         int driveFrom = Integer.MAX_VALUE;
         int driveTo = Integer.MIN_VALUE;
         if (design.garage() != 0) {
-            int[] drive = garage(blueprint, box, design.garage());
+            int[] drive = garage(blueprint, box, design.garage(), street);
             driveFrom = drive[0];
             driveTo = drive[1];
         }
-        yard(blueprint, box, design.porch(), paint, driveFrom, driveTo, design.garage() == 0);
+        yard(blueprint, box, design.porch(), paint, driveFrom, driveTo, design.garage() == 0, street);
         rooms(blueprint, box);
         return blueprint;
     }
@@ -572,7 +616,7 @@ public final class Houses {
      *
      * @return the columns across the lot the driveway takes
      */
-    private static int[] garage(Blueprint blueprint, Box box, int side) {
+    private static int[] garage(Blueprint blueprint, Box box, int side, Front street) {
         Frame frame = blueprint.frame();
         int g = box.g();
         int a0 = side > 0 ? box.right() + 1 : box.left() - GARAGE_WIDTH;
@@ -599,7 +643,11 @@ public final class Houses {
         blueprint.fill(outer, outer, front - 1, back + 1, top + 1, top + 1, Role.ROOF_RIDGE, FULL, ROOF);
         blueprint.set(doorFrom + 1, front - 1, top, Role.LAMP, lantern(true), EXTERIOR);
         for (int b = 0; b < front; b++) {
-            blueprint.fill(doorFrom, doorFrom + 2, b, b, g, g, Role.SIDEWALK, FULL, YARD);
+            // a flight of steps where the lot's front climbs to the sidewalk, which the car takes as it does stairs
+            Direction climb = street.climb(b, g, frame);
+            int y = street.row(b, g);
+            blueprint.fill(doorFrom, doorFrom + 2, b, b, y, y, climb != null ? Role.SIDEWALK_STEP : Role.SIDEWALK,
+                    climb != null ? stairs(climb, Half.BOTTOM) : FULL, YARD);
         }
         // the family car, parked nose in on the driveway
         blueprint.car(doorFrom + 1, 1, front - 2, g + 1, frame.back(), Math.floorMod(Long.hashCode(frame.origin().asLong()), 5));
@@ -612,31 +660,39 @@ public final class Houses {
      *
      * @param driveFrom where the driveway crosses the front of the lot, if it does
      */
-    private static void yard(Blueprint blueprint, Box box, Porch porch, Paint paint, int driveFrom, int driveTo, boolean room) {
+    private static void yard(Blueprint blueprint, Box box, Porch porch, Paint paint, int driveFrom, int driveTo, boolean room, Front street) {
         Frame frame = blueprint.frame();
         int g = box.g();
         int door = box.door();
         int last = TownPlan.LOT_WIDTH - 1;
+        int edge = street.row(0, g);
         for (int a = 0; a <= last; a++) {
             if (a == door || a >= driveFrom && a <= driveTo) {
                 continue;
             }
             if (paint.hedgeFront()) {
-                blueprint.set(a, 0, g + 1, Role.HEDGE, LEAVES, YARD);
+                blueprint.set(a, 0, edge + 1, Role.HEDGE, LEAVES, YARD);
             } else {
-                blueprint.set(a, 0, g + 1, Role.PICKET, FENCE, YARD);
+                blueprint.set(a, 0, edge + 1, Role.PICKET, FENCE, YARD);
             }
         }
-        blueprint.set(door, 0, g + 1, Role.GATE, gate(frame.back()), YARD);
+        blueprint.set(door, 0, edge + 1, Role.GATE, gate(frame.back()), YARD);
+        // the walk up to the porch, in steps where the front of the lot climbs to the sidewalk or comes down to it
         for (int b = 0; b <= box.front() - 4; b++) {
-            blueprint.set(door, b, g, Role.WALKWAY, FULL, YARD);
+            Direction climb = street.climb(b, g, frame);
+            if (climb != null) {
+                blueprint.set(door, b, street.row(b, g), Role.STEP, stairs(climb, Half.BOTTOM), YARD);
+            } else {
+                blueprint.set(door, b, g, Role.WALKWAY, FULL, YARD);
+            }
         }
         int mailbox = driveFrom < door ? door + 2 : door - 2;
-        blueprint.set(mailbox, 1, g + 1, Role.MAILBOX_POST, FENCE, YARD);
-        blueprint.set(mailbox, 1, g + 2, Role.MAILBOX, FULL, YARD);
+        int besideGate = street.row(1, g);
+        blueprint.set(mailbox, 1, besideGate + 1, Role.MAILBOX_POST, FENCE, YARD);
+        blueprint.set(mailbox, 1, besideGate + 2, Role.MAILBOX, FULL, YARD);
         for (int a : new int[] {0, last}) {
             if (a < driveFrom || a > driveTo) {
-                blueprint.set(a, 1, g + 1, Role.HEDGE, LEAVES, YARD);
+                blueprint.set(a, 1, besideGate + 1, Role.HEDGE, LEAVES, YARD);
             }
         }
         // beds along the wall beside the porch, or along the front of a porch across the house
@@ -650,7 +706,7 @@ public final class Houses {
             }
             blueprint.set(a, bed, g + 1, Role.FLOWER, a < door ? paint.flowers() : paint.otherFlowers(), FLOWER, YARD);
         }
-        if (paint.tree() && room && !wide) {
+        if (paint.tree() && room && !wide && street.row(2, g) == g) {
             shadeTree(blueprint, mailbox < door ? last - 2 : 2, 2, g, YARD);
         }
     }
@@ -1107,18 +1163,27 @@ public final class Houses {
      * Levels a lot to one height: ground above is cut away, hollows below are filled, and the whole lot is turfed.
      */
     static void level(Blueprint blueprint, int width, int depth, int ground, Heights heights) {
+        level(blueprint, width, depth, ground, heights, Front.LEVEL);
+    }
+
+    /**
+     * Levels a lot the same way, its front rows climbing or stepping down to the sidewalk as {@code street} has them. A
+     * hole in it deeper than a hollow is capped over rather than filled all the way down.
+     */
+    static void level(Blueprint blueprint, int width, int depth, int ground, Heights heights, Front street) {
         for (int b = 0; b < depth; b++) {
+            int g = street.row(b, ground);
             for (int a = 0; a < width; a++) {
                 int height = heights.at(a, b);
-                if (height > ground) {
-                    blueprint.fill(a, a, b, b, ground + 1, height + 2, Role.CLEAR, AIR, GROUND);
+                if (height > g) {
+                    blueprint.fill(a, a, b, b, g + 1, height + 2, Role.CLEAR, AIR, GROUND);
                 } else {
-                    blueprint.fill(a, a, b, b, ground + 1, ground + 2, Role.CLEAR, AIR, GROUND);
-                    if (height < ground) {
-                        blueprint.fill(a, a, b, b, height + 1, ground - 1, Role.FILL, FULL, GROUND);
+                    blueprint.fill(a, a, b, b, g + 1, g + 2, Role.CLEAR, AIR, GROUND);
+                    if (height < g) {
+                        blueprint.fill(a, a, b, b, g - height > FILL_DEEP ? g - CAP : height + 1, g - 1, Role.FILL, FULL, GROUND);
                     }
                 }
-                blueprint.set(a, b, ground, Role.LAWN, FULL, GROUND);
+                blueprint.set(a, b, g, Role.LAWN, FULL, GROUND);
             }
         }
     }
@@ -1136,7 +1201,7 @@ public final class Houses {
             case PORCH_POST, CHIMNEY, SHUTTER, AWNING, SIGN, LAMP_POST -> EXTERIOR;
             case WALKWAY, PICKET, GATE, HEDGE, FLOWER, MAILBOX, MAILBOX_POST, TREE_LOG, TREE_LEAVES, ORCHARD_LEAVES, ORCHARD_BLOSSOM,
                  SIDEWALK, ROAD, ROAD_LINE, ROAD_STEP, SIDEWALK_STEP, PLAZA, GAZEBO_POST, BENCH, HAY, PLAY_FRAME, SLIDE, CHAIN, BELL,
-                 PRESERVE, BRIDGE_PIER, BRIDGE_RAIL, LANE_STEP, LANE_DECK, LANE_PIER, LANE_RAIL, LANE_DECK_STEP -> YARD;
+                 PRESERVE, BRIDGE_PIER, BRIDGE_RAIL, LANE_STEP, LANE_DECK, LANE_PIER, LANE_RAIL, LANE_DECK_STEP, TUNNEL_WALL, TUNNEL_CEILING -> YARD;
             case RUG, COUCH, TABLE, SHELF, FRIDGE, COUNTER, SINK, PLANT, LAMP, BED, TELEVISION, RADIO, TELEPHONE, STOVE, TOASTER, ARMCHAIR,
                  TABLE_LAMP, CLOCK, PICTURE, POSTER -> INTERIOR;
         };

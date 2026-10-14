@@ -248,7 +248,7 @@ public final class HomeRemnant {
             if (entry == null) {
                 continue;
             }
-            if (!level.hasChunkAt(BlockPos.of(key))) {
+            if (!Terrain.isReady(level, BlockPos.of(key))) {
                 unloaded.accept(key, entry);
                 continue;
             }
@@ -262,7 +262,7 @@ public final class HomeRemnant {
         }
         // with its walls back as they were, what hung on them can go back up
         for (HexTown.Kept entry : kept) {
-            if (level.hasChunkAt(BlockPos.containing(entry.at()))) {
+            if (Terrain.isReady(level, BlockPos.containing(entry.at()))) {
                 HexTown.setDown(level, entry);
             } else {
                 unloadedKept.accept(entry);
@@ -287,14 +287,14 @@ public final class HomeRemnant {
             if (entry == null) {
                 continue;
             }
-            if (!level.hasChunkAt(BlockPos.of(key))) {
+            if (!Terrain.isReady(level, BlockPos.of(key))) {
                 unloaded.accept(key, entry);
                 continue;
             }
             restore(level, key, entry);
         }
         for (HexTown.Kept entry : kept) {
-            if (level.hasChunkAt(BlockPos.containing(entry.at()))) {
+            if (Terrain.isReady(level, BlockPos.containing(entry.at()))) {
                 HexTown.setDown(level, entry);
             } else {
                 unloadedKept.accept(entry);

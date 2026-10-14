@@ -444,7 +444,7 @@ public final class Restyle {
             for (int dz = -SITE_REACH; dz <= SITE_REACH; dz++) {
                 for (int dy = -3; dy <= 4; dy++) {
                     pos.set(at.getX() + dx, at.getY() + dy, at.getZ() + dz);
-                    if (level.hasChunkAt(pos) && !towns.test(pos.asLong()) && isBuilt(level, pos, level.getBlockState(pos))) {
+                    if (Terrain.isReady(level, pos) && !towns.test(pos.asLong()) && isBuilt(level, pos, level.getBlockState(pos))) {
                         starts.add(pos.immutable());
                         break;
                     }
@@ -838,7 +838,7 @@ public final class Restyle {
                             continue;
                         }
                         BlockPos next = new BlockPos(x, y, z);
-                        if (!level.hasChunkAt(next)) {
+                        if (!Terrain.isReady(level, next)) {
                             continue;
                         }
                         if (isBuilt(level, next, level.getBlockState(next))) {

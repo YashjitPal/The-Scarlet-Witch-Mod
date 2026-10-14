@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
  * weren't loaded when they fell, and the towns fallen Hexes left behind, for their casters' next Hexes to raise again.
  * Also the homes fallen Hexes have left standing for now, glitching before they go.
  */
-public final class HexData extends SavedData {
+public final class HexData extends SavedData implements HexTown.Leftovers {
 
     private static final Codec<HexData> CURRENT = RecordCodecBuilder.create(i -> i.group(
             Hex.CODEC.listOf().fieldOf("hexes").forGetter(data -> List.copyOf(data.hexes.values())),
@@ -69,6 +69,8 @@ public final class HexData extends SavedData {
     private final Map<UUID, Hex> hexes = new LinkedHashMap<>();
     /** Town blocks waiting for their chunk to load to be put back. */
     private final Long2ObjectOpenHashMap<HexTown.Built> pending;
+    /** Where among {@link #pending} each chunk's blocks are, for them to go back as soon as it is loaded. */
+    private final Long2ObjectOpenHashMap<LongOpenHashSet> pendingByChunk = new Long2ObjectOpenHashMap<>();
     /** Paintings, armor stands and the like a town took up, waiting for their chunk to load to be set back down. */
     private final List<HexTown.Kept> pendingKept;
     /** The towns fallen Hexes left behind, oldest first. */
@@ -99,6 +101,9 @@ public final class HexData extends SavedData {
             hexes.put(hex.caster, hex);
         }
         this.pending = new Long2ObjectOpenHashMap<>(pending);
+        for (long key : this.pending.keySet()) {
+            indexPending(key);
+        }
         this.pendingKept = new ArrayList<>(pendingKept);
         this.towns = new ArrayList<>(towns);
         this.pendingPaint = new Long2ObjectOpenHashMap<>(pendingPaint);
@@ -194,6 +199,74 @@ public final class HexData extends SavedData {
 
     Long2ObjectOpenHashMap<HexTown.Built> pending() {
         return pending;
+    }
+
+    @Override
+    public void leave(long key, HexTown.Built entry) {
+        if (pending.put(key, entry) == null) {
+            indexPending(key);
+        }
+        setDirty();
+    }
+
+    /** Done with a block that was waiting to be put back. */
+    void putBack(long key) {
+        if (pending.remove(key) != null) {
+            long chunk = chunkOf(key);
+            LongOpenHashSet keys = pendingByChunk.get(chunk);
+            if (keys != null && keys.remove(key) && keys.isEmpty()) {
+                pendingByChunk.remove(chunk);
+            }
+            setDirty();
+        }
+    }
+
+    @Override
+    public void putBackWithin(ServerLevel level, int minX, int minZ, int maxX, int maxZ) {
+        if (pending.isEmpty()) {
+            return;
+        }
+        for (int cx = minX >> 4; cx <= maxX >> 4; cx++) {
+            for (int cz = minZ >> 4; cz <= maxZ >> 4; cz++) {
+                for (long key : pendingIn(chunk(cx, cz))) {
+                    int x = BlockPos.getX(key);
+                    int z = BlockPos.getZ(key);
+                    HexTown.Built entry = pending.get(key);
+                    if (entry != null && x >= minX && x <= maxX && z >= minZ && z <= maxZ && HexTown.putBackLeftover(level, key, entry)) {
+                        putBack(key);
+                    }
+                }
+            }
+        }
+    }
+
+    /** The chunks town blocks are waiting to go back in, packed as {@link #chunk} does. */
+    long[] pendingChunks() {
+        return pendingByChunk.keySet().toLongArray();
+    }
+
+    /** The town blocks waiting to go back in a chunk. */
+    long[] pendingIn(long chunk) {
+        LongOpenHashSet keys = pendingByChunk.get(chunk);
+        return keys == null ? new long[0] : keys.toLongArray();
+    }
+
+    static long chunk(int chunkX, int chunkZ) {
+        return (long) chunkX << 32 | chunkZ & 0xFFFFFFFFL;
+    }
+
+    private static long chunkOf(long key) {
+        return chunk(BlockPos.getX(key) >> 4, BlockPos.getZ(key) >> 4);
+    }
+
+    private void indexPending(long key) {
+        long chunk = chunkOf(key);
+        LongOpenHashSet keys = pendingByChunk.get(chunk);
+        if (keys == null) {
+            keys = new LongOpenHashSet();
+            pendingByChunk.put(chunk, keys);
+        }
+        keys.add(key);
     }
 
     List<HexTown.Kept> pendingKept() {

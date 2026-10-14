@@ -5,6 +5,7 @@ import com.yashjit.scarlet.hex.Hex;
 import com.yashjit.scarlet.hex.HexData;
 import com.yashjit.scarlet.hex.HexShape;
 import com.yashjit.scarlet.hex.Hexes;
+import com.yashjit.scarlet.hex.town.Terrain;
 import com.yashjit.scarlet.registry.ScarletDataComponents;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -221,7 +222,7 @@ public final class HexMade {
         while (entries.hasNext()) {
             Long2ObjectMap.Entry<UUID> entry = entries.next();
             BlockPos pos = BlockPos.of(entry.getLongKey());
-            if (!level.hasChunkAt(pos)) {
+            if (!Terrain.isReady(level, pos)) {
                 continue;
             }
             BlockState state = level.getBlockState(pos);

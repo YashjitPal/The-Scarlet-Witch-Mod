@@ -24,8 +24,12 @@ public final class HexShape {
      * How far out a point is, as a share of the way from the center to the wall it faces: under 1 inside.
      */
     public static double level(Vec3 center, float radius, Vec3 point) {
-        double x = point.x - center.x;
-        double z = point.z - center.z;
+        return level(center, radius, point.x, point.z);
+    }
+
+    public static double level(Vec3 center, float radius, double pointX, double pointZ) {
+        double x = pointX - center.x;
+        double z = pointZ - center.z;
         return Math.max(Math.abs(z), Math.max(Math.abs(COS_30 * x + 0.5 * z), Math.abs(COS_30 * x - 0.5 * z))) / radius;
     }
 

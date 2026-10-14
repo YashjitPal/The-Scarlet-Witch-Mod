@@ -103,7 +103,10 @@ public enum Role {
     LANE_DECK,
     LANE_PIER,
     LANE_RAIL,
-    LANE_DECK_STEP;
+    LANE_DECK_STEP,
+    /** The lining of a street's tunnel through a hill, and its ceiling. */
+    TUNNEL_WALL,
+    TUNNEL_CEILING;
 
     private static final Role[] VALUES = values();
 

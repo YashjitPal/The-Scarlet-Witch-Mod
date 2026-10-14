@@ -15,11 +15,14 @@ import com.yashjit.scarlet.hex.town.TownPlan.Kind;
 import com.yashjit.scarlet.hex.town.TownPlan.Part;
 import com.yashjit.scarlet.network.TownGlitchPayload;
 import com.yashjit.scarlet.platform.Services;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2LongMap;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -47,6 +50,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.RandomSource;
@@ -102,6 +107,15 @@ public final class HexTown {
     private static final int TRIGGER_INTERVAL = 4;
     private static final int STARTS_PER_TRIGGER = 3;
     private static final int RETRY_SKIPPED = 400;
+    /**
+     * Most parts out where no one is whose land is asked to be loaded at once, for them to be built as the Hex grows; how
+     * long one's land is given to come before another has its turn; and how often what builds there is kept loaded.
+     */
+    private static final int MAX_FETCHING = 2;
+    private static final int FETCH_PATIENCE = 400;
+    private static final int KEEP_LOADED_INTERVAL = 10;
+    /** No more land is asked for while the server's ticks take longer than this on average, in nanoseconds. */
+    private static final long FETCH_WHILE_UNDER_NANOS = 35_000_000L;
     /** How near a player must be to a slipping part to be shown it. */
     private static final double SLIP_SEEN_FROM = 160.0;
     /** Parts slip only this near someone, where they can be seen to. */
@@ -115,8 +129,16 @@ public final class HexTown {
     /** How far the town will cut a hill down, or fill a hollow in, to level a part. */
     private static final int MAX_CUT = 8;
     private static final int MAX_FILL = 6;
-    /** How far either way along a street the land is looked over to reckon where two stretches of it meet. */
-    private static final int MEETING_REACH = 12;
+    /** How far a run of street keeps to the land, either way from the even line along it. */
+    private static final int FOLLOW = 5;
+    /** How many columns either way the heights along a run of street are smoothed over. */
+    private static final int SMOOTH = 3;
+    /** Most stretches looked along for the crossing at either end of a run of street. */
+    private static final int RUN_REACH = 4;
+    /** Fewest columns a tunnel runs for: a shorter hill is cut through. */
+    private static final int SHORTEST_TUNNEL = 3;
+    /** Furthest a lot can lie over or under its sidewalk for what stands on it to be come to from the street. */
+    private static final int UNREACHABLE = Houses.FRONT_RISE + 3;
     /** Water deeper than this is a lake, a river or the sea, and the town leaves it be. */
     private static final int SHALLOW = 2;
     /** How far down through what stands on the land the town looks for the ground. */
@@ -133,9 +155,6 @@ public final class HexTown {
     private static final float WHOLE = Float.MAX_VALUE;
     /** Ticks the wall as players see it trails where it truly is, while it is resized. */
     private static final int SEEN_LAG = Hexes.GLIDE_TICKS;
-    /** How far in from the wall a sweep taking the town back looks ahead, and how often it looks again for new blocks. */
-    private static final float CUT_WINDOW = 24.0F;
-    private static final int CUT_REFRESH = 10;
     /** How long after the wall stops moving in its sweep is let go. */
     private static final int CUT_LINGER = 40;
     /** Most blocks put back each tick as the wall moves in, enough to keep up with it at its fastest. */
@@ -197,19 +216,23 @@ public final class HexTown {
             // towns from before homes were raised around their casters were laid out from where they stood
             Codec.INT.optionalFieldOf("home_shift", 0).forGetter(town -> town.homeShift),
             Recall.CODEC.forGetter(town -> new Recall(Optional.ofNullable(town.origin), Optional.ofNullable(town.home), town.reach,
-                    town.remembered, Optional.ofNullable(town.homeLot), town.endsToSave()))
+                    town.remembered, Optional.ofNullable(town.homeLot), town.endsToSave(), town.streetLevelsToSave(), town.plannedCrossingsToSave(),
+                    town.gardens.toIntArray()))
     ).apply(i, HexTown::load));
 
     /**
      * Where a town's grid is laid out from, where its home rose, how far out its wall has stood, the towns it gives way
-     * to, where its caster raised their home off its grid, and where each stretch of street laid along the land meets
-     * the road past its ends, saved with the rest; towns from before these were kept are laid out from their Hex's
-     * middle.
+     * to, where its caster raised their home off its grid, where each stretch of street laid along the land meets the
+     * road past its ends, and how high every stretch and crossing worked out with its run is to be laid, saved with
+     * the rest; towns from before these were kept are laid out from their Hex's middle.
      *
-     * @param ends each stretch's id, then the heights it meets the road at past its start and past its far end
+     * @param ends         each stretch's id, then the heights it meets the road at past its start and past its far end
+     * @param streetLevels each stretch's id, how many columns it has, then how high each is laid
+     * @param crossings    each crossing's id, then how high it is to be laid
+     * @param gardens      the lots laid out as gardens, their land not taking a house
      */
     private record Recall(Optional<BlockPos> origin, Optional<Vec3> home, float reach, List<TownMemory> remembered,
-                          Optional<TownPlan.HomeLot> homeLot, int[] ends) {
+                          Optional<TownPlan.HomeLot> homeLot, int[] ends, int[] streetLevels, int[] crossings, int[] gardens) {
 
         static final MapCodec<Recall> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 BlockPos.CODEC.optionalFieldOf("origin").forGetter(Recall::origin),
@@ -217,7 +240,10 @@ public final class HexTown {
                 Codec.FLOAT.optionalFieldOf("reach", 0.0F).forGetter(Recall::reach),
                 TownMemory.CODEC.listOf().optionalFieldOf("remembered", List.of()).forGetter(Recall::remembered),
                 TownPlan.HomeLot.CODEC.optionalFieldOf("home_lot").forGetter(Recall::homeLot),
-                INTS.optionalFieldOf("street_ends", new int[0]).forGetter(Recall::ends)
+                INTS.optionalFieldOf("street_ends", new int[0]).forGetter(Recall::ends),
+                INTS.optionalFieldOf("street_levels", new int[0]).forGetter(Recall::streetLevels),
+                INTS.optionalFieldOf("crossing_levels", new int[0]).forGetter(Recall::crossings),
+                INTS.optionalFieldOf("gardens", new int[0]).forGetter(Recall::gardens)
         ).apply(i, Recall::new));
     }
 
@@ -225,6 +251,11 @@ public final class HexTown {
     private final Direction forward;
     private final long seed;
     private final Long2ObjectOpenHashMap<Built> built = new Long2ObjectOpenHashMap<>();
+    /**
+     * Where each part's blocks are among {@link #built}, for a part to find its own without going through the whole
+     * town, which can run to hundreds of thousands of blocks. Kept by {@link #putBuilt} and {@link #removeBuilt}.
+     */
+    private final Int2ObjectOpenHashMap<LongOpenHashSet> byPart = new Int2ObjectOpenHashMap<>();
     /** The ground level each part was laid at, from when it was begun. */
     private final Int2IntOpenHashMap levels = new Int2IntOpenHashMap();
     /**
@@ -232,6 +263,15 @@ public final class HexTown {
      * the stretches either side of it to meet it there.
      */
     private final Int2LongOpenHashMap ends = new Int2LongOpenHashMap();
+    /**
+     * How high each column of a stretch of street is to be laid, worked out with its whole run from one crossing to
+     * the next, for every stretch of it to meet the next as each is begun.
+     */
+    private final Int2ObjectOpenHashMap<int[]> streetLevels = new Int2ObjectOpenHashMap<>();
+    /** How high crossings the runs meeting them were worked out to meet are to be laid, before they are begun. */
+    private final Int2IntOpenHashMap plannedCrossings = new Int2IntOpenHashMap();
+    /** Lots whose land won't take a house, at the edge of a drop or too steep, laid out as gardens instead. */
+    private final IntOpenHashSet gardens = new IntOpenHashSet();
     private final IntOpenHashSet finished = new IntOpenHashSet();
     /** Parts being built, and when they began. */
     private final Int2LongOpenHashMap started = new Int2LongOpenHashMap();
@@ -255,11 +295,14 @@ public final class HexTown {
     private long lastClosing;
     /** The town's blocks from the outside in, while the wall is moving in over them. */
     private @Nullable Sweep cut;
-    private float cutFloor;
-    private int cutVersion;
-    private long cutAt;
-    /** Counts every block the town puts down, so a sweep knows when it has missed some. */
-    private int version;
+    /** Blocks the town has put down since {@link #cut} was sorted, which it would miss. */
+    private final LongArrayList cutFresh = new LongArrayList();
+    /** When this tick's share of the server's time for the town runs out, in {@link System#nanoTime} nanoseconds. */
+    private long deadline = Long.MAX_VALUE;
+    /** Where what the wall takes back in chunks that aren't loaded goes, to be put back once they are. */
+    private @Nullable Leftovers leftovers;
+    /** Parts out where no one is whose land the town has asked to be loaded, to build them, and when it asked. */
+    private final Int2LongOpenHashMap fetching = new Int2LongOpenHashMap();
     /** Where bits of the town went back this tick, by two-by-two cell, with the lowest and highest y that went. */
     private final Long2LongOpenHashMap gone = new Long2LongOpenHashMap();
 
@@ -388,6 +431,9 @@ public final class HexTown {
         HexTown town = new HexTown(mode, forward.getAxis().isHorizontal() ? forward : Direction.NORTH, seed, era, homeShift,
                 recall.origin().orElse(null), recall.home().orElse(null), recall.reach(), recall.remembered(), recall.homeLot().orElse(null));
         blocks.into(town.built);
+        for (Long2ObjectMap.Entry<Built> entry : town.built.long2ObjectEntrySet()) {
+            town.index(entry.getLongKey(), entry.getValue().part());
+        }
         for (int id : finished) {
             town.finished.add(id);
         }
@@ -408,7 +454,44 @@ public final class HexTown {
         for (int k = 0; k + 2 < ends.length; k += 3) {
             town.ends.put(ends[k], pack(ends[k + 1], ends[k + 2]));
         }
+        int[] streetLevels = recall.streetLevels();
+        for (int k = 0; k + 1 < streetLevels.length; ) {
+            int id = streetLevels[k];
+            int count = streetLevels[k + 1];
+            if (count <= 0 || k + 2 + count > streetLevels.length) {
+                break;
+            }
+            town.streetLevels.put(id, Arrays.copyOfRange(streetLevels, k + 2, k + 2 + count));
+            k += 2 + count;
+        }
+        int[] crossings = recall.crossings();
+        for (int k = 0; k + 1 < crossings.length; k += 2) {
+            town.plannedCrossings.put(crossings[k], crossings[k + 1]);
+        }
+        for (int id : recall.gardens()) {
+            town.gardens.add(id);
+        }
         return town;
+    }
+
+    private int[] streetLevelsToSave() {
+        IntArrayList saved = new IntArrayList();
+        for (Int2ObjectMap.Entry<int[]> entry : streetLevels.int2ObjectEntrySet()) {
+            saved.add(entry.getIntKey());
+            saved.add(entry.getValue().length);
+            saved.addElements(saved.size(), entry.getValue());
+        }
+        return saved.toIntArray();
+    }
+
+    private int[] plannedCrossingsToSave() {
+        int[] saved = new int[plannedCrossings.size() * 2];
+        int k = 0;
+        for (Int2IntMap.Entry entry : plannedCrossings.int2IntEntrySet()) {
+            saved[k++] = entry.getIntKey();
+            saved[k++] = entry.getIntValue();
+        }
+        return saved;
     }
 
     private int[] endsToSave() {
@@ -633,12 +716,8 @@ public final class HexTown {
             return;
         }
         LongArrayList blocks = new LongArrayList();
-        for (Long2ObjectMap.Entry<Built> entry : built.long2ObjectEntrySet()) {
-            if (ids.contains(entry.getValue().part())) {
-                blocks.add(entry.getLongKey());
-            }
-        }
         for (int id : ids) {
+            blocks.addElements(blocks.size(), blocksOf(id));
             finished.remove(id);
             builds.remove(id);
             started.remove(id);
@@ -646,9 +725,7 @@ public final class HexTown {
             partial.remove(id);
             adopted.remove(id);
         }
-        long[] keys = blocks.toLongArray();
-        Long[] order = Arrays.stream(keys).boxed().toArray(Long[]::new);
-        Arrays.sort(order, (a, b) -> Integer.compare(BlockPos.getY(b), BlockPos.getY(a)));
+        long[] order = byHeight(blocks.toLongArray(), false);
         // after whatever was already on its way down, so the queue stays in order
         long from = takedown.isEmpty() ? now : Math.max(now, takedown.peekLast()[1]);
         for (int k = 0; k < order.length; k++) {
@@ -676,11 +753,16 @@ public final class HexTown {
      * @param eraFront how far out from the middle its era has spread since it last changed
      * @param caster   whose Hex it is
      * @param aloft    the caster, while they float in the middle of their rising home
+     * @param deadline when its share of this tick runs out, in {@link System#nanoTime} nanoseconds: whatever is left of
+     *                 building, taking down and making over carries on next tick
+     * @param leftovers where what the wall takes back in chunks that aren't loaded goes, to be put back once they are
      */
     public void tick(ServerLevel level, Vec3 hexCenter, float wall, float radius, Era era, float eraFront, boolean falling, UUID caster,
-                     @Nullable UUID aloft, long now) {
+                     @Nullable UUID aloft, long now, long deadline, Leftovers leftovers) {
         BlockPos center = BlockPos.containing(hexCenter);
         this.aloft = aloft;
+        this.deadline = deadline;
+        this.leftovers = leftovers;
         float seen = seen(wall, now);
         if (falling) {
             fall(level, hexCenter, wall);
@@ -694,9 +776,9 @@ public final class HexTown {
         if (!swept) {
             swept = true;
             IntOpenHashSet orphaned = new IntOpenHashSet();
-            for (Built block : built.values()) {
-                if (!orphaned.contains(block.part()) && part(center, block.part()) == null) {
-                    orphaned.add(block.part());
+            for (int id : byPart.keySet()) {
+                if (part(center, id) == null) {
+                    orphaned.add(id);
                 }
             }
             if (!orphaned.isEmpty()) {
@@ -752,19 +834,20 @@ public final class HexTown {
         if (cut == null && !closing || built.isEmpty()) {
             return;
         }
-        if (!closing && now - lastClosing > CUT_LINGER) {
+        boolean caughtUp = cut == null || cut.cursor >= cut.order.length || cut.reach[cut.cursor] <= wall;
+        if (!closing && now - lastClosing > CUT_LINGER && caughtUp) {
             cut = null;
+            cutFresh.clear();
             return;
         }
-        if (cut == null || wall < cutFloor + 1.0F || cutVersion != version && now - cutAt >= CUT_REFRESH) {
-            cutFloor = Math.max(0.0F, wall - CUT_WINDOW);
-            cut = Sweep.outsideIn(built, hexCenter, cutFloor);
-            cutVersion = version;
-            cutAt = now;
+        if (cut == null) {
+            // sorted once, however far it is drawn in, and kept up with what goes up meanwhile
+            cut = Sweep.outsideIn(built, hexCenter);
+            cutFresh.clear();
         }
         int budget = CUT_BUDGET;
         boolean any = false;
-        while (cut.cursor < cut.order.length && budget > 0) {
+        while (cut.cursor < cut.order.length && budget > 0 && !outOfTime()) {
             int at = cut.cursor;
             if (cut.reach[at] <= wall) {
                 break;
@@ -773,6 +856,22 @@ public final class HexTown {
             long key = cut.order[at];
             Built entry = built.get(key);
             if (entry != null && restore(level, key, entry)) {
+                budget--;
+                gone(key);
+                any = true;
+            }
+        }
+        // and whatever has gone up since the sweep was sorted, once the wall has passed it too
+        for (int k = cutFresh.size() - 1; k >= 0 && budget > 0 && !outOfTime(); k--) {
+            long key = cutFresh.getLong(k);
+            Built entry = built.get(key);
+            float reach = reachOf(hexCenter, key);
+            if (entry != null && reach <= wall) {
+                continue;
+            }
+            cutFresh.set(k, cutFresh.getLong(cutFresh.size() - 1));
+            cutFresh.removeLong(cutFresh.size() - 1);
+            if (entry != null && reach > wall && restore(level, key, entry)) {
                 budget--;
                 gone(key);
                 any = true;
@@ -845,6 +944,10 @@ public final class HexTown {
         boolean settled = mode.isTown() && wall >= radius - 0.01F && now - radiusChangedAt >= SETTLE_TICKS;
         int starts = 0;
         for (Part part : plan(center).parts()) {
+            if (outOfTime()) {
+                // the rest wait for the next tick there is time for them
+                return;
+            }
             int id = part.id();
             if (finished.contains(id) || started.containsKey(id) || builds.containsKey(id)) {
                 if (finished.contains(id) && partial.containsKey(id) && !adopted.contains(id) && wall > partial.get(id) + 1.0F
@@ -852,6 +955,7 @@ public final class HexTown {
                     // the wall has moved out past a garden or a street's end: build it out to where the wall is now, as
                     // soon as the wall has passed all of it, or wherever the wall comes to rest
                     float clip = TownPlan.fits(part, hexCenter, wall, center.getY()) ? WHOLE : wall;
+                    putBackLeftovers(level, part);
                     Survey survey = survey(level, part, hexCenter, clip);
                     if (survey != null) {
                         finished.remove(id);
@@ -876,9 +980,29 @@ public final class HexTown {
                 clip = wall;
             }
             if (!isLoaded(level, part)) {
+                fetch(level, part, now);
                 continue;
             }
+            fetching.remove(id);
+            if (part.kind() == Kind.HOUSE && clip == WHOLE) {
+                // a lot waits for its street to be worked out, to be laid near its height
+                Part street = frontStreet(center, part);
+                if (street != null && laidStretch(street) == null && !isLoaded(level, street)) {
+                    fetch(level, street, now);
+                    continue;
+                }
+            }
+            putBackLeftovers(level, part);
             Survey survey = survey(level, part, hexCenter, clip);
+            if (survey == null && part.kind() == Kind.HOUSE && gardens.add(id)) {
+                // land a house won't go on is still the town's: a garden, as much of it as will take one
+                survey = survey(level, part, hexCenter, clip);
+                if (survey == null) {
+                    gardens.remove(id);
+                } else {
+                    changed = true;
+                }
+            }
             if (survey == null) {
                 skipped.add(id);
                 continue;
@@ -957,10 +1081,10 @@ public final class HexTown {
             planned.add(piece.pos().asLong());
         }
         List<Piece> clearing = new ArrayList<>();
-        for (Long2ObjectMap.Entry<Built> entry : built.long2ObjectEntrySet()) {
-            Built block = entry.getValue();
-            if (block.part() == part.id() && block.role() != Role.CLEAR && block.role() != Role.PRESERVE && !planned.contains(entry.getLongKey())) {
-                clearing.add(new Piece(BlockPos.of(entry.getLongKey()), Role.CLEAR, 0, AIR, 0, 0));
+        for (long key : blocksOf(part.id())) {
+            Built block = built.get(key);
+            if (block != null && block.role() != Role.CLEAR && block.role() != Role.PRESERVE && !planned.contains(key)) {
+                clearing.add(new Piece(BlockPos.of(key), Role.CLEAR, 0, AIR, 0, 0));
             }
         }
         int top = survey.ground();
@@ -1106,7 +1230,7 @@ public final class HexTown {
     /**
      * Picks up builds that were under way when the world was last saved.
      */
-    private void resume(ServerLevel level, BlockPos center, Vec3 hexCenter) {
+    private void resume(ServerLevel level, BlockPos center, Vec3 hexCenter, long now) {
         if (started.isEmpty() || started.size() == builds.size()) {
             return;
         }
@@ -1115,9 +1239,14 @@ public final class HexTown {
                 continue;
             }
             Part part = part(center, id);
-            if (part == null || !isLoaded(level, part)) {
+            if (part == null) {
                 continue;
             }
+            if (!isLoaded(level, part)) {
+                fetch(level, part, now);
+                continue;
+            }
+            fetching.remove(id);
             if (adopted.contains(id)) {
                 // what is left of making over a building can't be worked out again once it is under way
                 started.remove(id);
@@ -1144,15 +1273,21 @@ public final class HexTown {
      *             as everything building then fit inside it when it began
      */
     private int advance(ServerLevel level, BlockPos center, Vec3 hexCenter, float wall, Era era, long now, int budget) {
-        resume(level, center, hexCenter);
+        resume(level, center, hexCenter, now);
+        if (now % KEEP_LOADED_INTERVAL == 0) {
+            // what builds where no one is stays loaded until it is done
+            for (Build build : builds.values()) {
+                keepLoaded(level, build.part);
+            }
+        }
         Iterator<Build> iterator = builds.values().iterator();
-        while (iterator.hasNext() && budget > 0) {
+        while (iterator.hasNext() && budget > 0 && !outOfTime()) {
             Build build = iterator.next();
             long elapsed = now - build.start;
             if (build.part.kind() == Kind.HOME) {
                 announce(level, build, elapsed, era);
             }
-            while (build.next < build.pieces.size() && budget > 0) {
+            while (build.next < build.pieces.size() && budget > 0 && !outOfTime()) {
                 Piece piece = build.pieces.get(build.next);
                 if (piece.tick() > elapsed) {
                     break;
@@ -1164,7 +1299,6 @@ public final class HexTown {
                 }
                 if (place(level, build, piece, era)) {
                     budget--;
-                    version++;
                 }
             }
             if (build.next >= build.pieces.size()) {
@@ -1214,7 +1348,7 @@ public final class HexTown {
     private static void park(ServerLevel level, List<Blueprint.Car> cars) {
         for (Blueprint.Car car : cars) {
             AABB spot = new AABB(car.at().x - 1.5, car.at().y - 0.5, car.at().z - 1.5, car.at().x + 1.5, car.at().y + 2.0, car.at().z + 1.5);
-            if (level.hasChunkAt(BlockPos.containing(car.at())) && level.getEntitiesOfClass(ParkedCar.class, spot).isEmpty()) {
+            if (Terrain.isReady(level, BlockPos.containing(car.at())) && level.getEntitiesOfClass(ParkedCar.class, spot).isEmpty()) {
                 ParkedCar.park(level, car.at(), car.facing().toYRot(), car.paint(), true);
             }
         }
@@ -1227,7 +1361,7 @@ public final class HexTown {
      */
     private boolean place(ServerLevel level, Build build, Piece piece, Era era) {
         BlockPos pos = piece.pos();
-        if (!level.hasChunkAt(pos)) {
+        if (!Terrain.isReady(level, pos)) {
             return false;
         }
         if (piece.role() == Role.CLEAR) {
@@ -1343,7 +1477,7 @@ public final class HexTown {
                 return false;
             }
             // the town's own block, or leaves it was holding fast: cleared, still remembering what first stood here
-            built.put(key, new Built(existing.original(), Role.CLEAR, 0, part, existing.data()));
+            putBuilt(key, new Built(existing.original(), Role.CLEAR, 0, part, existing.data()));
             level.setBlock(pos, AIR, CLEAR_FLAGS);
             changed = true;
             return true;
@@ -1356,7 +1490,7 @@ public final class HexTown {
         if (entity != null) {
             data = entity.saveWithFullMetadata(level.registryAccess());
         }
-        built.put(key, new Built(HexPaint.unpainted(level, pos, current), Role.CLEAR, 0, part, data));
+        putBuilt(key, new Built(HexPaint.unpainted(level, pos, current), Role.CLEAR, 0, part, data));
         level.setBlock(pos, AIR, CLEAR_FLAGS);
         if (current.is(BlockTags.LOGS)) {
             holdLeaves(level, pos, part);
@@ -1384,7 +1518,7 @@ public final class HexTown {
         if (shaped.isAir() || shaped == current) {
             return false;
         }
-        built.put(key, new Built(HexPaint.unpainted(level, pos, current), piece.role(), piece.paint(), build.part.id()));
+        putBuilt(key, new Built(HexPaint.unpainted(level, pos, current), piece.role(), piece.paint(), build.part.id()));
         level.setBlock(pos, shaped, QUIET_FLAGS);
         build.restyled.add(key);
         changed = true;
@@ -1398,7 +1532,7 @@ public final class HexTown {
     private static void reshape(ServerLevel level, LongArrayList positions) {
         for (long key : positions.toLongArray()) {
             BlockPos pos = BlockPos.of(key);
-            if (!level.hasChunkAt(pos)) {
+            if (!Terrain.isReady(level, pos)) {
                 continue;
             }
             BlockState state = level.getBlockState(pos);
@@ -1434,7 +1568,7 @@ public final class HexTown {
             for (Direction direction : Direction.values()) {
                 BlockPos next = at.relative(direction);
                 if (next.distManhattan(trunk) > LEAF_REACH * 2 || Math.abs(next.getX() - trunk.getX()) > LEAF_REACH
-                        || Math.abs(next.getZ() - trunk.getZ()) > LEAF_REACH || !seen.add(next.asLong()) || !level.hasChunkAt(next)) {
+                        || Math.abs(next.getZ() - trunk.getZ()) > LEAF_REACH || !seen.add(next.asLong()) || !Terrain.isReady(level, next)) {
                     continue;
                 }
                 BlockState state = level.getBlockState(next);
@@ -1443,7 +1577,7 @@ public final class HexTown {
                 }
                 queue.add(next);
                 if (!built.containsKey(next.asLong())) {
-                    built.put(next.asLong(), new Built(state, Role.PRESERVE, 0, part));
+                    putBuilt(next.asLong(), new Built(state, Role.PRESERVE, 0, part));
                     level.setBlock(next, state.setValue(LeavesBlock.PERSISTENT, true), CLEAR_FLAGS);
                     held++;
                 }
@@ -1502,7 +1636,7 @@ public final class HexTown {
             if (!all && standing || outside > 0.0F && HexShape.level(hexCenter, 1.0F, entry.at()) < outside) {
                 continue;
             }
-            boolean loaded = level.hasChunkAt(BlockPos.containing(entry.at()));
+            boolean loaded = Terrain.isReady(level, BlockPos.containing(entry.at()));
             if (!loaded && unloaded == null) {
                 continue;
             }
@@ -1528,10 +1662,6 @@ public final class HexTown {
     }
 
     /**
-     * Remembers what stood somewhere before the town built there. A plant two blocks tall is remembered whole, since
-     * taking either half takes both.
-     */
-    /**
      * Makes a spot a piece's, about to be put down there: remembering what stands there now if the town hasn't touched
      * it yet, or else taking on the piece's part and role, as the door its caster steps out of is found by them, and
      * still remembering what first stood there and anything kept in it.
@@ -1541,18 +1671,111 @@ public final class HexTown {
         if (existing == null) {
             record(level, pos, now, piece, part);
         } else if (existing.part() != part || existing.role() != piece.role() || existing.paint() != piece.paint()) {
-            built.put(pos.asLong(), new Built(existing.original(), piece.role(), piece.paint(), part, existing.data()));
+            putBuilt(pos.asLong(), new Built(existing.original(), piece.role(), piece.paint(), part, existing.data()));
         }
     }
 
+    /**
+     * Remembers what stood somewhere before the town built there. A plant two blocks tall is remembered whole, since
+     * taking either half takes both.
+     */
     private void record(ServerLevel level, BlockPos pos, BlockState original, Piece piece, int part) {
-        built.put(pos.asLong(), new Built(HexPaint.unpainted(level, pos, original), piece.role(), piece.paint(), part));
+        putBuilt(pos.asLong(), new Built(HexPaint.unpainted(level, pos, original), piece.role(), piece.paint(), part));
         if (original.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)) {
             BlockPos other = original.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.LOWER ? pos.above() : pos.below();
             long otherKey = other.asLong();
             if (!built.containsKey(otherKey)) {
-                built.put(otherKey, new Built(level.getBlockState(other), Role.CLEAR, 0, part));
+                putBuilt(otherKey, new Built(level.getBlockState(other), Role.CLEAR, 0, part));
             }
+        }
+    }
+
+    /** Makes a spot the town's, or changes what it is to the town, keeping {@link #byPart} in step. */
+    private void putBuilt(long key, Built entry) {
+        Built old = built.put(key, entry);
+        if (old == null) {
+            index(key, entry.part());
+            if (cut != null) {
+                cutFresh.add(key);
+            }
+        } else if (old.part() != entry.part()) {
+            unindex(key, old.part());
+            index(key, entry.part());
+        }
+    }
+
+    private @Nullable Built removeBuilt(long key) {
+        Built old = built.remove(key);
+        if (old != null) {
+            unindex(key, old.part());
+        }
+        return old;
+    }
+
+    private void index(long key, int part) {
+        LongOpenHashSet keys = byPart.get(part);
+        if (keys == null) {
+            keys = new LongOpenHashSet();
+            byPart.put(part, keys);
+        }
+        keys.add(key);
+    }
+
+    private void unindex(long key, int part) {
+        LongOpenHashSet keys = byPart.get(part);
+        if (keys != null && keys.remove(key) && keys.isEmpty()) {
+            byPart.remove(part);
+        }
+    }
+
+    /** Where a part's blocks are, as a copy that changing them leaves alone. */
+    private long[] blocksOf(int part) {
+        LongOpenHashSet keys = byPart.get(part);
+        return keys == null ? new long[0] : keys.toLongArray();
+    }
+
+    /** Whether this tick's share of the server's time for the town has run out. */
+    private boolean outOfTime() {
+        return System.nanoTime() > deadline;
+    }
+
+    /**
+     * Asks for the land of a part out where no one is to be loaded, for it to be built as the Hex grows out over it
+     * rather than once someone goes there: a few parts at a time, the rest waiting their turn.
+     */
+    private void fetch(ServerLevel level, Part part, long now) {
+        long asked = fetching.getOrDefault(part.id(), Long.MIN_VALUE);
+        if (asked == Long.MIN_VALUE) {
+            // making new land is hard work for the server: only so much at once, and only while it has time to spare
+            if (fetching.size() >= MAX_FETCHING || level.getServer().getAverageTickTimeNanos() > FETCH_WHILE_UNDER_NANOS) {
+                return;
+            }
+            fetching.put(part.id(), now);
+        } else if (now - asked > FETCH_PATIENCE) {
+            // its land never came; another's turn, and its own again later
+            fetching.remove(part.id());
+            return;
+        }
+        keepLoaded(level, part);
+    }
+
+    /**
+     * Keeps a part's land loaded a moment longer: while it is fetched, or while it builds where no one is to keep it
+     * loaded.
+     */
+    private static void keepLoaded(ServerLevel level, Part part) {
+        // a chunk round it too, for what is put down at its edge to read and update its neighbors there
+        for (int cx = (part.minX() >> 4) - 1; cx <= (part.maxX() >> 4) + 1; cx++) {
+            for (int cz = (part.minZ() >> 4) - 1; cz <= (part.maxZ() >> 4) + 1; cz++) {
+                level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_SPAWN, new ChunkPos(cx, cz), 0);
+            }
+        }
+    }
+
+    /** Puts back first whatever a town left on a part's ground where it couldn't then, for the part to go up on the land. */
+    private void putBackLeftovers(ServerLevel level, Part part) {
+        if (leftovers != null) {
+            leftovers.putBackWithin(level, part.minX(), part.minZ(), part.maxX(), part.maxZ());
         }
     }
 
@@ -1615,23 +1838,10 @@ public final class HexTown {
             forgetLevel(id);
             partial.remove(id);
             adopted.remove(id);
-            LongArrayList blocks = new LongArrayList();
-            for (Long2ObjectMap.Entry<Built> entry : built.long2ObjectEntrySet()) {
-                if (entry.getValue().part() == id) {
-                    blocks.add(entry.getLongKey());
-                }
-            }
             // from the wall inward, over a moment
-            long[] keys = blocks.toLongArray();
-            float[] reach = new float[keys.length];
-            Integer[] order = new Integer[keys.length];
-            for (int k = 0; k < keys.length; k++) {
-                reach[k] = (float) HexShape.level(hexCenter, 1.0F, Vec3.atCenterOf(BlockPos.of(keys[k])));
-                order[k] = k;
-            }
-            Arrays.sort(order, (a, b) -> Float.compare(reach[b], reach[a]));
-            for (int k = 0; k < order.length; k++) {
-                takedown.add(new long[] {keys[order[k]], now + (long) TAKEDOWN_TICKS * k / Math.max(1, order.length)});
+            Sweep order = Sweep.sorted(blocksOf(id), hexCenter, false, 0.0F);
+            for (int k = 0; k < order.order.length; k++) {
+                takedown.add(new long[] {order.order[k], now + (long) TAKEDOWN_TICKS * k / Math.max(1, order.order.length)});
             }
             changed = true;
         }
@@ -1641,7 +1851,7 @@ public final class HexTown {
         if (takedown.isEmpty()) {
             return budget;
         }
-        while (!takedown.isEmpty() && budget > 0 && takedown.peek()[1] <= now) {
+        while (!takedown.isEmpty() && budget > 0 && takedown.peek()[1] <= now && !outOfTime()) {
             long key = takedown.poll()[0];
             Built built = this.built.get(key);
             if (built != null && restore(level, key, built)) {
@@ -1657,7 +1867,8 @@ public final class HexTown {
     }
 
     /**
-     * Brings the town down behind the wall as it rushes in.
+     * Brings the town down behind the wall as it rushes in. A town too big to keep up with the wall goes on coming down
+     * a moment after it has gone in, rather than all at once.
      */
     private void fall(ServerLevel level, Vec3 hexCenter, float wall) {
         builds.clear();
@@ -1666,7 +1877,7 @@ public final class HexTown {
             collapse = Sweep.outsideIn(built, hexCenter);
         }
         int budget = COLLAPSE_BUDGET;
-        while (collapse.cursor < collapse.order.length && budget > 0) {
+        while (collapse.cursor < collapse.order.length && budget > 0 && !outOfTime()) {
             int at = collapse.cursor;
             if (collapse.reach[at] < wall) {
                 break;
@@ -1682,6 +1893,14 @@ public final class HexTown {
         if (!kept.isEmpty() && wall > 0.0F) {
             putBackKept(level, true, hexCenter, wall + 2.0F, null);
         }
+    }
+
+    /**
+     * Whether the falling wall has taken back everything of the town it has passed, as far as loaded chunks go, for the
+     * Hex to be gone: what lies in the rest goes back when they are loaded.
+     */
+    public boolean hasFallen() {
+        return collapse != null && collapse.cursor >= collapse.order.length;
     }
 
     /**
@@ -1705,10 +1924,8 @@ public final class HexTown {
         int id = home.id();
         if (homeReach < 0.0F) {
             homeReach = 0.0F;
-            for (Long2ObjectMap.Entry<Built> entry : built.long2ObjectEntrySet()) {
-                if (entry.getValue().part() == id) {
-                    homeReach = Math.max(homeReach, (float) HexShape.level(hexCenter, 1.0F, Vec3.atCenterOf(BlockPos.of(entry.getLongKey()))));
-                }
+            for (long key : blocksOf(id)) {
+                homeReach = Math.max(homeReach, reachOf(hexCenter, key));
             }
         }
         if (wall > homeReach + 1.0F) {
@@ -1758,16 +1975,14 @@ public final class HexTown {
         int id = home.id();
         homeLeft = true;
         Long2ObjectOpenHashMap<Built> blocks = new Long2ObjectOpenHashMap<>();
-        for (Long2ObjectMap.Entry<Built> entry : built.long2ObjectEntrySet()) {
-            if (entry.getValue().part() == id) {
-                blocks.put(entry.getLongKey(), entry.getValue());
+        for (long key : blocksOf(id)) {
+            Built entry = removeBuilt(key);
+            if (entry != null) {
+                blocks.put(key, entry);
             }
         }
         if (blocks.isEmpty()) {
             return null;
-        }
-        for (long key : blocks.keySet()) {
-            built.remove(key);
         }
         List<Kept> keptThere = new ArrayList<>();
         Iterator<Kept> keeping = kept.iterator();
@@ -1812,23 +2027,21 @@ public final class HexTown {
         builds.clear();
         started.clear();
         takedown.clear();
-        long[] keys = built.keySet().toLongArray();
         // bottom up, so plants come back onto their ground
-        Long[] boxed = Arrays.stream(keys).boxed().toArray(Long[]::new);
-        Arrays.sort(boxed, (a, b) -> Integer.compare(BlockPos.getY(a), BlockPos.getY(b)));
-        for (long key : boxed) {
+        for (long key : byHeight(built.keySet().toLongArray(), true)) {
             Built entry = built.get(key);
             if (entry == null) {
                 continue;
             }
-            if (!level.hasChunkAt(BlockPos.of(key))) {
-                built.remove(key);
+            if (!Terrain.isReady(level, BlockPos.of(key))) {
+                removeBuilt(key);
                 unloaded.accept(key, entry);
                 continue;
             }
             restore(level, key, entry);
         }
         built.clear();
+        byPart.clear();
         finished.clear();
         partial.clear();
         adopted.clear();
@@ -1843,10 +2056,17 @@ public final class HexTown {
      */
     private boolean restore(ServerLevel level, long key, Built entry) {
         BlockPos pos = BlockPos.of(key);
-        if (!level.hasChunkAt(pos)) {
+        if (!Terrain.isReady(level, pos)) {
+            if (leftovers != null) {
+                // passed where no one is: it goes back as soon as its chunk is loaded again, rather than staying the
+                // town's outside its wall
+                removeBuilt(key);
+                leftovers.leave(key, entry);
+                changed = true;
+            }
             return false;
         }
-        built.remove(key);
+        removeBuilt(key);
         changed = true;
         BlockState current = level.getBlockState(pos);
         if (!isStill(entry, current) && !HexPaint.paintedOver(level, pos, current)) {
@@ -1856,7 +2076,7 @@ public final class HexTown {
         // the other half of a tall plant, a door or a bed comes back with it
         if (entry.original().hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)) {
             BlockPos other = entry.original().getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.LOWER ? pos.above() : pos.below();
-            Built pair = built.remove(other.asLong());
+            Built pair = removeBuilt(other.asLong());
             if (pair != null) {
                 BlockState otherNow = level.getBlockState(other);
                 if (isStill(pair, otherNow)) {
@@ -1888,7 +2108,7 @@ public final class HexTown {
      */
     public static boolean putBackLeftover(ServerLevel level, long key, Built entry) {
         BlockPos pos = BlockPos.of(key);
-        if (!level.hasChunkAt(pos)) {
+        if (!Terrain.isReady(level, pos)) {
             return false;
         }
         BlockState current = level.getBlockState(pos);
@@ -1936,7 +2156,7 @@ public final class HexTown {
             restyle.start = now;
         }
         Sweep sweep = restyle;
-        while (sweep.cursor < sweep.order.length && budget > 0) {
+        while (sweep.cursor < sweep.order.length && budget > 0 && !outOfTime()) {
             int at = sweep.cursor;
             if (sweep.reach[at] > front) {
                 break;
@@ -1948,7 +2168,7 @@ public final class HexTown {
                 continue;
             }
             BlockPos pos = BlockPos.of(key);
-            if (!level.hasChunkAt(pos)) {
+            if (!Terrain.isReady(level, pos)) {
                 continue;
             }
             BlockState current = level.getBlockState(pos);
@@ -1976,9 +2196,9 @@ public final class HexTown {
         }
         if (sweep.cursor >= sweep.order.length) {
             // a block's connections can only be worked out once its neighbors have changed too
-            for (long key : sweep.touched.toLongArray()) {
-                BlockPos pos = BlockPos.of(key);
-                if (!level.hasChunkAt(pos)) {
+            while (sweep.reshaped < sweep.touched.size() && !outOfTime()) {
+                BlockPos pos = BlockPos.of(sweep.touched.getLong(sweep.reshaped++));
+                if (!Terrain.isReady(level, pos)) {
                     continue;
                 }
                 BlockState state = level.getBlockState(pos);
@@ -1990,9 +2210,11 @@ public final class HexTown {
                     level.setBlock(pos, shaped, QUIET_FLAGS);
                 }
             }
-            builtEra = era;
-            restyle = null;
-            changed = true;
+            if (sweep.reshaped >= sweep.touched.size()) {
+                builtEra = era;
+                restyle = null;
+                changed = true;
+            }
         }
     }
 
@@ -2039,12 +2261,12 @@ public final class HexTown {
         int ground = levels.getOrDefault(id, Integer.MIN_VALUE);
         LongArrayList positions = new LongArrayList();
         IntArrayList states = new IntArrayList();
-        for (var entry : built.long2ObjectEntrySet()) {
-            Built block = entry.getValue();
-            if (block.part() != id || block.role() == Role.PRESERVE) {
+        for (long key : blocksOf(id)) {
+            Built block = built.get(key);
+            if (block == null || block.role() == Role.PRESERVE) {
                 continue;
             }
-            BlockPos pos = BlockPos.of(entry.getLongKey());
+            BlockPos pos = BlockPos.of(key);
             BlockState current = level.getBlockState(pos);
             BlockState shown;
             if (block.role() == Role.CLEAR) {
@@ -2066,7 +2288,7 @@ public final class HexTown {
                 shown = EraStyle.state(block.role(), era, block.paint(), current);
             }
             if (shown != current) {
-                positions.add(entry.getLongKey());
+                positions.add(key);
                 states.add(Block.getId(shown));
             }
         }
@@ -2164,18 +2386,19 @@ public final class HexTown {
         return survey == null ? OptionalInt.empty() : OptionalInt.of(survey.ground());
     }
 
+    /**
+     * Whether a part's land is loaded, and the land a chunk round it: a block put down at its edge reads and updates its
+     * neighbors, and one of them in a chunk not wholly loaded holds the server up until that chunk is made.
+     */
     private boolean isLoaded(ServerLevel level, Part part) {
-        boolean loaded = level.hasChunkAt(new BlockPos(part.minX(), 0, part.minZ())) && level.hasChunkAt(new BlockPos(part.maxX(), 0, part.maxZ()))
-                && level.hasChunkAt(new BlockPos(part.minX(), 0, part.maxZ())) && level.hasChunkAt(new BlockPos(part.maxX(), 0, part.minZ()));
-        if (!loaded || !graded(part)) {
-            return loaded;
+        for (int cx = (part.minX() >> 4) - 1; cx <= (part.maxX() >> 4) + 1; cx++) {
+            for (int cz = (part.minZ() >> 4) - 1; cz <= (part.maxZ() >> 4) + 1; cz++) {
+                if (!Terrain.isReady(level, cx, cz)) {
+                    return false;
+                }
+            }
         }
-        // and the land round either end of a stretch of street, that where it meets the next is reckoned from
-        Frame frame = new Frame(part.origin(), part.front());
-        int far = part.width() + MEETING_REACH - 1;
-        int across = TownPlan.STREET_WIDTH - 1;
-        return level.hasChunkAt(frame.at(-MEETING_REACH, 0, 0)) && level.hasChunkAt(frame.at(-MEETING_REACH, across, 0))
-                && level.hasChunkAt(frame.at(far, 0, 0)) && level.hasChunkAt(frame.at(far, across, 0));
+        return true;
     }
 
     /**
@@ -2210,44 +2433,137 @@ public final class HexTown {
                 }
             }
         }
-        boolean graded = graded(part);
-        boolean forgiving = part.kind().isStreet() || clip != WHOLE;
-        if (count == 0 && !graded || !forgiving && count < inside) {
+        boolean road = graded(part) || part.kind() == Kind.CROSSING;
+        boolean forgiving = part.kind().isStreet() || clip != WHOLE || gardens.contains(part.id());
+        if (count == 0 && !road) {
             return null;
         }
         int[] sorted = Arrays.copyOf(land, count);
         Arrays.sort(sorted);
         int ground = count == 0 ? BlockPos.containing(hexCenter).getY() : sorted[count / 2];
         boolean[] blocked = new boolean[columns.length];
-        if (graded) {
-            // laid along the land rather than level: what it can't be laid on is worked out with how it runs
+        if (road) {
+            // laid along the land, over a drop or water and through a hill: only what can't be broken is left alone
+            int unbreakable = 0;
             for (int index = 0; index < columns.length; index++) {
-                blocked[index] = columns[index] == null;
+                Terrain.Column column = columns[index];
+                blocked[index] = column == null || column.untouchable();
+                unbreakable += column != null && column.untouchable() ? 1 : 0;
             }
-            Streets.Profile profile = profile(level, hexCenter, part, columns, blocked);
-            return profile == null ? null : new Survey(ground, columns, blocked, width, profile);
+            if (inside == 0 || unbreakable * 2 > inside) {
+                return null;
+            }
+            Streets.Profile profile = graded(part) ? profile(level, hexCenter, part, columns) : crossingProfile(level, hexCenter, part, columns);
+            return new Survey(graded(part) ? ground : profile.levels()[0], columns, blocked, width, profile, null);
         }
-        int blockedCount = 0;
+        int[] sidewalk = part.kind() == Kind.HOUSE && clip == WHOLE && !gardens.contains(part.id()) ? sidewalk(level, hexCenter, part) : null;
+        if (sidewalk != null) {
+            // laid near its street's height, for its front to come down to the sidewalk, or up to it, in a few steps:
+            // anything but a house within a step of it. Where the land won't have that, as it was
+            int at = sidewalk[width / 2];
+            boolean house = zoning().getOrDefault(part.id(), Use.HOUSE) == Use.HOUSE;
+            int near = Math.clamp(ground, at - (house ? Houses.FRONT_DROP : 1), at + (house ? Houses.FRONT_RISE : 1));
+            if (near != ground && fits(columns, width, depth, near, inside, forgiving, blocked)) {
+                return new Survey(near, columns, blocked, width, null, sidewalk);
+            }
+            if (Math.abs(ground - at) > UNREACHABLE) {
+                // its street goes by far over it, on a bridge, or far under it, in a cutting: nothing on it could be come
+                // to, so it is laid out as a garden instead
+                return null;
+            }
+        }
+        return fits(columns, width, depth, ground, inside, forgiving, blocked) ? new Survey(ground, columns, blocked, width, null, sidewalk) : null;
+    }
+
+    /**
+     * Whether a part laid at a height can go on its land: a house needs every column of its lot, a garden or anything
+     * the wall cuts through only most of them. A hole in a lot, a pit or a cave's mouth, is capped over like the town's
+     * ground anywhere, as long as there isn't too much of it; where most of a side of the lot falls away, it is the edge
+     * of a drop instead.
+     *
+     * @param blocked filled in with the columns it leaves alone
+     */
+    private static boolean fits(Terrain.@Nullable Column[] columns, int width, int depth, int ground, int inside, boolean forgiving,
+                                boolean[] blocked) {
+        Arrays.fill(blocked, false);
+        // how much of each side falls away: front, back, left, right
+        int[] sides = new int[4];
+        for (int index = 0; index < columns.length; index++) {
+            if (columns[index] != null && falls(columns[index], ground)) {
+                int a = index % width;
+                int b = index / width;
+                sides[0] += b == 0 ? 1 : 0;
+                sides[1] += b == depth - 1 ? 1 : 0;
+                sides[2] += a == 0 ? 1 : 0;
+                sides[3] += a == width - 1 ? 1 : 0;
+            }
+        }
+        boolean drop = sides[0] * 2 > width || sides[1] * 2 > width || sides[2] * 2 > depth || sides[3] * 2 > depth;
+        int left = 0;
+        int holes = 0;
         for (int index = 0; index < columns.length; index++) {
             Terrain.Column column = columns[index];
             if (column == null) {
                 blocked[index] = true;
                 continue;
             }
-            boolean usable = column.isLand(SHALLOW) && !column.untouchable() && column.surface() - ground <= MAX_CUT
+            boolean hole = !drop && falls(column, ground);
+            boolean usable = hole || column.isLand(SHALLOW) && !column.untouchable() && column.surface() - ground <= MAX_CUT
                     && ground - column.surface() <= MAX_FILL;
+            holes += hole ? 1 : 0;
             if (!usable) {
                 if (!forgiving) {
-                    return null;
+                    return false;
                 }
                 blocked[index] = true;
-                blockedCount++;
+                left++;
             }
         }
-        if (blockedCount * 2 > inside) {
+        return left * 2 <= inside && holes * 10 <= inside * 3;
+    }
+
+    /** The stretch of street a lot faces, if it faces one. */
+    private @Nullable Part frontStreet(BlockPos center, Part lot) {
+        Part street = streetAt(center, new Frame(lot.origin(), lot.front()).at(lot.width() / 2, -1, 0), lot);
+        return street != null && graded(street) ? street : null;
+    }
+
+    /** Whether a column of land is a dry hole too deep under a part laid at a height to fill in: one to cap over. */
+    private static boolean falls(Terrain.Column column, int ground) {
+        return column.water() == 0 && !column.untouchable() && (column.surface() == Terrain.NO_GROUND || ground - column.surface() > MAX_FILL);
+    }
+
+    /**
+     * How high the sidewalk past each column of a lot's front is laid: its street's, worked out with its run now if it
+     * hasn't been yet, for the lot to be laid near it and its front to meet it. Null for a lot with no stretch of street
+     * in front of it, or whose street's land isn't loaded.
+     */
+    private int @Nullable [] sidewalk(ServerLevel level, Vec3 hexCenter, Part lot) {
+        Frame frame = new Frame(lot.origin(), lot.front());
+        Part street = frontStreet(BlockPos.containing(hexCenter), lot);
+        if (street == null) {
             return null;
         }
-        return new Survey(ground, columns, blocked, width, null);
+        int[] laid = laidStretch(street);
+        if (laid == null) {
+            if (!isLoaded(level, street)) {
+                return null;
+            }
+            survey(level, street, hexCenter, WHOLE);
+            laid = laidStretch(street);
+            if (laid == null) {
+                return null;
+            }
+        }
+        Frame along = new Frame(street.origin(), street.front());
+        Direction right = along.right();
+        int[] sidewalk = new int[lot.width()];
+        for (int a = 0; a < lot.width(); a++) {
+            BlockPos at = frame.at(a, -1, 0);
+            int column = (at.getX() - street.origin().getX()) * right.getStepX() + (at.getZ() - street.origin().getZ()) * right.getStepZ();
+            sidewalk[a] = laid[Math.clamp(column, 0, laid.length - 1)];
+        }
+        return sidewalk;
     }
 
     /** Whether a part is a stretch of street, or of a lane, laid along the land rather than level. */
@@ -2255,108 +2571,460 @@ public final class HexTown {
         return part.kind() == Kind.STREET || part.kind() == Kind.CROSS_STREET;
     }
 
+    // ---------------------------------------------------------------- streets along the land
+
     /**
-     * How a stretch of street runs along the land: from the height it meets the road past its start at to the height it
-     * meets the road past its far end at, evenly, a block at a time at most, and over a drop or water, where it can be
-     * met at both ends, on a bridge. The columns it can't be laid on, too far below it without a bridge to cross them,
-     * too high above it to cut down, or what can't be broken, are left out.
-     *
-     * @param blocked which of its columns it leaves out, filled in here
-     * @return null if it can't go there at all
+     * How a stretch of street runs along the land, worked out with the whole run of street it is part of, from the
+     * crossing before it to the crossing after it: see {@link #planRun}. Where the land stands far over it, it goes
+     * through in a tunnel; where it falls far away under it, or there is water, it goes over on a bridge.
      */
-    private Streets.@Nullable Profile profile(ServerLevel level, Vec3 hexCenter, Part part, Terrain.@Nullable Column[] columns, boolean[] blocked) {
+    private Streets.Profile profile(ServerLevel level, Vec3 hexCenter, Part part, Terrain.@Nullable Column[] columns) {
+        // worked out already, with its run, or begun by an older town
+        int[] laid = laidStretch(part);
+        int[] meets = new int[2];
+        if (laid == null || !runMeets(hexCenter, part, laid, meets)) {
+            laid = planRun(level, hexCenter, part, columns, meets);
+        }
+        return new Streets.Profile(laid, spans(columns, part.width(), part.depth(), laid), meets[0], meets[1]);
+    }
+
+    /**
+     * How a crossing is laid: level, at the height the runs meeting it were worked out to meet it at, or else at the
+     * middle height of its land, and never lower than a block over any water there.
+     */
+    private Streets.Profile crossingProfile(ServerLevel level, Vec3 hexCenter, Part part, Terrain.@Nullable Column[] columns) {
+        int at = crossingLevel(level, hexCenter, part, columns);
+        int size = part.width();
+        int[] heights = new int[size];
+        Arrays.fill(heights, at);
+        Streets.Span[] spans = spans(columns, size, part.depth(), heights);
+        // a crossing is carried one way all over, by however most of it is
+        int bridges = 0;
+        int tunnels = 0;
+        for (Streets.Span span : spans) {
+            bridges += span == Streets.Span.BRIDGE ? 1 : 0;
+            tunnels += span == Streets.Span.TUNNEL ? 1 : 0;
+        }
+        Arrays.fill(spans, bridges * 2 > size ? Streets.Span.BRIDGE : tunnels * 2 > size ? Streets.Span.TUNNEL : Streets.Span.LAND);
+        return new Streets.Profile(heights, spans, at, at);
+    }
+
+    /**
+     * Where a stretch already worked out meets the road past its ends, and whether both are still as it was worked out
+     * to meet them: one not begun yet is worked out again if a crossing has been laid since at another height, as one
+     * from an older town may be. One already begun keeps to how it was begun.
+     */
+    private boolean runMeets(Vec3 hexCenter, Part part, int[] laid, int[] meets) {
+        BlockPos center = BlockPos.containing(hexCenter);
         Frame frame = new Frame(part.origin(), part.front());
-        int length = part.width();
-        int depth = part.depth();
-        OptionalInt start = meeting(level, hexCenter, part, frame, -1, 0);
-        OptionalInt finish = meeting(level, hexCenter, part, frame, length, length);
-        if (start.isEmpty() && finish.isEmpty()) {
+        boolean begun = levels.containsKey(part.id());
+        boolean meeting = true;
+        for (int end = 0; end < 2; end++) {
+            Part next = streetAt(center, frame.at(end == 0 ? -1 : part.width(), TownPlan.STREET_WIDTH / 2, 0), part);
+            int own = laid[end == 0 ? 0 : laid.length - 1];
+            OptionalInt there = next == null ? OptionalInt.empty() : laidLevel(next, end == 0);
+            if (there.isPresent() && Math.abs(there.getAsInt() - own) > 1) {
+                meeting = false;
+            }
+            meets[end] = there.orElse(own);
+        }
+        return begun || meeting;
+    }
+
+    /**
+     * How high a part of a run is laid or worked out to be, at its end facing another: a crossing's height, or the
+     * column of a stretch at that end.
+     *
+     * @param facingEnd whether it is the far end of the part that faces the other, rather than its start
+     */
+    private OptionalInt laidLevel(Part part, boolean facingEnd) {
+        if (part.kind() == Kind.CROSSING) {
+            if (levels.containsKey(part.id())) {
+                return OptionalInt.of(levels.get(part.id()));
+            }
+            return plannedCrossings.containsKey(part.id()) ? OptionalInt.of(plannedCrossings.get(part.id())) : OptionalInt.empty();
+        }
+        int[] laid = laidStretch(part);
+        return laid == null ? OptionalInt.empty() : OptionalInt.of(laid[facingEnd ? laid.length - 1 : 0]);
+    }
+
+    /**
+     * How high each column of a stretch is laid, if it is: worked out with its run, or, for a stretch laid by an older
+     * town, evenly between where it met the road past its ends, or level.
+     */
+    private int @Nullable [] laidStretch(Part part) {
+        int[] planned = streetLevels.get(part.id());
+        if (planned != null) {
+            return planned;
+        }
+        if (!levels.containsKey(part.id())) {
             return null;
         }
-        int from = start.isPresent() ? start.getAsInt() : finish.getAsInt();
-        int to = finish.isPresent() ? finish.getAsInt() : from;
-        int[] levels = new int[length];
+        int length = part.width();
+        int[] laid = new int[length];
+        if (!ends.containsKey(part.id())) {
+            Arrays.fill(laid, levels.get(part.id()));
+            return laid;
+        }
+        long packed = ends.get(part.id());
+        int from = (int) (packed >> 32);
+        int to = (int) packed;
         for (int a = 0; a < length; a++) {
-            levels[a] = Math.round(from + (to - from) * (a + 0.5F) / length);
+            laid[a] = Math.round(from + (to - from) * (a + 0.5F) / length);
             if (a > 0) {
-                // a block a column at most: too steep for that, its far end falls short of the road past it
-                levels[a] = Math.clamp(levels[a], levels[a - 1] - 1, levels[a - 1] + 1);
+                laid[a] = Math.clamp(laid[a], laid[a - 1] - 1, laid[a - 1] + 1);
             }
         }
-        boolean met = start.isPresent() && finish.isPresent();
-        boolean[] bridged = new boolean[length];
-        for (int a = 0; a < length; a++) {
-            int cells = 0;
-            int deep = 0;
-            for (int b = 0; b < depth; b++) {
-                Terrain.Column column = columns[b * length + a];
-                if (column != null) {
-                    cells++;
-                    if (deep(column, levels[a])) {
-                        deep++;
+        return laid;
+    }
+
+    /**
+     * Works out a run of street from the crossing before a stretch to the crossing after it, every stretch of it whose
+     * land is loaded and the crossings either end, so each meets the next. It keeps to the even line between what is
+     * laid already, or between the crossings, as long as the land is within a few blocks of it, and follows the land
+     * otherwise only as far as that: a valley is crossed high on a bridge, a hill gone through in a tunnel, rather than
+     * the road dipping into every hollow and climbing every rise. It climbs a block a column at most, and is laid at
+     * least a block over any water.
+     *
+     * @param meets filled in with where the road past either end of the stretch is laid
+     * @return how high each column of the stretch is laid
+     */
+    private int[] planRun(ServerLevel level, Vec3 hexCenter, Part part, Terrain.@Nullable Column[] columns, int[] meets) {
+        BlockPos center = BlockPos.containing(hexCenter);
+        List<Part> stops = run(center, part);
+        // the stretch in front of the caster's home is laid level with it, the rest of its run climbing or falling to it,
+        // for the home to be come to from its street wherever it rose
+        Part home = home(center);
+        Part homeStreet = home != null && levels.containsKey(home.id()) ? frontStreet(center, home) : null;
+        // every column along the run, a crossing counting as one: how high it must be laid, if it already is or has been
+        // worked out to be, and else how the land lies there
+        IntArrayList fixed = new IntArrayList();
+        DoubleArrayList land = new DoubleArrayList();
+        IntArrayList lowest = new IntArrayList();
+        int[] firstColumn = new int[stops.size()];
+        boolean[] known = new boolean[stops.size()];
+        for (int k = 0; k < stops.size(); k++) {
+            Part stop = stops.get(k);
+            firstColumn[k] = fixed.size();
+            int span = stop.kind() == Kind.CROSSING ? 1 : stop.width();
+            int[] laid = stop.kind() == Kind.CROSSING ? laidLevel(stop, false).stream().toArray() : laidStretch(stop);
+            if (stop.kind() == Kind.CROSSING && laid.length == 0 && isLoaded(level, stop)) {
+                // a crossing is worked out by itself, with the crossings round it, and the run meets it there
+                laid = new int[] {crossingLevel(level, hexCenter, stop, read(level, stop))};
+            }
+            boolean homeFront = homeStreet != null && stop.id() == homeStreet.id();
+            if (laid == null && homeFront) {
+                laid = new int[span];
+                Arrays.fill(laid, levels.get(home.id()));
+            }
+            if (laid != null && laid.length == span && (stop.id() != part.id() || homeFront)) {
+                for (int y : laid) {
+                    fixed.add(y);
+                    land.add(Double.NaN);
+                    lowest.add(Integer.MIN_VALUE);
+                }
+                continue;
+            }
+            Terrain.Column[] read = stop.id() == part.id() ? columns : isLoaded(level, stop) ? read(level, stop) : null;
+            known[k] = read != null;
+            for (int a = 0; a < span; a++) {
+                fixed.add(Integer.MIN_VALUE);
+                if (read == null) {
+                    land.add(Double.NaN);
+                    lowest.add(Integer.MIN_VALUE);
+                } else {
+                    int[] lie = lie(read, stop.width(), stop.depth(), stop.kind() == Kind.CROSSING ? -1 : a);
+                    land.add(lie[0] == Integer.MIN_VALUE ? Double.NaN : lie[0]);
+                    lowest.add(lie[1]);
+                }
+            }
+        }
+        int count = fixed.size();
+        int[] laidAt = new int[count];
+        double fallback = BlockPos.containing(hexCenter).getY();
+        for (int i = count - 1; i >= 0; i--) {
+            if (fixed.getInt(i) != Integer.MIN_VALUE) {
+                laidAt[i] = fixed.getInt(i);
+                fallback = laidAt[i];
+            }
+        }
+        // an end of the run where nothing is laid starts, or finishes, where the land lies there
+        int left = (int) Math.round(landNear(land, 0, count, fallback));
+        int right = (int) Math.round(landNear(land, count - 1, -1, fallback));
+        // each length of the run not laid yet, between what is laid either side of it or the ends of the run
+        int i = 0;
+        while (i < count) {
+            if (fixed.getInt(i) != Integer.MIN_VALUE) {
+                i++;
+                continue;
+            }
+            int from = i;
+            while (i < count && fixed.getInt(i) == Integer.MIN_VALUE) {
+                i++;
+            }
+            int to = i - 1;
+            int before = from > 0 ? laidAt[from - 1] : Math.max(left, lowest.getInt(from));
+            int after = to < count - 1 ? laidAt[to + 1] : Math.max(right, lowest.getInt(to));
+            plan(land, lowest, laidAt, from, to, before, after, from == 0, to == count - 1);
+        }
+        // kept for every stretch and crossing of the run whose land was read, for each to meet the next as it is begun
+        int[] own = new int[part.width()];
+        for (int k = 0; k < stops.size(); k++) {
+            Part stop = stops.get(k);
+            int first = firstColumn[k];
+            if (stop.id() == part.id()) {
+                own = Arrays.copyOfRange(laidAt, first, first + stop.width());
+                meets[0] = first > 0 ? laidAt[first - 1] : own[0];
+                meets[1] = first + stop.width() < count ? laidAt[first + stop.width()] : own[own.length - 1];
+                streetLevels.put(stop.id(), own);
+                changed = true;
+                continue;
+            }
+            if (!known[k]) {
+                continue;
+            }
+            if (stop.kind() == Kind.CROSSING) {
+                plannedCrossings.put(stop.id(), laidAt[first]);
+            } else {
+                streetLevels.put(stop.id(), Arrays.copyOfRange(laidAt, first, first + stop.width()));
+            }
+            changed = true;
+        }
+        return own;
+    }
+
+    /**
+     * Works out the columns of a run not laid yet, between what stands either side: along the even line from one to
+     * the other, keeping to the land when it is near that line, smoothed, never so steep the far side can't be met, a
+     * block a column at most, and over water.
+     *
+     * @param openStart whether nothing is laid before them, the run ending there
+     */
+    private static void plan(DoubleArrayList land, IntArrayList lowest, int[] out, int from, int to, int before, int after, boolean openStart,
+                             boolean openEnd) {
+        int n = to - from + 1;
+        double[] wanted = new double[n];
+        for (int j = 0; j < n; j++) {
+            double even = before + (after - before) * (j + 1) / (double) (n + 1);
+            double lies = land.getDouble(from + j);
+            if (Double.isNaN(lies)) {
+                wanted[j] = even;
+                continue;
+            }
+            // land near the line is followed; a hill or a hollow well off it is gone through, or over, on the line
+            double off = lies - even;
+            wanted[j] = even + (Math.abs(off) <= FOLLOW ? off : Math.signum(off) * Math.max(0.0, 2 * FOLLOW - Math.abs(off)));
+        }
+        int[] laid = new int[n];
+        for (int j = 0; j < n; j++) {
+            double sum = 0.0;
+            for (int k = j - SMOOTH; k <= j + SMOOTH; k++) {
+                sum += k < 0 ? (openStart ? wanted[0] : before) : k >= n ? (openEnd ? wanted[n - 1] : after) : wanted[k];
+            }
+            int y = (int) Math.round(sum / (2 * SMOOTH + 1));
+            // an even climb a block a column from what is laid either side can still reach it
+            int low = Math.max(openStart ? Integer.MIN_VALUE : before - (j + 1), openEnd ? Integer.MIN_VALUE : after - (n - j));
+            int high = Math.min(openStart ? Integer.MAX_VALUE : before + (j + 1), openEnd ? Integer.MAX_VALUE : after + (n - j));
+            if (low <= high) {
+                y = Math.clamp(y, low, high);
+            }
+            laid[j] = Math.max(y, lowest.getInt(from + j));
+        }
+        // a block a column at most, raised where it has to clear water rather than lowered into it
+        int previous = openStart ? laid[0] : before;
+        for (int j = 0; j < n; j++) {
+            laid[j] = Math.max(laid[j], previous - 1);
+            previous = laid[j];
+        }
+        int next = openEnd ? laid[n - 1] : after;
+        for (int j = n - 1; j >= 0; j--) {
+            laid[j] = Math.max(laid[j], next - 1);
+            next = laid[j];
+        }
+        System.arraycopy(laid, 0, out, from, n);
+    }
+
+    /** The nearest height the land is known at along a run from a column, going one way; else what is given. */
+    private static double landNear(DoubleArrayList land, int from, int stopBefore, double otherwise) {
+        int step = stopBefore > from ? 1 : -1;
+        for (int i = from; i != stopBefore; i += step) {
+            if (!Double.isNaN(land.getDouble(i))) {
+                return land.getDouble(i);
+            }
+        }
+        return otherwise;
+    }
+
+    /**
+     * How the land lies across a column of a part, or across the whole of it: the middle height of its dry ground, or
+     * {@link Integer#MIN_VALUE} for none, and the lowest a road may be laid there, a block over the top of any water.
+     *
+     * @param a the column, or less than 0 for all of them
+     */
+    private static int[] lie(Terrain.@Nullable Column[] columns, int width, int depth, int a) {
+        int[] dry = new int[columns.length];
+        int count = 0;
+        int lowest = Integer.MIN_VALUE;
+        for (int b = 0; b < depth; b++) {
+            for (int x = a < 0 ? 0 : a; x <= (a < 0 ? width - 1 : a); x++) {
+                Terrain.Column column = columns[b * width + x];
+                if (column == null || column.surface() == Terrain.NO_GROUND) {
+                    continue;
+                }
+                if (column.water() > 0) {
+                    lowest = Math.max(lowest, column.surface() + column.water() + 1);
+                } else {
+                    dry[count++] = column.surface();
+                }
+            }
+        }
+        if (count == 0) {
+            return new int[] {Integer.MIN_VALUE, lowest};
+        }
+        Arrays.sort(dry, 0, count);
+        return new int[] {dry[count / 2], lowest};
+    }
+
+    /** Reads the land under every column of a part, as {@link #survey} does. */
+    private Terrain.Column[] read(ServerLevel level, Part part) {
+        Frame frame = new Frame(part.origin(), part.front());
+        Terrain.Column[] columns = new Terrain.Column[part.width() * part.depth()];
+        for (int b = 0; b < part.depth(); b++) {
+            for (int a = 0; a < part.width(); a++) {
+                BlockPos at = frame.at(a, b, 0);
+                columns[b * part.width() + a] = column(level, at.getX(), at.getZ());
+            }
+        }
+        return columns;
+    }
+
+    /**
+     * The run of street a stretch is part of, in order along it: from the crossing before it, by way of every stretch
+     * between, to the crossing after it, as far as the plan has them.
+     */
+    private List<Part> run(BlockPos center, Part stretch) {
+        ArrayDeque<Part> stops = new ArrayDeque<>();
+        stops.add(stretch);
+        for (int way = 0; way < 2; way++) {
+            Part at = stretch;
+            for (int k = 0; k < RUN_REACH; k++) {
+                Frame frame = new Frame(at.origin(), at.front());
+                Part next = streetAt(center, frame.at(way == 0 ? -1 : at.width(), TownPlan.STREET_WIDTH / 2, 0), at);
+                boolean along = next != null && next.kind() == stretch.kind() && next.front() == stretch.front();
+                if (next == null || next.kind() != Kind.CROSSING && !along) {
+                    break;
+                }
+                if (way == 0) {
+                    stops.addFirst(next);
+                } else {
+                    stops.addLast(next);
+                }
+                if (next.kind() == Kind.CROSSING) {
+                    break;
+                }
+                at = next;
+            }
+        }
+        return new ArrayList<>(stops);
+    }
+
+    /**
+     * How high a crossing is laid: as it was begun, or as the runs meeting it were worked out to meet it; else at the
+     * middle height of its own land and the land of the crossings round it, never lower than a block over any water
+     * there, kept for the runs meeting it. With the crossings round it, a canyon or a ridge no wider than a block of
+     * the town is crossed over, or gone through, at the height of the town either side, while the town still climbs a
+     * hillside, or keeps to a plateau or a valley as wide as the blocks around.
+     */
+    private int crossingLevel(ServerLevel level, Vec3 hexCenter, Part crossing, Terrain.@Nullable Column[] columns) {
+        if (levels.containsKey(crossing.id())) {
+            return levels.get(crossing.id());
+        }
+        if (plannedCrossings.containsKey(crossing.id())) {
+            return plannedCrossings.get(crossing.id());
+        }
+        int[] lie = lie(columns, crossing.width(), crossing.depth(), -1);
+        IntArrayList around = new IntArrayList();
+        if (lie[0] != Integer.MIN_VALUE) {
+            around.add(lie[0]);
+        }
+        BlockPos center = BlockPos.containing(hexCenter);
+        for (int ds = -1; ds <= 1; ds++) {
+            for (int dg = -1; dg <= 1; dg++) {
+                if (ds == 0 && dg == 0) {
+                    continue;
+                }
+                Part next = part(center, crossing.id() + (ds << 16) + (dg << 8));
+                if (next == null || next.kind() != Kind.CROSSING) {
+                    continue;
+                }
+                OptionalInt laid = laidLevel(next, false);
+                if (laid.isPresent()) {
+                    around.add(laid.getAsInt());
+                } else if (isLoaded(level, next)) {
+                    int lies = lie(read(level, next), next.width(), next.depth(), -1)[0];
+                    if (lies != Integer.MIN_VALUE) {
+                        around.add(lies);
                     }
                 }
             }
-            // most of the way across falls away under it, or is water
-            bridged[a] = met && cells > 0 && deep * 2 > cells;
         }
-        int inside = 0;
-        int left = 0;
-        for (int b = 0; b < depth; b++) {
-            for (int a = 0; a < length; a++) {
-                int index = b * length + a;
-                Terrain.Column column = columns[index];
-                if (column == null) {
-                    continue;
-                }
-                inside++;
-                boolean deep = deep(column, levels[a]);
-                if (column.untouchable() || !deep && column.surface() - levels[a] > MAX_CUT || deep && !bridged[a]) {
-                    blocked[index] = true;
-                    left++;
-                }
-            }
+        int at;
+        if (around.size() >= 5) {
+            int[] sorted = around.toIntArray();
+            Arrays.sort(sorted);
+            at = sorted[sorted.length / 2];
+        } else {
+            at = lie[0] != Integer.MIN_VALUE ? lie[0] : center.getY();
         }
-        if (inside == 0 || left * 2 > inside) {
-            return null;
+        if (lie[1] != Integer.MIN_VALUE) {
+            at = Math.max(at, lie[1]);
         }
-        return new Streets.Profile(levels, bridged, from, to);
-    }
-
-    /** Whether a column of land lies too far under a street laid at a height to be filled up to it, or under water. */
-    private static boolean deep(Terrain.Column column, int level) {
-        return !column.isLand(SHALLOW) || level - column.surface() > MAX_FILL;
+        plannedCrossings.put(crossing.id(), at);
+        changed = true;
+        return at;
     }
 
     /**
-     * The height a stretch of street meets the road past one of its ends at: a crossing's own level; where a stretch
-     * laid along the land already there ends, or the level an older stretch was laid flat at; or otherwise the lie of
-     * the land round where they meet, which each of them reckons alike.
-     *
-     * @param past     the column past that end, along the stretch
-     * @param boundary where along the stretch they meet: 0 at its start, its length at its far end
+     * How each column of a street or crossing laid at its heights is carried: through a hill in a tunnel where most of
+     * the land across it stands well over it, on a bridge where most of it falls far away under it or is water, and on
+     * the land otherwise. A hill too short to tunnel through is cut through.
      */
-    private OptionalInt meeting(ServerLevel level, Vec3 hexCenter, Part part, Frame frame, int past, int boundary) {
-        BlockPos beyond = frame.at(past, TownPlan.STREET_WIDTH / 2, 0);
-        Part other = streetAt(BlockPos.containing(hexCenter), beyond, part);
-        if (other != null) {
-            if (other.kind() == Kind.CROSSING) {
-                OptionalInt laid = levelOf(level, hexCenter, other);
-                if (laid.isPresent()) {
-                    return laid;
+    private static Streets.Span[] spans(Terrain.@Nullable Column[] columns, int length, int depth, int[] levels) {
+        Streets.Span[] spans = new Streets.Span[length];
+        for (int a = 0; a < length; a++) {
+            int cells = 0;
+            int deep = 0;
+            int high = 0;
+            for (int b = 0; b < depth; b++) {
+                Terrain.Column column = columns[b * length + a];
+                if (column == null) {
+                    continue;
                 }
-            } else if (ends.containsKey(other.id())) {
-                // whichever of its ends faces this one
-                long packed = ends.get(other.id());
-                Frame theirs = new Frame(other.origin(), other.front());
-                double toStart = theirs.at(0, TownPlan.STREET_WIDTH / 2, 0).distSqr(beyond);
-                double toFinish = theirs.at(other.width() - 1, TownPlan.STREET_WIDTH / 2, 0).distSqr(beyond);
-                return OptionalInt.of(toStart <= toFinish ? (int) (packed >> 32) : (int) packed);
-            } else if (levels.containsKey(other.id())) {
-                return OptionalInt.of(levels.get(other.id()));
+                cells++;
+                if (column.surface() == Terrain.NO_GROUND || column.water() > 0 || levels[a] - column.surface() > MAX_FILL) {
+                    deep++;
+                } else if (column.surface() >= levels[a] + Streets.TUNNEL_HEIGHT + 2) {
+                    high++;
+                }
+            }
+            spans[a] = deep * 2 > cells ? Streets.Span.BRIDGE : high * 2 > cells ? Streets.Span.TUNNEL : Streets.Span.LAND;
+        }
+        for (int a = 0; a < length; ) {
+            if (spans[a] != Streets.Span.TUNNEL) {
+                a++;
+                continue;
+            }
+            int from = a;
+            while (a < length && spans[a] == Streets.Span.TUNNEL) {
+                a++;
+            }
+            // a tunnel running on into the next stretch is long enough
+            boolean open = from == 0 || a == length;
+            if (a - from < SHORTEST_TUNNEL && !open) {
+                Arrays.fill(spans, from, a, Streets.Span.LAND);
             }
         }
-        return lieOfTheLand(level, frame, boundary);
+        return spans;
     }
 
     /** The street, crossing or stretch, in the plan at a column, other than the one given. */
@@ -2370,35 +3038,11 @@ public final class HexTown {
         return null;
     }
 
-    /**
-     * The middle height of the land round where two stretches of street meet: across the street's width, as far along
-     * it either way; empty if none of it is land.
-     */
-    private OptionalInt lieOfTheLand(ServerLevel level, Frame frame, int boundary) {
-        int[] heights = new int[2 * MEETING_REACH * TownPlan.STREET_WIDTH];
-        int count = 0;
-        for (int k = -MEETING_REACH; k < MEETING_REACH; k++) {
-            for (int b = 0; b < TownPlan.STREET_WIDTH; b++) {
-                BlockPos at = frame.at(boundary + k, b, 0);
-                if (!level.hasChunkAt(at)) {
-                    continue;
-                }
-                Terrain.Column column = column(level, at.getX(), at.getZ());
-                if (column.isLand(SHALLOW)) {
-                    heights[count++] = column.surface();
-                }
-            }
-        }
-        if (count == 0) {
-            return OptionalInt.empty();
-        }
-        Arrays.sort(heights, 0, count);
-        return OptionalInt.of(heights[count / 2]);
-    }
-
     private void forgetLevel(int id) {
         levels.remove(id);
         ends.remove(id);
+        streetLevels.remove(id);
+        gardens.remove(id);
     }
 
     /**
@@ -2455,21 +3099,22 @@ public final class HexTown {
         if (mode == HexBuild.ORCHARD) {
             return switch (part.kind()) {
                 case HOME -> Houses.anchor(frame, ground, heights, random, homes);
-                case HOUSE -> random.nextFloat() < 0.18F ? Orchard.meadow(frame, ground, heights, random, occupied)
+                case HOUSE -> random.nextFloat() < 0.18F || gardens.contains(part.id()) ? Orchard.meadow(frame, ground, heights, random, occupied)
                         : Orchard.plot(frame, ground, heights, random, occupied);
                 case SQUARE -> Orchard.farmyard(frame, part.width(), part.depth(), ground, heights, random);
                 case STREET, CROSS_STREET -> survey.profile() != null ? Streets.lane(frame, part.width(), survey.profile(), heights)
                         : Orchard.lane(frame, part.width(), ground, heights);
-                case CROSSING -> Orchard.crossing(frame, ground, heights);
+                case CROSSING -> survey.profile() != null ? Streets.crossing(frame, survey.profile(), heights, true) : Orchard.crossing(frame, ground, heights);
             };
         }
         return switch (part.kind()) {
             case HOME -> Houses.anchor(frame, ground, heights, random, homes);
-            case HOUSE -> cutThrough ? Houses.garden(frame, ground, heights, random) : lot(part, frame, ground, heights, random);
+            case HOUSE -> cutThrough || gardens.contains(part.id()) ? Houses.garden(frame, ground, heights, random)
+                    : lot(part, frame, ground, heights, random, survey.sidewalk());
             case SQUARE -> Streets.square(frame, part.width(), part.depth(), ground, heights, random);
             case STREET -> survey.profile() != null ? Streets.graded(frame, part.width(), survey.profile(), heights, 0)
                     : Streets.street(frame, part.width(), ground, heights, meet(part, frame, -1, ground, levelOf), meet(part, frame, part.width(), ground, levelOf), 0);
-            case CROSSING -> Streets.crossing(frame, ground, heights);
+            case CROSSING -> survey.profile() != null ? Streets.crossing(frame, survey.profile(), heights, false) : Streets.crossing(frame, ground, heights);
             case CROSS_STREET -> survey.profile() != null ? Streets.graded(frame, part.width(), survey.profile(), heights, part.width() / 2)
                     : Streets.street(frame, part.width(), ground, heights, meet(part, frame, -1, ground, levelOf), meet(part, frame, part.width(), ground, levelOf),
                     part.width() / 2);
@@ -2479,7 +3124,7 @@ public final class HexTown {
     /**
      * What goes up on a lot, by what the town has zoned it for.
      */
-    private Blueprint lot(Part part, Frame frame, int ground, Houses.Heights heights, RandomSource random) {
+    private Blueprint lot(Part part, Frame frame, int ground, Houses.Heights heights, RandomSource random, int @Nullable [] sidewalk) {
         return switch (zoning().getOrDefault(part.id(), Use.HOUSE)) {
             case SHOP -> Civic.shop(frame, ground, heights, shopKinds.get(part.id()), random);
             case LIBRARY -> Civic.library(frame, ground, heights, random);
@@ -2487,7 +3132,7 @@ public final class HexTown {
             case SCHOOL -> Civic.school(frame, ground, heights, random);
             case PLAYGROUND -> Civic.playground(frame, ground, heights, random);
             case PARK -> Houses.park(frame, ground, heights, random);
-            case HOUSE -> Houses.house(frame, ground, heights, random);
+            case HOUSE -> Houses.house(frame, ground, heights, random, sidewalk);
         };
     }
 
@@ -2625,6 +3270,16 @@ public final class HexTown {
     // ---------------------------------------------------------------- records
 
     /**
+     * Where a town leaves what it can't put back yet, in chunks that aren't loaded, and puts back first what any town
+     * left where it is about to build.
+     */
+    public interface Leftovers {
+        void leave(long key, Built entry);
+
+        void putBackWithin(ServerLevel level, int minX, int minZ, int maxX, int maxZ);
+    }
+
+    /**
      * A block the town put down or cleared away.
      *
      * @param original what stood there before
@@ -2658,25 +3313,32 @@ public final class HexTown {
     /**
      * @param columns the land under each column, by b * width + a; null where the part isn't looked at
      * @param blocked columns to leave alone
-     * @param profile how a stretch of street runs along the land, for one; null for anything laid level
+     * @param profile  how a stretch of street runs along the land, for one; null for anything laid level
+     * @param sidewalk how high the sidewalk past each column of a lot's front is laid, for one with a street before it
      */
-    private record Survey(int ground, Terrain.@Nullable Column[] columns, boolean[] blocked, int width, Streets.@Nullable Profile profile) {
+    private record Survey(int ground, Terrain.@Nullable Column[] columns, boolean[] blocked, int width, Streets.@Nullable Profile profile,
+                          int @Nullable [] sidewalk) {
+
+        /** How far down a column no ground was found under is taken to go: deep enough to be capped over, not filled. */
+        private static final int BOTTOMLESS = 64;
 
         static Survey flat(int ground, Part part) {
-            return new Survey(ground, new Terrain.Column[part.width() * part.depth()], new boolean[part.width() * part.depth()], part.width(), null);
+            return new Survey(ground, new Terrain.Column[part.width() * part.depth()], new boolean[part.width() * part.depth()], part.width(),
+                    null, null);
         }
 
         Survey at(int ground) {
-            return new Survey(ground, columns, blocked, width, profile);
+            return new Survey(ground, columns, blocked, width, profile, sidewalk);
         }
 
         /**
-         * The natural ground under a column, or the part's level where that isn't known.
+         * The natural ground under a column: the part's level where nothing was looked at there, and far below it where
+         * no ground was found, a cave or a gorge.
          */
         int height(int a, int b) {
             int index = b * width + a;
             Terrain.Column column = index >= 0 && index < columns.length ? columns[index] : null;
-            return column == null || column.surface() == Terrain.NO_GROUND ? ground : column.surface();
+            return column == null ? ground : column.surface() == Terrain.NO_GROUND ? ground - BOTTOMLESS : column.surface();
         }
 
         boolean isBlocked(int index) {
@@ -2735,10 +3397,16 @@ public final class HexTown {
      * The town's blocks in order of how far out they lie, for a sweep across it.
      */
     private static final class Sweep {
+        /** How finely a sweep tells blocks apart by how far out they stand: a quarter of a block. */
+        private static final int RINGS_PER_BLOCK = 4;
+        private static final int MAX_RING = 1 << 16;
+
         final long[] order;
         final float[] reach;
         final it.unimi.dsi.fastutil.longs.LongArrayList touched = new it.unimi.dsi.fastutil.longs.LongArrayList();
         int cursor;
+        /** How many of {@link #touched} have had their connections worked out again. */
+        int reshaped;
         @Nullable Era era;
         long start;
 
@@ -2763,32 +3431,69 @@ public final class HexTown {
         }
 
         private static Sweep sorted(Long2ObjectOpenHashMap<Built> built, Vec3 center, boolean ascending, float from) {
-            long[] all = built.keySet().toLongArray();
-            float[] allReach = new float[all.length];
+            return sorted(built.keySet().toLongArray(), center, ascending, from);
+        }
+
+        static Sweep sorted(long[] keys, Vec3 center, boolean ascending, float from) {
+            // into rings a fraction of a block wide, by how far out each block stands, rather than sorted one against
+            // another: a town can have a million blocks and more
+            int n = keys.length;
+            float[] reaches = new float[n];
+            int[] rings = new int[n];
+            int top = 0;
             int count = 0;
-            for (int k = 0; k < all.length; k++) {
-                float reach = (float) HexShape.level(center, 1.0F, Vec3.atCenterOf(BlockPos.of(all[k])));
+            for (int k = 0; k < n; k++) {
+                float reach = reachOf(center, keys[k]);
+                reaches[k] = reach;
                 if (reach >= from) {
-                    all[count] = all[k];
-                    allReach[count] = reach;
+                    int ring = Math.min(MAX_RING, (int) (reach * RINGS_PER_BLOCK));
+                    rings[k] = ring;
+                    top = Math.max(top, ring);
                     count++;
+                } else {
+                    rings[k] = -1;
                 }
             }
-            long[] keys = Arrays.copyOf(all, count);
-            float[] reaches = Arrays.copyOf(allReach, count);
-            Integer[] index = new Integer[keys.length];
-            for (int k = 0; k < keys.length; k++) {
-                index[k] = k;
+            int[] starts = new int[top + 2];
+            for (int k = 0; k < n; k++) {
+                if (rings[k] >= 0) {
+                    starts[(ascending ? rings[k] : top - rings[k]) + 1]++;
+                }
             }
-            Arrays.sort(index, (a, b) -> ascending ? Float.compare(reaches[a], reaches[b]) : Float.compare(reaches[b], reaches[a]));
-            long[] order = new long[keys.length];
-            float[] reach = new float[keys.length];
-            for (int k = 0; k < keys.length; k++) {
-                order[k] = keys[index[k]];
-                reach[k] = reaches[index[k]];
+            for (int ring = 1; ring < starts.length; ring++) {
+                starts[ring] += starts[ring - 1];
+            }
+            long[] order = new long[count];
+            float[] reach = new float[count];
+            for (int k = 0; k < n; k++) {
+                if (rings[k] >= 0) {
+                    int at = starts[ascending ? rings[k] : top - rings[k]]++;
+                    order[at] = keys[k];
+                    reach[at] = reaches[k];
+                }
             }
             return new Sweep(order, reach);
         }
+    }
+
+    /** How far out from the middle of the Hex a block of the town stands, as {@link HexShape#level} measures. */
+    private static float reachOf(Vec3 center, long key) {
+        return (float) HexShape.level(center, 1.0F, BlockPos.getX(key) + 0.5, BlockPos.getZ(key) + 0.5);
+    }
+
+    /** Blocks in order of height: from the bottom up, or from the top down. */
+    private static long[] byHeight(long[] keys, boolean upward) {
+        long[] packed = new long[keys.length];
+        for (int k = 0; k < keys.length; k++) {
+            // heights are within a few thousand of 0 either way; shifted up, they sort as plain numbers
+            packed[k] = (long) (BlockPos.getY(keys[k]) + (1 << 20)) << 32 | k;
+        }
+        Arrays.sort(packed);
+        long[] order = new long[keys.length];
+        for (int i = 0; i < keys.length; i++) {
+            order[i] = keys[(int) packed[upward ? i : keys.length - 1 - i]];
+        }
+        return order;
     }
 
     /**

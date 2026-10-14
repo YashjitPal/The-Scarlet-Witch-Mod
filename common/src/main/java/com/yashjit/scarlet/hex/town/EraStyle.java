@@ -97,6 +97,11 @@ public final class EraStyle {
         era(Role.BRIDGE_PIER, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, concrete(DyeColor.LIGHT_GRAY), concrete(DyeColor.LIGHT_GRAY),
                 concrete(DyeColor.LIGHT_GRAY), Blocks.POLISHED_ANDESITE);
         era(Role.BRIDGE_RAIL, Blocks.STONE_BRICK_WALL, Blocks.IRON_BARS, Blocks.IRON_BARS, Blocks.IRON_BARS, Blocks.IRON_BARS, Blocks.GLASS_PANE);
+        // tunnels lined in the bridges' stone, then concrete, under a smooth ceiling
+        era(Role.TUNNEL_WALL, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, concrete(DyeColor.LIGHT_GRAY), concrete(DyeColor.LIGHT_GRAY),
+                concrete(DyeColor.LIGHT_GRAY), Blocks.POLISHED_ANDESITE);
+        era(Role.TUNNEL_CEILING, Blocks.SMOOTH_STONE, Blocks.SMOOTH_STONE, concrete(DyeColor.WHITE), concrete(DyeColor.WHITE),
+                concrete(DyeColor.LIGHT_GRAY), Blocks.SMOOTH_QUARTZ);
         era(Role.LAMP_POST, Blocks.NETHER_BRICK_FENCE, Blocks.NETHER_BRICK_FENCE, Blocks.DARK_OAK_FENCE, Blocks.NETHER_BRICK_FENCE,
                 Blocks.NETHER_BRICK_FENCE, Blocks.NETHER_BRICK_FENCE);
         era(Role.LAMP, Blocks.LANTERN, Blocks.LANTERN, Blocks.LANTERN, Blocks.SOUL_LANTERN, Blocks.LANTERN,
