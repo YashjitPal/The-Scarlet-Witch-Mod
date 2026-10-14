@@ -29,6 +29,18 @@ neoForge {
                 if (project.hasProperty('showcaseFilm')) {
                     systemProperty('scarlet.showcase.world', 'film')
                     programArguments.addAll('--width', '1920', '--height', '1080', '--username', 'Scarlet')
+                } else if (project.hasProperty('showcaseSeed')) {
+                    // a world of ordinary land grown from someone's own world's seed
+                    systemProperty('scarlet.showcase.seed', project.property('showcaseSeed').toString())
+                    programArguments.addAll('--width', '1280', '--height', '720', '--username', 'Showcase')
+                } else if (project.hasProperty('showcaseWorld')) {
+                    // a copy of a world someone played, in runs/client/saves, played as them: -PshowcaseAs=<name>:<uuid>
+                    systemProperty('scarlet.showcase.world', project.property('showcaseWorld').toString())
+                    def player = project.findProperty('showcaseAs')?.toString()?.split(':')
+                    programArguments.addAll('--width', '1280', '--height', '720', '--username', player ? player[0] : 'Showcase')
+                    if (player && player.length > 1) {
+                        programArguments.addAll('--uuid', player[1])
+                    }
                 } else {
                     programArguments.addAll('--width', '1280', '--height', '720', '--username', 'Showcase')
                 }

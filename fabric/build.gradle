@@ -26,10 +26,26 @@ loom {
                 if (project.hasProperty('showcaseServer')) {
                     vmArg("-Dscarlet.showcase.server=${project.property('showcaseServer')}")
                 }
+                // a flight recording of the whole run, to see where the time goes: -PshowcaseProfile=<file.jfr>
+                if (project.hasProperty('showcaseProfile')) {
+                    vmArg("-XX:StartFlightRecording=filename=${project.property('showcaseProfile')},settings=profile,dumponexit=true")
+                }
                 // films: a world of ordinary land, a player whose default skin is Alex's, at film size
                 if (project.hasProperty('showcaseFilm')) {
                     vmArg('-Dscarlet.showcase.world=film')
                     programArgs('--width', '1920', '--height', '1080', '--username', 'Scarlet')
+                } else if (project.hasProperty('showcaseSeed')) {
+                    // a world of ordinary land grown from someone's own world's seed
+                    vmArg("-Dscarlet.showcase.seed=${project.property('showcaseSeed')}")
+                    programArgs('--width', '1280', '--height', '720', '--username', 'Showcase')
+                } else if (project.hasProperty('showcaseWorld')) {
+                    // a copy of a world someone played, in runs/client/saves, played as them: -PshowcaseAs=<name>:<uuid>
+                    vmArg("-Dscarlet.showcase.world=${project.property('showcaseWorld')}")
+                    def player = project.findProperty('showcaseAs')?.toString()?.split(':')
+                    programArgs('--width', '1280', '--height', '720', '--username', player ? player[0] : 'Showcase')
+                    if (player && player.length > 1) {
+                        programArgs('--uuid', player[1])
+                    }
                 } else {
                     programArgs('--width', '1280', '--height', '720', '--username', 'Showcase')
                 }

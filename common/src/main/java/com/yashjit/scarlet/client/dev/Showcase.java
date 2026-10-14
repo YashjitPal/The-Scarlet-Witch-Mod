@@ -102,11 +102,16 @@ public final class Showcase {
 
     /**
      * Films are made in a world of ordinary land grown from a seed of its own, given by {@code -PshowcaseFilm}; other
-     * scenes play on flat test ground.
+     * scenes play on flat test ground, or in a copy of a world someone played, given by {@code -PshowcaseWorld=<folder>}.
      */
-    private static final boolean FILM_WORLD = "film".equals(System.getProperty("scarlet.showcase.world"));
-    private static final String WORLD = FILM_WORLD ? "scarlet-film" : "scarlet-showcase";
-    private static final long FILM_SEED = 20261004L;
+    private static final @Nullable String WORLD_GIVEN = System.getProperty("scarlet.showcase.world");
+    /** Or a world of ordinary land grown from a seed given by {@code -PshowcaseSeed=<seed>}, someone's own world's. */
+    private static final @Nullable Long SEED_GIVEN = Long.getLong("scarlet.showcase.seed");
+    private static final boolean FILM_WORLD = "film".equals(WORLD_GIVEN) || SEED_GIVEN != null;
+    private static final boolean PLAYED_WORLD = WORLD_GIVEN != null && !WORLD_GIVEN.isBlank() && !"film".equals(WORLD_GIVEN);
+    private static final String WORLD = PLAYED_WORLD ? WORLD_GIVEN : SEED_GIVEN != null ? "scarlet-seed-" + SEED_GIVEN : FILM_WORLD ? "scarlet-film"
+            : "scarlet-showcase";
+    private static final long FILM_SEED = SEED_GIVEN != null ? SEED_GIVEN : 20261004L;
     private static final @Nullable String SCENE = System.getProperty("scarlet.showcase");
     private static final boolean QUIT = Boolean.getBoolean("scarlet.showcase.quit");
     /** A server to play the scene on instead of the test world, given by {@code -PshowcaseServer=<address>}. */
@@ -337,6 +342,10 @@ public final class Showcase {
         }
         if (minecraft.getLevelSource().levelExists(WORLD)) {
             minecraft.createWorldOpenFlows().openWorld(WORLD, () -> minecraft.gui.setScreen(new TitleScreen()));
+            return;
+        }
+        if (PLAYED_WORLD) {
+            Scarlet.LOG.error("Showcase: there is no world {} in the saves folder to play in", WORLD);
             return;
         }
         LevelSettings settings = new LevelSettings(WORLD, GameType.CREATIVE,
@@ -1723,6 +1732,120 @@ public final class Showcase {
                         .playerCamera()
                         .dispelHexes()
                         .command("execute as @a run scarlet hex forget");
+            }
+            // a town on land with a ridge of rock across it to the north, a canyon to the south, a lake to the east and a
+            // pit in the middle: its streets going through the ridge in tunnels, over the canyon and the lake on bridges,
+            // and over the pit on ground capped over it
+            case "tunnels" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -72; x <= 72; x += 8) {
+                    int x1 = Math.min(72, x + 7);
+                    s.command("execute at @a run fill ~" + x + " ~ ~-72 ~" + x1 + " ~30 ~72 minecraft:air")
+                            .command("execute at @a run fill ~" + x + " ~-24 ~-72 ~" + x1 + " ~-7 ~72 minecraft:stone")
+                            .command("execute at @a run fill ~" + x + " ~-6 ~-72 ~" + x1 + " ~-2 ~72 minecraft:dirt")
+                            .command("execute at @a run fill ~" + x + " ~-1 ~-72 ~" + x1 + " ~-1 ~72 minecraft:grass_block")
+                            // the ridge, east to west
+                            .command("execute at @a run fill ~" + x + " ~ ~-44 ~" + x1 + " ~16 ~-22 minecraft:stone")
+                            .command("execute at @a run fill ~" + x + " ~17 ~-44 ~" + x1 + " ~17 ~-22 minecraft:grass_block")
+                            // the canyon, east to west
+                            .command("execute at @a run fill ~" + x + " ~-20 ~26 ~" + x1 + " ~-1 ~40 minecraft:air");
+                }
+                // the lake to the east, and the pit in the middle of a block
+                s.command("execute at @a run fill ~40 ~-4 ~-12 ~72 ~-1 ~16 minecraft:water")
+                        .command("execute at @a run fill ~10 ~-14 ~6 ~15 ~-1 ~11 minecraft:air");
+                s.anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 900).logHexSize("built").logSteps("its streets")
+                        .command("execute as @a run scarlet hex era 1980s").then(minecraft -> {
+                        }, 200)
+                        .view(0.0, 95.0, 1.0, 0.0, 0.0, 0.0).shot(name + "_above", 40)
+                        .view(29.0, 3.0, -8.0, 29.0, 2.0, -40.0).shot(name + "_ridge", 20)
+                        .view(29.0, 2.5, -20.0, 29.0, 2.0, -40.0).shot(name + "_inside", 20)
+                        .view(54.0, -12.0, 33.0, 29.0, -6.0, 33.0).shot(name + "_canyon", 20)
+                        .view(54.0, 6.0, 30.0, 40.0, 0.0, 2.0).shot(name + "_lake", 20)
+                        .view(4.0, 14.0, 24.0, 12.0, 0.0, 8.0).shot(name + "_pit", 20)
+                        .playerCamera()
+                        .dispelHexes()
+                        .command("execute as @a run scarlet hex forget");
+            }
+            // a town raised on ordinary land among hills, where someone cast theirs, in a world from their own seed
+            // (-PshowcaseSeed=<seed>), grown out over the hills around: whether its streets keep connected, and its houses
+            // can be come to from them
+            case "hills" -> {
+                s.command("gamerule doDaylightCycle false").command("time set noon").command("weather clear")
+                        .command("tp @a 141 220 66").then(minecraft -> {
+                        }, 200)
+                        .command("execute as @a positioned 141 0 66 positioned over motion_blocking_no_leaves run tp @s ~0.5 ~ ~0.5 0 0")
+                        .then(minecraft -> {
+                        }, 40)
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air");
+                s.anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 700).logHexSize("cast")
+                        .command("execute as @a run scarlet hex size 130");
+                for (int k = 1; k <= 8; k++) {
+                    s.then(minecraft -> {
+                    }, 100).logHexSize("grown, " + 5 * k + " s on");
+                }
+                s.logSteps("its streets")
+                        .command("execute as @a run scarlet hex era 1980s").then(minecraft -> {
+                        }, 200)
+                        .view(0.0, 140.0, 1.0, 0.0, 0.0, 0.0).shot(name + "_above", 60)
+                        .view(60.0, 45.0, 60.0, 0.0, 0.0, 0.0).shot(name + "_southeast", 30)
+                        .view(-60.0, 45.0, 60.0, 0.0, 0.0, 0.0).shot(name + "_southwest", 30)
+                        .view(60.0, 45.0, -60.0, 0.0, 0.0, 0.0).shot(name + "_northeast", 30)
+                        .view(-60.0, 45.0, -60.0, 0.0, 0.0, 0.0).shot(name + "_northwest", 30)
+                        // along the main street at the height of a walk up to a front door, and across it at the homes
+                        .view(-34.0, 7.0, -13.0, 30.0, 0.0, -13.0).shot(name + "_street", 30)
+                        .view(10.0, 9.0, -30.0, 10.0, 0.0, 0.0).shot(name + "_fronts", 30)
+                        .playerCamera()
+                        .dispelHexes()
+                        .command("execute as @a run scarlet hex forget");
+            }
+            // a copy of a world someone played, as they left it (-PshowcaseWorld=<folder> -PshowcaseAs=<name>:<uuid>): how
+            // long the server's ticks take while their Hex stands, and then while it is drawn in, or falls from its
+            // full size
+            case "replay", "replayfall" -> {
+                s.then(minecraft -> {
+                }, 200).hideHud(false).logHexSize("loaded");
+                for (int k = 1; k <= 10; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("standing, " + 2 * k + " s on");
+                }
+                s.shot(name + "_standing", 2)
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .select(Spell.HEX);
+                if (name.equals("replayfall")) {
+                    s.command("execute as @a run scarlet hex dispel");
+                    for (int k = 1; k <= 25; k++) {
+                        s.then(minecraft -> {
+                        }, 40).logHexSize("falling, " + 2 * k + " s on");
+                    }
+                } else {
+                    s.sneak(true).hold(true);
+                    for (int k = 1; k <= 12; k++) {
+                        s.then(minecraft -> {
+                        }, 40).logHexSize("drawn in for " + 2 * k + " s");
+                    }
+                    s.hold(false).sneak(false);
+                    for (int k = 1; k <= 10; k++) {
+                        s.then(minecraft -> {
+                        }, 40).logHexSize("let go, " + 2 * k + " s on");
+                    }
+                }
+                s.shot(name + "_after", 2);
             }
             // a standing Hex made over from its remote: a town into an orchard, then just its home, then nothing, and a
             // town again
