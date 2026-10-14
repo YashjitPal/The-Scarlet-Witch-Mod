@@ -49,7 +49,8 @@ public final class LaughTrack {
         }
         long now = level.getGameTime();
         HexSnapshot around = Hexes.clientHexAt(self.position(), now);
-        boolean audience = around != null && around.eraValue().ordinal() <= Era.EIGHTIES.ordinal();
+        // out past where its caster can see, there is no show, and no one laughing at it
+        boolean audience = around != null && around.eraValue().ordinal() <= Era.EIGHTIES.ordinal() && ResidentsClient.unwatched() <= 0.0F;
         boolean funny = false;
         Int2IntOpenHashMap seen = new Int2IntOpenHashMap();
         for (Player player : level.players()) {

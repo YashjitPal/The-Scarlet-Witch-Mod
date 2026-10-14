@@ -75,6 +75,12 @@ public final class ResidentRenderer extends LivingEntityRenderer<LivingEntity, A
         state.speedValue = 1.0F;
         state.swimAmount = entity.getSwimAmount(partialTicks);
         state.isVisuallySwimming = entity.isVisuallySwimming();
+        float frozen = ResidentsClient.frozenAge(entity);
+        if (!Float.isNaN(frozen)) {
+            // out past where its Hex's caster can see, the show has stopped: it stands stock still, not even breathing
+            state.ageInTicks = frozen;
+            state.walkAnimationSpeed = 0.0F;
+        }
         if (state instanceof ResidentRenderState resident) {
             ResidentsClient.Gesturing gesturing = ResidentsClient.gesture(entity);
             resident.gesture = gesturing == null ? null : gesturing.kind();

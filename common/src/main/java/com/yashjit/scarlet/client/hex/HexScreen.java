@@ -373,9 +373,11 @@ public final class HexScreen {
                     builder.putVec4(Era.PRESENT.ordinal(), Era.PRESENT.ordinal(), 0.0F, 0.0F);
                 }
             }
-            builder.putVec4(wrapped(cameraPos.x), wrapped(cameraPos.y), wrapped(cameraPos.z), 0.0F);
+            builder.putVec4(wrapped(cameraPos.x), wrapped(cameraPos.y), wrapped(cameraPos.z),
+                    Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0F);
             float partial = (float) (now - Math.floor(now));
-            builder.putVec4(RewindClient.amount(partial), RewindClient.speed(now), RewindClient.seconds(now), 0.0F);
+            builder.putVec4(RewindClient.amount(partial), RewindClient.speed(now), RewindClient.seconds(now),
+                    ResidentsClient.unwatched() * (config.reduceFlashing ? 0.6F : 1.0F));
         }
     }
 

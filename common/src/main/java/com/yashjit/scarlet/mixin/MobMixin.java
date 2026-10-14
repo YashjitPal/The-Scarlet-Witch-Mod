@@ -6,8 +6,10 @@ import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.magic.MindControl;
 import com.yashjit.scarlet.magic.RuneTraps;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.LevelAccessor;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -42,6 +44,9 @@ abstract class MobMixin {
             ci.cancel();
         } else if (HexEjection.carries(self)) {
             ci.cancel();
+        } else if (Residents.isPaused(self)) {
+            Residents.hold(self);
+            ci.cancel();
         }
     }
 
@@ -52,6 +57,17 @@ abstract class MobMixin {
     private void scarlet$staysWhileSteered(CallbackInfo ci) {
         if (MindControl.steers((Mob) (Object) this)) {
             ci.cancel();
+        }
+    }
+
+    /**
+     * Nothing comes out of the dark into a Hex: its townspeople turn up in the town's own way, in its homes and out on
+     * its streets, rather than wherever it is dark enough, on a roof as like as not.
+     */
+    @Inject(method = "checkSpawnRules", at = @At("HEAD"), cancellable = true)
+    private void scarlet$notOutOfTheDark(LevelAccessor level, EntitySpawnReason reason, CallbackInfoReturnable<Boolean> cir) {
+        if (Residents.keptFromSpawning((Mob) (Object) this, level, reason)) {
+            cir.setReturnValue(false);
         }
     }
 

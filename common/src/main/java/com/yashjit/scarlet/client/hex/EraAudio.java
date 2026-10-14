@@ -28,6 +28,9 @@ public final class EraAudio {
     private static final float[] LOUDNESS = {0.88F, 0.9F, 0.95F, 0.97F, 1.0F, 1.0F};
     /** How far toward its new era the sound moves each tick. */
     private static final float EASE = 0.12F;
+    /** How much of the highs, and of the loudness, falls away out past where a Hex's caster can see. */
+    private static final float UNWATCHED_HIGHS = 0.7F;
+    private static final float UNWATCHED_QUIETER = 0.45F;
 
     private static volatile float highs = 1.0F;
     private static volatile float loudness = 1.0F;
@@ -50,8 +53,10 @@ public final class EraAudio {
                 HexSnapshot hex = Hexes.clientHexAt(ear, now);
                 if (hex != null) {
                     Era era = Hexes.eraAt(hex, ear, now);
-                    targetHighs = HIGHS[era.ordinal()];
-                    targetLoudness = LOUDNESS[era.ordinal()];
+                    // out past where its caster can see, everything sounds far off, as if through a wall
+                    float unwatched = ResidentsClient.unwatched();
+                    targetHighs = HIGHS[era.ordinal()] * (1.0F - UNWATCHED_HIGHS * unwatched);
+                    targetLoudness = LOUDNESS[era.ordinal()] * (1.0F - UNWATCHED_QUIETER * unwatched);
                 }
             }
         }

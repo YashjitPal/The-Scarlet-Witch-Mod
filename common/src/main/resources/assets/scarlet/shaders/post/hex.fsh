@@ -41,10 +41,11 @@ layout(std140) uniform HexView {
     // where each is in stepping back through the eras, x: the era it is leaving, y: the era sweeping round it, z: how far
     // round it the sweep has come, w: where round it the sweep set off from, in radians
     vec4 RemnantStyle[2];
-    // xyz: where the camera is in the world's grid of blocks, as its position modulo 256
+    // xyz: where the camera is in the world's grid of blocks, as its position modulo 256; w: how far out the world is
+    // drawn, in blocks
     vec4 Grid;
     // the Hex around the camera winding back, x: how strongly (0 for not), y: how fast, 1 to 4 times, z: seconds since
-    // it began
+    // it began; w: how far the stopped show has set in around the camera, out past where the Hex's caster can see
     vec4 Rewind;
 };
 
@@ -760,6 +761,22 @@ float televisionMask(vec2 uv, vec2 screen, float amount, float roundness) {
     return mix(1.0, inside, smoothstep(0.0, 0.25, amount));
 }
 
+// Out past where the Hex's caster can see, the show has stopped: the picture drains and dims, the signal frays into a
+// little snow, and a faint bright band rolls slowly down it, as on a set left on with nothing on the air.
+vec3 unwatchedLook(vec3 color, vec2 uv, vec2 pixel, float time, float amount) {
+    color = mix(color, vec3(dot(color, LUMA)), 0.5 * amount);
+    color *= 1.0 - 0.2 * amount;
+    float band = fract(uv.y * 0.7 - time * 0.06);
+    color += vec3(0.06) * amount * smoothstep(0.0, 0.05, band) * (1.0 - smoothstep(0.05, 0.16, band));
+    return mix(color, snow(pixel, time), 0.1 * amount);
+}
+
+// The wall is drawn as far out as the world is and no further, fading as the world does toward the edge of what is drawn.
+float drawnOut(vec3 at, vec3 eye) {
+    float across = length((at - eye).xz);
+    return 1.0 - smoothstep(Grid.w * 0.8, Grid.w, across);
+}
+
 void main() {
     float time = Params.x;
     vec2 screen = Params.yz;
@@ -826,7 +843,7 @@ void main() {
                 int farFace = int(span.w + 0.5);
                 // as in the show, those inside barely see it: a faint shimmer, unless it flares
                 vec4 layer = wallLayer(farSide, t1, c, r, farFace, dir, pixelAngle, time, Styles[i], 0.28, Tears[i]);
-                layer.a *= insideFade(farSide.y - c.y, r);
+                layer.a *= insideFade(farSide.y - c.y, r) * drawnOut(farSide, eye);
                 wall = over(wall, layer);
                 if (i == around) {
                     throughTear = max(throughTear, openingAt(farSide, farFace, c, r, Tears[i], time).x);
@@ -845,14 +862,14 @@ void main() {
                 float farContact = exp(-max(dist - t1, 0.0) * 3.0);
                 vec4 far = wallLayer(farSide, t1, c, r, int(span.w + 0.5), dir, pixelAngle, time, Styles[i], 0.8, Tears[i]);
                 far.rgb = mix(far.rgb, vec3(1.0, 0.8, 0.84), farContact * 0.5);
-                far.a = clamp(far.a + farContact * 0.4, 0.0, 0.95) * outsideFade(farSide.y - c.y, r) * open;
+                far.a = clamp(far.a + farContact * 0.4, 0.0, 0.95) * outsideFade(farSide.y - c.y, r) * open * drawnOut(farSide, eye);
                 wall = over(wall, far);
             }
             // burning brighter where the wall meets the ground and whatever stands in it, though not where it stands open
             float contact = exp(-max(dist - t0, 0.0) * 3.0) * (1.0 - open);
             vec4 layer = wallLayer(entry, t0, c, r, entryFace, dir, pixelAngle, time, Styles[i], 1.0, Tears[i]);
             layer.rgb = mix(layer.rgb, vec3(1.0, 0.8, 0.84), contact * 0.5);
-            layer.a = clamp(layer.a + contact * 0.4, 0.0, 0.95) * outsideFade(entry.y - c.y, r);
+            layer.a = clamp(layer.a + contact * 0.4, 0.0, 0.95) * outsideFade(entry.y - c.y, r) * drawnOut(entry, eye);
             wall = over(wall, layer);
         }
     }
@@ -928,6 +945,9 @@ void main() {
         color = crossingLook(color, uv, texCoord, pixel, p, time, screen, Crossing.z, Crossing.w);
     }
     color = rewindLook(color, uv, texCoord, pixel, insideEra, rewind, Rewind.y, Rewind.z, time, screen, Crossing.z, seam);
+    if (Rewind.w > 0.0) {
+        color = unwatchedLook(color, uv, pixel, time, Rewind.w * insideAmount);
+    }
 
     float television = Params.w;
     if (television > 0.0) {

@@ -12,6 +12,7 @@ import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.network.GesturePayload;
 import com.yashjit.scarlet.network.ResidentsPayload;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
@@ -58,6 +59,14 @@ public final class ResidentsClient {
             "Tanner", "Winslow", "Bundy", "Cunningham", "Pemberton", "Abernathy", "McAllister", "Whitfield", "Lambert"};
 
     private static IntOpenHashSet residents = new IntOpenHashSet();
+    /** Those out past where their Hex's caster can see, and how far into their idling each was when it stopped. */
+    private static final Int2FloatOpenHashMap FROZEN = new Int2FloatOpenHashMap();
+    /** How unsteady those look, slipping as in a shaken Hex, however steady it is. */
+    private static final float FROZEN_UNREST = 0.6F;
+    /** Whether the player stands out past where the caster of the Hex around them can see, and how far that has set in. */
+    private static boolean unwatched;
+    private static float unwatchedAmount;
+    private static final float UNWATCHED_EASE = 0.06F;
     /** When each mob began changing between its two selves. */
     private static final Int2DoubleOpenHashMap CHANGED = new Int2DoubleOpenHashMap();
     /** The gesture each townsperson is making, and when they began it. */
@@ -94,6 +103,32 @@ public final class ResidentsClient {
                         1.9F, false);
             }
         }
+        IntOpenHashSet paused = new IntOpenHashSet(payload.paused());
+        FROZEN.keySet().removeIf(id -> !paused.contains(id));
+        for (int id : paused) {
+            if (!FROZEN.containsKey(id) && level != null && level.getEntity(id) instanceof Entity entity) {
+                FROZEN.put(id, entity.tickCount);
+            }
+        }
+        unwatched = payload.unwatched();
+    }
+
+    /**
+     * How far into its idling a townsperson out past where its Hex's caster can see was when it stopped, which is where
+     * it stays; NaN for one that isn't stopped.
+     */
+    public static float frozenAge(Entity entity) {
+        return FROZEN.getOrDefault(entity.getId(), Float.NaN);
+    }
+
+    /** How far the stopped show has set in around the player: 0 where the Hex's caster can see them, up to 1. */
+    public static float unwatched() {
+        return unwatchedAmount;
+    }
+
+    /** For a showcase of a Hex its caster can't see, shown to its own caster, who always can. */
+    public static void showUnwatched(boolean shown) {
+        unwatched = shown;
     }
 
     public static void gesture(GesturePayload payload) {
@@ -118,6 +153,7 @@ public final class ResidentsClient {
         if (level == null || minecraft.isPaused()) {
             return;
         }
+        unwatchedAmount = Math.clamp(unwatchedAmount + (unwatched ? UNWATCHED_EASE : -UNWATCHED_EASE), 0.0F, 1.0F);
         double now = level.getGameTime();
         CHANGED.int2DoubleEntrySet().removeIf(entry -> now - entry.getDoubleValue() > CHANGE_TICKS);
         GESTURES.values().removeIf(gesturing -> now - gesturing.start() > gesturing.kind().ticks);
@@ -156,6 +192,9 @@ public final class ResidentsClient {
             residents = new IntOpenHashSet();
             CHANGED.clear();
             GESTURES.clear();
+            FROZEN.clear();
+            unwatched = false;
+            unwatchedAmount = 0.0F;
         }
     }
 
@@ -171,12 +210,13 @@ public final class ResidentsClient {
     }
 
     /**
-     * How a resident is slipping right now, while its Hex is unsteady: into another era's clothes, or out of its
-     * disguise altogether.
+     * How a resident is slipping right now, while its Hex is unsteady, or out past where its caster can see: into
+     * another era's clothes, or out of its disguise altogether.
      */
     private static Glitch.Slip slip(Entity entity, double now) {
         HexSnapshot hex = Hexes.clientHexAt(entity.position(), now);
-        return Glitch.slip(now, entity.getId(), hex == null ? 0.0F : HexClient.unrest(hex, now));
+        float unrest = hex == null ? 0.0F : HexClient.unrest(hex, now);
+        return Glitch.slip(now, entity.getId(), FROZEN.containsKey(entity.getId()) ? Math.max(unrest, FROZEN_UNREST) : unrest);
     }
 
     /**
