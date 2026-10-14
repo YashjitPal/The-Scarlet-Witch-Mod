@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
+import java.util.function.LongPredicate;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import net.minecraft.core.BlockPos;
@@ -102,8 +103,11 @@ public final class HexTown {
 
     /** Most blocks the town changes in a tick, building, restyling and taking down together. */
     private static final int BUDGET = 512;
-    /** Most blocks it puts back in a tick while the Hex falls, enough for the biggest town to go back as the wall passes. */
-    private static final int COLLAPSE_BUDGET = 4096;
+    /**
+     * Most blocks it puts back in a tick while the Hex falls, and as its wall moves in: more than the time it has for
+     * them lets it, which is what holds it.
+     */
+    private static final int COLLAPSE_BUDGET = 16384;
     private static final int TRIGGER_INTERVAL = 4;
     private static final int STARTS_PER_TRIGGER = 3;
     private static final int RETRY_SKIPPED = 400;
@@ -114,8 +118,11 @@ public final class HexTown {
     private static final int MAX_FETCHING = 2;
     private static final int FETCH_PATIENCE = 400;
     private static final int KEEP_LOADED_INTERVAL = 10;
-    /** No more land is asked for while the server's ticks take longer than this on average, in nanoseconds. */
-    private static final long FETCH_WHILE_UNDER_NANOS = 35_000_000L;
+    /**
+     * No more land is asked for while the server's ticks take longer than this on average, in nanoseconds, for all but
+     * the towns: making new land is what makes the rest of them long.
+     */
+    private static final long FETCH_WHILE_UNDER_NANOS = 40_000_000L;
     /** How near a player must be to a slipping part to be shown it. */
     private static final double SLIP_SEEN_FROM = 160.0;
     /** Parts slip only this near someone, where they can be seen to. */
@@ -125,6 +132,16 @@ public final class HexTown {
     /** Clearing touches nothing around it: no neighbors told, nothing dropped, no chest spilling its contents. */
     private static final int CLEAR_FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_SKIP_ALL_SIDEEFFECTS;
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
+    /** The order a block's neighbors take in its shape, as the game's own, and how far a change may ripple on. */
+    private static final Direction[] SHAPE_ORDER = {Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH, Direction.DOWN, Direction.UP};
+    private static final int SHAPE_UPDATE_LIMIT = 512;
+    /** What a townsperson may be found standing on, and how far over and under a part's ground they are looked for. */
+    private static final java.util.Set<Role> STANDS_ON = java.util.EnumSet.of(Role.FLOOR, Role.RUG, Role.PORCH, Role.PLAZA, Role.SIDEWALK,
+            Role.WALKWAY, Role.LAWN);
+    private static final int SPAWN_ABOVE = 16;
+    private static final int SPAWN_BELOW = 4;
+    private static final int SPAWN_ATTEMPTS = 12;
+    private static final LongPredicate NONE_GOING_BACK = key -> false;
 
     /** How far the town will cut a hill down, or fill a hollow in, to level a part. */
     private static final int MAX_CUT = 8;
@@ -159,8 +176,7 @@ public final class HexTown {
     private static final int SEEN_LAG = Hexes.GLIDE_TICKS;
     /** How long after the wall stops moving in its sweep is let go. */
     private static final int CUT_LINGER = 40;
-    /** Most blocks put back each tick as the wall moves in, enough to keep up with it at its fastest. */
-    private static final int CUT_BUDGET = 4096;
+    private static final int CUT_BUDGET = COLLAPSE_BUDGET;
     /** Ticks a house the wall cuts into takes to dissolve, from the wall inward. */
     private static final int TAKEDOWN_TICKS = 14;
     /** Ticks what stands in the way takes to dissolve, from the top down, as the town makes way for a home raised anew. */
@@ -307,6 +323,10 @@ public final class HexTown {
     private final LongArrayList cutFresh = new LongArrayList();
     /** When this tick's share of the server's time for the town runs out, in {@link System#nanoTime} nanoseconds. */
     private long deadline = Long.MAX_VALUE;
+    /** The same for putting back what its wall has passed, which goes before anything else. */
+    private long wallDeadline = Long.MAX_VALUE;
+    /** Where the falling wall last stood as the town came down behind it. */
+    private float lastFallWall = Float.MAX_VALUE;
     /** Where what the wall takes back in chunks that aren't loaded goes, to be put back once they are. */
     private @Nullable Leftovers leftovers;
     /** Parts out where no one is whose land the town has asked to be loaded, to build them, and when it asked. */
@@ -545,6 +565,62 @@ public final class HexTown {
 
     public int size() {
         return built.size();
+    }
+
+    /**
+     * Somewhere in the town for a townsperson to be found, between so near a spot and so far from it: on the floor of a
+     * room, a porch or a plaza, or out on a sidewalk, a walk or a lawn, with room to stand. Never on a roof, nor in the
+     * road.
+     *
+     * @return where they would stand, or null if nowhere would do this time
+     */
+    public @Nullable BlockPos spawnSpot(ServerLevel level, Vec3 near, double nearest, double furthest, RandomSource random) {
+        if (plan == null || finished.isEmpty()) {
+            return null;
+        }
+        List<Part> parts = new ArrayList<>();
+        for (Part part : plan.parts()) {
+            if (!finished.contains(part.id()) || !levels.containsKey(part.id())) {
+                continue;
+            }
+            double dx = (part.minX() + part.maxX()) / 2.0 - near.x;
+            double dz = (part.minZ() + part.maxZ()) / 2.0 - near.z;
+            double distance = Math.sqrt(dx * dx + dz * dz);
+            if (distance >= nearest && distance <= furthest) {
+                parts.add(part);
+            }
+        }
+        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
+        for (int attempt = 0; attempt < SPAWN_ATTEMPTS && !parts.isEmpty(); attempt++) {
+            Part part = parts.get(random.nextInt(parts.size()));
+            int x = part.minX() + random.nextInt(part.maxX() - part.minX() + 1);
+            int z = part.minZ() + random.nextInt(part.maxZ() - part.minZ() + 1);
+            int ground = levels.get(part.id());
+            // down through the house from the top, to the first floor with room over it, upstairs as like as not
+            for (int y = ground + SPAWN_ABOVE; y >= ground - SPAWN_BELOW; y--) {
+                Built entry = built.get(BlockPos.asLong(x, y, z));
+                if (entry == null || !STANDS_ON.contains(entry.role()) || !Terrain.isReady(level, x >> 4, z >> 4)) {
+                    continue;
+                }
+                if (level.getBlockState(above.set(x, y + 1, z)).getCollisionShape(level, above).isEmpty()
+                        && level.getBlockState(above.set(x, y + 2, z)).getCollisionShape(level, above).isEmpty()) {
+                    return new BlockPos(x, y + 1, z);
+                }
+                break;
+            }
+        }
+        return null;
+    }
+
+    /** How many of the town's blocks stand out past its wall, still to go back: for seeing how well it keeps up. */
+    public int standingOutside(Vec3 hexCenter, float wall) {
+        int outside = 0;
+        for (long key : built.keySet()) {
+            if (reachOf(hexCenter, key) > wall + 0.5F) {
+                outside++;
+            }
+        }
+        return outside;
     }
 
     /**
@@ -797,15 +873,18 @@ public final class HexTown {
      * @param eraFront how far out from the middle its era has spread since it last changed
      * @param caster   whose Hex it is
      * @param aloft    the caster, while they float in the middle of their rising home
-     * @param deadline when its share of this tick runs out, in {@link System#nanoTime} nanoseconds: whatever is left of
-     *                 building, taking down and making over carries on next tick
-     * @param leftovers where what the wall takes back in chunks that aren't loaded goes, to be put back once they are
+     * @param deadline     when its share of this tick runs out, in {@link System#nanoTime} nanoseconds: whatever is left
+     *                     of building, taking down and making over carries on next tick
+     * @param wallDeadline when its share of this tick for putting back what its wall has passed runs out, which goes
+     *                     first; what is left of that, the wall waits for
+     * @param leftovers    where what the wall takes back in chunks that aren't loaded goes, to be put back once they are
      */
     public void tick(ServerLevel level, Vec3 hexCenter, float wall, float radius, Era era, float eraFront, boolean falling, UUID caster,
-                     @Nullable UUID aloft, long now, long deadline, Leftovers leftovers) {
+                     @Nullable UUID aloft, long now, long deadline, long wallDeadline, Leftovers leftovers) {
         BlockPos center = BlockPos.containing(hexCenter);
         this.aloft = aloft;
         this.deadline = deadline;
+        this.wallDeadline = wallDeadline;
         this.leftovers = leftovers;
         float seen = seen(wall, now);
         if (falling) {
@@ -834,9 +913,9 @@ public final class HexTown {
             lastRadius = radius;
             radiusChangedAt = now;
         }
+        cutBack(level, hexCenter, seen, now);
         int budget = BUDGET;
         budget = takeDown(level, budget, now);
-        cutBack(level, hexCenter, seen, now);
         if (now % TRIGGER_INTERVAL == 0) {
             // while the wall spreads or grows, what is built needs only fit the Hex it is growing into
             float holds = Math.max(seen, radius);
@@ -878,7 +957,7 @@ public final class HexTown {
         if (cut == null && !closing || built.isEmpty()) {
             return;
         }
-        boolean caughtUp = cut == null || cut.cursor >= cut.order.length || cut.reach[cut.cursor] <= wall;
+        boolean caughtUp = cut == null || cut.cursor >= cut.order.length || Sweep.ring(cut.reach[cut.cursor]) <= Sweep.ring(wall);
         if (!closing && now - lastClosing > CUT_LINGER && caughtUp) {
             cut = null;
             cutFresh.clear();
@@ -891,22 +970,25 @@ public final class HexTown {
         }
         int budget = CUT_BUDGET;
         boolean any = false;
-        while (cut.cursor < cut.order.length && budget > 0 && !outOfTime()) {
+        LongPredicate passed = other -> built.containsKey(other) && reachOf(hexCenter, other) > wall;
+        // a ring at a time, those outside the wall's own: within one the sweep keeps no order
+        int inner = Sweep.ring(wall);
+        while (cut.cursor < cut.order.length && budget > 0 && !wallOutOfTime()) {
             int at = cut.cursor;
-            if (cut.reach[at] <= wall) {
+            if (Sweep.ring(cut.reach[at]) <= inner) {
                 break;
             }
             cut.cursor++;
             long key = cut.order[at];
             Built entry = built.get(key);
-            if (entry != null && restore(level, key, entry)) {
+            if (entry != null && restore(level, key, entry, passed)) {
                 budget--;
                 gone(key);
                 any = true;
             }
         }
         // and whatever has gone up since the sweep was sorted, once the wall has passed it too
-        for (int k = cutFresh.size() - 1; k >= 0 && budget > 0 && !outOfTime(); k--) {
+        for (int k = cutFresh.size() - 1; k >= 0 && budget > 0 && !wallOutOfTime(); k--) {
             long key = cutFresh.getLong(k);
             Built entry = built.get(key);
             float reach = reachOf(hexCenter, key);
@@ -915,7 +997,7 @@ public final class HexTown {
             }
             cutFresh.set(k, cutFresh.getLong(cutFresh.size() - 1));
             cutFresh.removeLong(cutFresh.size() - 1);
-            if (entry != null && reach > wall && restore(level, key, entry)) {
+            if (entry != null && reach > wall && restore(level, key, entry, passed)) {
                 budget--;
                 gone(key);
                 any = true;
@@ -1792,6 +1874,35 @@ public final class HexTown {
         return System.nanoTime() > deadline;
     }
 
+    private boolean wallOutOfTime() {
+        return System.nanoTime() > wallDeadline;
+    }
+
+    /**
+     * How many of the town's blocks stand out past where its wall has come in to, still to go back: while there are too
+     * many, the wall waits for them, so it never leaves the town standing outside it.
+     */
+    public int behind() {
+        Sweep sweep = collapse != null ? collapse : cut;
+        if (sweep == null) {
+            return 0;
+        }
+        // the sweep runs from the outside in, a ring at a time: what it has yet to reach out past the wall, the falling
+        // wall's own ring with it
+        int last = collapse != null ? Sweep.ring(lastFallWall) : Sweep.ring(lastSeen) + 1;
+        int low = sweep.cursor;
+        int high = sweep.order.length;
+        while (low < high) {
+            int middle = (low + high) >>> 1;
+            if (Sweep.ring(sweep.reach[middle]) >= last) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        return low - sweep.cursor;
+    }
+
     /**
      * Asks for the land of a part out where no one is to be loaded, for it to be built as the Hex grows out over it
      * rather than once someone goes there: a few parts at a time, the rest waiting their turn.
@@ -1800,7 +1911,7 @@ public final class HexTown {
         long asked = fetching.getOrDefault(part.id(), Long.MIN_VALUE);
         if (asked == Long.MIN_VALUE) {
             // making new land is hard work for the server: only so much at once, and only while it has time to spare
-            if (fetching.size() >= MAX_FETCHING || level.getServer().getAverageTickTimeNanos() > FETCH_WHILE_UNDER_NANOS) {
+            if (fetching.size() >= MAX_FETCHING || Hexes.othersNanos(level.getServer()) > FETCH_WHILE_UNDER_NANOS) {
                 return;
             }
             fetching.put(part.id(), now);
@@ -1929,16 +2040,19 @@ public final class HexTown {
         if (collapse == null) {
             collapse = Sweep.outsideIn(built, hexCenter);
         }
+        lastFallWall = wall;
         int budget = COLLAPSE_BUDGET;
-        while (collapse.cursor < collapse.order.length && budget > 0 && !outOfTime()) {
+        // a ring at a time, the wall's own with it: within one the sweep keeps no order
+        int last = Sweep.ring(wall);
+        while (collapse.cursor < collapse.order.length && budget > 0 && !wallOutOfTime()) {
             int at = collapse.cursor;
-            if (collapse.reach[at] < wall) {
+            if (Sweep.ring(collapse.reach[at]) < last) {
                 break;
             }
             collapse.cursor++;
             long key = collapse.order[at];
             Built entry = built.get(key);
-            if (entry != null && restore(level, key, entry)) {
+            if (entry != null && restore(level, key, entry, built::containsKey)) {
                 budget--;
                 gone(key);
             }
@@ -2091,7 +2205,7 @@ public final class HexTown {
                 unloaded.accept(key, entry);
                 continue;
             }
-            restore(level, key, entry);
+            restore(level, key, entry, built::containsKey);
         }
         built.clear();
         byPart.clear();
@@ -2108,6 +2222,14 @@ public final class HexTown {
      * @return whether anything changed in the world
      */
     private boolean restore(ServerLevel level, long key, Built entry) {
+        return restore(level, key, entry, NONE_GOING_BACK);
+    }
+
+    /**
+     * @param goingBack which of its neighbors go back themselves in a moment, and take it in then: they aren't told of
+     *                  it now
+     */
+    private boolean restore(ServerLevel level, long key, Built entry, LongPredicate goingBack) {
         BlockPos pos = BlockPos.of(key);
         if (!Terrain.isReady(level, pos)) {
             if (leftovers != null) {
@@ -2125,7 +2247,7 @@ public final class HexTown {
         if (!isStill(entry, current) && !HexPaint.paintedOver(level, pos, current)) {
             return false;
         }
-        boolean moved = putBack(level, pos, current, entry);
+        boolean moved = putBack(level, pos, current, entry, goingBack);
         // the other half of a tall plant, a door or a bed comes back with it
         if (entry.original().hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)) {
             BlockPos other = entry.original().getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.LOWER ? pos.above() : pos.below();
@@ -2133,7 +2255,7 @@ public final class HexTown {
             if (pair != null) {
                 BlockState otherNow = level.getBlockState(other);
                 if (isStill(pair, otherNow)) {
-                    putBack(level, other, otherNow, pair);
+                    putBack(level, other, otherNow, pair, goingBack);
                 }
             }
         }
@@ -2159,14 +2281,14 @@ public final class HexTown {
      *
      * @return whether it is done with, rather than still waiting for its chunk
      */
-    public static boolean putBackLeftover(ServerLevel level, long key, Built entry) {
+    public static boolean putBackLeftover(ServerLevel level, long key, Built entry, LongPredicate goingBack) {
         BlockPos pos = BlockPos.of(key);
         if (!Terrain.isReady(level, pos)) {
             return false;
         }
         BlockState current = level.getBlockState(pos);
         if (isStill(entry, current) || HexPaint.paintedOver(level, pos, current)) {
-            putBack(level, pos, current, entry);
+            putBack(level, pos, current, entry, goingBack);
         }
         return true;
     }
@@ -2175,6 +2297,10 @@ public final class HexTown {
      * Puts back what stood at a spot, and whatever was kept in it.
      */
     static boolean putBack(ServerLevel level, BlockPos pos, BlockState current, Built entry) {
+        return putBack(level, pos, current, entry, NONE_GOING_BACK);
+    }
+
+    private static boolean putBack(ServerLevel level, BlockPos pos, BlockState current, Built entry, LongPredicate goingBack) {
         BlockState original = entry.original();
         CompoundTag data = entry.data();
         if (current == original && data == null) {
@@ -2189,7 +2315,13 @@ public final class HexTown {
                 level.sendBlockUpdated(pos, original, original, Block.UPDATE_CLIENTS);
             }
         }
-        original.updateNeighbourShapes(level, pos, BUILT_FLAGS);
+        BlockPos.MutableBlockPos neighbor = new BlockPos.MutableBlockPos();
+        for (Direction direction : SHAPE_ORDER) {
+            neighbor.setWithOffset(pos, direction);
+            if (!goingBack.test(neighbor.asLong())) {
+                level.neighborShapeChanged(direction.getOpposite(), neighbor, pos, original, BUILT_FLAGS, SHAPE_UPDATE_LIMIT);
+            }
+        }
         return true;
     }
 
@@ -3652,6 +3784,11 @@ public final class HexTown {
             this.reach = reach;
         }
 
+        /** Which ring a block that far out falls in; a sweep orders its rings, but not what lies within each. */
+        static int ring(float reach) {
+            return Math.min(MAX_RING, (int) (reach * RINGS_PER_BLOCK));
+        }
+
         static Sweep insideOut(Long2ObjectOpenHashMap<Built> built, Vec3 center) {
             return sorted(built, center, true, 0.0F);
         }
@@ -3683,7 +3820,7 @@ public final class HexTown {
                 float reach = reachOf(center, keys[k]);
                 reaches[k] = reach;
                 if (reach >= from) {
-                    int ring = Math.min(MAX_RING, (int) (reach * RINGS_PER_BLOCK));
+                    int ring = ring(reach);
                     rings[k] = ring;
                     top = Math.max(top, ring);
                     count++;

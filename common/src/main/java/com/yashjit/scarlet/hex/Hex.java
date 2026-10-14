@@ -63,6 +63,8 @@ public final class Hex {
     long phaseSince;
     /** The radius when the current phase began, which the collapse shrinks from. */
     float phaseRadius;
+    /** How long its falling wall has waited for its town to come down behind it. Not saved: a reload ends the wait. */
+    int fallWaited;
     /** When the era last changed, as it spreads out over the Hex from its middle. */
     long eraSince;
     /** The era before, still showing wherever the new one hasn't spread to yet. Not saved: a reload finishes a change. */
@@ -173,6 +175,7 @@ public final class Hex {
         phase = next;
         phaseSince = now;
         phaseRadius = radius;
+        fallWaited = 0;
     }
 
     HexSnapshot snapshot() {

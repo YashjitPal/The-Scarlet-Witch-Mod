@@ -174,10 +174,14 @@ public final class HexClient {
         // the size glides, so the wall keeps pace with the town the server is cutting back or building out behind it
         float size = wall.size(hex.radius(), now);
         float t = (float) (now - hex.phaseSince());
+        if (hex.phaseValue() != Hex.Phase.COLLAPSING) {
+            wall.fallen = Float.MAX_VALUE;
+        }
         return switch (hex.phaseValue()) {
             case FOUNDING -> 0.0F;
             case SPREADING -> size * Ease.outCubic(Ease.clamp01(t / Hexes.SPREAD_TICKS));
-            case COLLAPSING -> hex.phaseRadius() * (1.0F - Hexes.fallen(t / Hexes.collapseTicks(hex.phaseRadius())));
+            // waiting on the town, the server sets its fall back a little at a time: it stops, but never goes back out
+            case COLLAPSING -> wall.fallen = Math.min(wall.fallen, hex.phaseRadius() * (1.0F - Hexes.fallen(t / Hexes.collapseTicks(hex.phaseRadius()))));
             default -> size;
         };
     }
@@ -249,6 +253,8 @@ public final class HexClient {
 
     private static final class Wall {
         float opening;
+        /** How far in it has fallen as drawn, while it falls. */
+        float fallen = Float.MAX_VALUE;
         /** How brightly its front burns as drawn, easing after how brightly it should. */
         float flare;
         /** The size it is gliding to, from what, since when and over how long. */

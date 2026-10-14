@@ -232,7 +232,7 @@ public final class HexData extends SavedData implements HexTown.Leftovers {
                     int x = BlockPos.getX(key);
                     int z = BlockPos.getZ(key);
                     HexTown.Built entry = pending.get(key);
-                    if (entry != null && x >= minX && x <= maxX && z >= minZ && z <= maxZ && HexTown.putBackLeftover(level, key, entry)) {
+                    if (entry != null && x >= minX && x <= maxX && z >= minZ && z <= maxZ && HexTown.putBackLeftover(level, key, entry, pending::containsKey)) {
                         putBack(key);
                     }
                 }
@@ -243,6 +243,29 @@ public final class HexData extends SavedData implements HexTown.Leftovers {
     /** The chunks town blocks are waiting to go back in, packed as {@link #chunk} does. */
     long[] pendingChunks() {
         return pendingByChunk.keySet().toLongArray();
+    }
+
+    /** How many blocks of towns gone wait to be put back, and in how many chunks: for seeing how well that keeps up. */
+    public int leftoverCount() {
+        return pending.size();
+    }
+
+    public int leftoverChunks() {
+        return pendingByChunk.size();
+    }
+
+    /** About the middle of where blocks of towns gone wait to be put back, in block columns, or null if none do. */
+    public @Nullable BlockPos leftoverMiddle() {
+        if (pendingByChunk.isEmpty()) {
+            return null;
+        }
+        long x = 0;
+        long z = 0;
+        for (long chunk : pendingByChunk.keySet()) {
+            x += (chunk >> 32) * 16 + 8;
+            z += (int) chunk * 16L + 8;
+        }
+        return new BlockPos((int) (x / pendingByChunk.size()), 0, (int) (z / pendingByChunk.size()));
     }
 
     /** The town blocks waiting to go back in a chunk. */
