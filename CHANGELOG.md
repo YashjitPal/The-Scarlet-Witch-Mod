@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.9
+
+- **No land in the Hex is left as it was.** A lot a house won't go on is made into what suits its land. A pond is kept as it lies, with a railed boardwalk out over it to a deck. A slope, however steep, is laid in terraces held up by stone walls, with steps up through them, flowers along each, and a wall with steps along the street where it stands over or under the sidewalk. The edge of a drop is a lookout with a parapet, benches facing out and a telescope. A lot its street passes far over on a bridge, like a canyon's floor, is a ball court or a picnic grove.
+- **More to the town.** Ball courts with hoops and painted lines, picnic groves with tables and a grill under shade trees, and out past the middle a filling station or two: pumps under a canopy in the era's colors, a car pulled up at them, and an office with a service bay.
+- **More to the orchard.** Now and then a plot is a greenhouse with benches of potted plants, a chicken coop with a fenced run, a pumpkin patch with a scarecrow, or beehives among beds of flowers with a honey stand by the lane.
+- **The woken hunt.** A townsperson you hit goes after you, or any player near, before anyone else. With no player about it goes after the other townspeople, and any it hurts wakes and joins it. The woken never turn on each other.
+- **Townspeople sound like people all the way.** An enderman among them no longer gives itself away with a whoosh when it teleports or a cry when you look at it, and a witch drinks like anyone.
+
 ## 0.1.8
 
 - **Big Hexes no longer slow the game down.** A town hundreds of blocks across could hold the server up until it ran at a third of its speed, so everything fell seconds behind. The town now does its building, taking down and making over a share of each tick at a time, however big it grows; it finds each part's blocks without going through all of them; and it never waits on land that is still being made. In a world with a Hex at its full size, its town over a million blocks, the server now keeps its pace while the Hex stands and while it's drawn in.
