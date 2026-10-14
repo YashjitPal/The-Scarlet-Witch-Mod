@@ -168,6 +168,15 @@ public final class EraStyle {
                 terracotta(DyeColor.RED), Blocks.DARK_OAK_PLANKS);
         era(Role.BED, Blocks.BED.pick(DyeColor.LIGHT_BLUE), Blocks.BED.pick(DyeColor.CYAN), Blocks.BED.pick(DyeColor.ORANGE),
                 Blocks.BED.pick(DyeColor.PINK), Blocks.BED.pick(DyeColor.LIGHT_GRAY), Blocks.BED.pick(DyeColor.GRAY));
+        // the pumps in the oil company's colors of the day
+        era(Role.PUMP, concrete(DyeColor.RED), concrete(DyeColor.RED), concrete(DyeColor.ORANGE), concrete(DyeColor.WHITE),
+                concrete(DyeColor.LIGHT_GRAY), concrete(DyeColor.WHITE));
+        everyEra(Role.NET, Blocks.IRON_BARS);
+        era(Role.RETAINING, Blocks.STONE_BRICKS, Blocks.STONE_BRICKS, Blocks.COBBLESTONE, Blocks.BRICKS, Blocks.STONE_BRICKS,
+                Blocks.POLISHED_ANDESITE);
+        everyEra(Role.PUMPKIN, Blocks.PUMPKIN);
+        everyEra(Role.BEEHIVE, Blocks.BEEHIVE);
+        everyEra(Role.GLASS, Blocks.GLASS);
     }
 
     private EraStyle() {

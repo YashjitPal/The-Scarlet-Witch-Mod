@@ -65,7 +65,7 @@ public final class Houses {
      */
     private static final long HOMES_MARK = 0x5CA1L << 48;
     private static final long SEED_BITS = (1L << 48) - 1;
-    private static final int[] GARDEN_TICKS = {8, 10, 12};
+    static final int[] GARDEN_TICKS = {8, 10, 12};
     /** Leveling around a building that stays, a while for it to be made over, then the yard. */
     private static final int[] AROUND_TICKS = {8, 30, 12};
 
@@ -1201,7 +1201,8 @@ public final class Houses {
             case PORCH_POST, CHIMNEY, SHUTTER, AWNING, SIGN, LAMP_POST -> EXTERIOR;
             case WALKWAY, PICKET, GATE, HEDGE, FLOWER, MAILBOX, MAILBOX_POST, TREE_LOG, TREE_LEAVES, ORCHARD_LEAVES, ORCHARD_BLOSSOM,
                  SIDEWALK, ROAD, ROAD_LINE, ROAD_STEP, SIDEWALK_STEP, PLAZA, GAZEBO_POST, BENCH, HAY, PLAY_FRAME, SLIDE, CHAIN, BELL,
-                 PRESERVE, BRIDGE_PIER, BRIDGE_RAIL, LANE_STEP, LANE_DECK, LANE_PIER, LANE_RAIL, LANE_DECK_STEP, TUNNEL_WALL, TUNNEL_CEILING -> YARD;
+                 PRESERVE, BRIDGE_PIER, BRIDGE_RAIL, LANE_STEP, LANE_DECK, LANE_PIER, LANE_RAIL, LANE_DECK_STEP, TUNNEL_WALL, TUNNEL_CEILING,
+                 PUMP, NET, RETAINING, PUMPKIN, BEEHIVE, GLASS -> YARD;
             case RUG, COUCH, TABLE, SHELF, FRIDGE, COUNTER, SINK, PLANT, LAMP, BED, TELEVISION, RADIO, TELEPHONE, STOVE, TOASTER, ARMCHAIR,
                  TABLE_LAMP, CLOCK, PICTURE, POSTER -> INTERIOR;
         };

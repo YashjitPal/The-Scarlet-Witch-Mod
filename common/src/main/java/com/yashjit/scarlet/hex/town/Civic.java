@@ -325,6 +325,80 @@ final class Civic {
         return lot;
     }
 
+    // ---------------------------------------------------------------- the filling station
+
+    /**
+     * A filling station: its forecourt paved out to the street, a canopy on four posts over two pairs of pumps, banded
+     * in the oil company's colors with lamps hanging under it, a car pulled up between the pumps, and behind them a
+     * little office with its window on the forecourt, a service bay with a glass door beside it, its sign over the
+     * door, and another on a post by the street.
+     */
+    static Blueprint gasStation(Frame frame, int g, Houses.Heights heights, RandomSource random) {
+        Blueprint lot = new Blueprint(frame, STAGE_TICKS);
+        Houses.level(lot, LOT_WIDTH, LOT_DEPTH, g, heights);
+        int forecourt = 10;
+        lot.fill(1, LOT_WIDTH - 2, 0, forecourt, g, g, Role.ROAD, FULL, GROUND);
+        lot.fill(0, 0, 0, forecourt, g, g, Role.SIDEWALK, FULL, GROUND);
+        lot.fill(LOT_WIDTH - 1, LOT_WIDTH - 1, 0, forecourt, g, g, Role.SIDEWALK, FULL, GROUND);
+        // the canopy
+        int left = 3;
+        int right = LOT_WIDTH - 4;
+        int front = 3;
+        int back = 8;
+        for (int a : new int[] {left + 1, right - 1}) {
+            for (int b : new int[] {front + 1, back - 1}) {
+                lot.fill(a, a, b, b, g + 1, g + 4, Role.TRIM, pillar(Direction.Axis.Y), FRAME);
+            }
+        }
+        lot.fill(left + 1, right - 1, front + 1, back - 1, g + 5, g + 5, Role.CEILING, FULL, ROOF);
+        ring(lot, left, right, front, back, g + 5, Role.PUMP, FULL, ROOF);
+        lot.fill(left, right, front, back, g + 6, g + 6, Role.ROOF_SLAB, slab(SlabType.BOTTOM), ROOF);
+        int middle = LOT_WIDTH / 2;
+        lot.set(middle - 2, front + 2, g + 4, Role.LAMP, lantern(true), EXTERIOR);
+        lot.set(middle + 2, back - 2, g + 4, Role.LAMP, lantern(true), EXTERIOR);
+        // the pumps, either side of the car's place
+        for (int a : new int[] {middle - 2, middle + 2}) {
+            lot.fill(a, a, front + 2, back - 2, g + 1, g + 2, Role.PUMP, FULL, EXTERIOR);
+            lot.set(a, front + 2, g + 3, Role.ROOF_SLAB, slab(SlabType.BOTTOM), EXTERIOR);
+            lot.set(a, back - 2, g + 3, Role.ROOF_SLAB, slab(SlabType.BOTTOM), EXTERIOR);
+        }
+        lot.car(middle, front + 1, back - 1, g + 1, frame.back(), Math.floorMod(Long.hashCode(frame.origin().asLong()), 5));
+        // the office and the service bay
+        int officeLeft = 3;
+        int officeRight = LOT_WIDTH - 4;
+        int officeFront = forecourt + 1;
+        int officeBack = LOT_DEPTH - 3;
+        int top = g + 4;
+        boolean brick = random.nextBoolean();
+        Role walls = brick ? Role.CIVIC_WALL : Role.WALL;
+        int paint = random.nextInt(EraStyle.PAINTS);
+        hall(lot, officeLeft, officeRight, officeFront, officeBack, g, top, walls, paint);
+        lot.fill(officeLeft - 1, officeRight + 1, officeFront - 1, officeBack + 1, top + 1, top + 1, Role.ROOF_SLAB, slab(SlabType.BOTTOM), ROOF);
+        ring(lot, officeLeft, officeRight, officeFront, officeBack, top + 1, Role.PUMP, FULL, ROOF);
+        int door = officeLeft + 3;
+        for (int a = officeLeft + 1; a < door; a++) {
+            window(lot, a, officeFront, g + 2, 2, WALLS);
+        }
+        door(lot, door, officeFront, g + 2, frame.back(), WALLS);
+        lot.set(door, officeFront - 1, g + 4, Role.SIGN, Signs.GAS, sign(frame.front()), EXTERIOR);
+        // a wall between the office and the bay, and the bay's glass door
+        lot.fill(door + 2, door + 2, officeFront + 1, officeBack - 1, g + 2, top, walls, paint, FULL, WALLS);
+        for (int a = door + 3; a < officeRight; a++) {
+            window(lot, a, officeFront, g + 2, 3, WALLS);
+        }
+        lot.fill(officeLeft + 1, officeLeft + 2, officeFront + 2, officeFront + 2, g + 2, g + 2, Role.COUNTER, FULL, INTERIOR);
+        lot.fill(officeLeft + 1, door + 1, officeBack - 1, officeBack - 1, g + 2, g + 3, Role.SHELF, FULL, INTERIOR);
+        lot.set(officeLeft + 2, officeFront + 2, top, Role.LAMP, lantern(true), INTERIOR);
+        lot.set(officeRight - 2, officeFront + 2, top, Role.LAMP, lantern(true), INTERIOR);
+        lot.fill(door + 3, officeRight - 1, officeBack - 1, officeBack - 1, g + 2, g + 3, Role.SHELF, FULL, INTERIOR);
+        // the sign by the street, on a post with a box of the company's colors over it
+        lot.fill(0, 0, 1, 1, g + 1, g + 3, Role.LAMP_POST, FENCE, EXTERIOR);
+        lot.set(0, 1, g + 4, Role.PUMP, FULL, EXTERIOR);
+        lot.set(0, 0, g + 4, Role.SIGN, Signs.GAS, sign(frame.front()), EXTERIOR);
+        lot.set(LOT_WIDTH - 1, forecourt + 1, g + 1, Role.BENCH, stairs(frame.right(), Half.BOTTOM), EXTERIOR);
+        return lot;
+    }
+
     // ---------------------------------------------------------------- the schoolhouse
 
     /**

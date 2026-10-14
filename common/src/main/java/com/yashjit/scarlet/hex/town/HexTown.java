@@ -139,6 +139,8 @@ public final class HexTown {
     private static final int SHORTEST_TUNNEL = 3;
     /** Furthest a lot can lie over or under its sidewalk for what stands on it to be come to from the street. */
     private static final int UNREACHABLE = Houses.FRONT_RISE + 3;
+    /** How far a lot's land may climb from its front to its back, past which what can't go on it is laid in terraces. */
+    private static final int TERRACE_CLIMB = 4;
     /** Water deeper than this is a lake, a river or the sea, and the town leaves it be. */
     private static final int SHALLOW = 2;
     /** How far down through what stands on the land the town looks for the ground. */
@@ -217,7 +219,7 @@ public final class HexTown {
             Codec.INT.optionalFieldOf("home_shift", 0).forGetter(town -> town.homeShift),
             Recall.CODEC.forGetter(town -> new Recall(Optional.ofNullable(town.origin), Optional.ofNullable(town.home), town.reach,
                     town.remembered, Optional.ofNullable(town.homeLot), town.endsToSave(), town.streetLevelsToSave(), town.plannedCrossingsToSave(),
-                    town.gardens.toIntArray()))
+                    new int[0], town.groundsToSave()))
     ).apply(i, HexTown::load));
 
     /**
@@ -229,10 +231,12 @@ public final class HexTown {
      * @param ends         each stretch's id, then the heights it meets the road at past its start and past its far end
      * @param streetLevels each stretch's id, how many columns it has, then how high each is laid
      * @param crossings    each crossing's id, then how high it is to be laid
-     * @param gardens      the lots laid out as gardens, their land not taking a house
+     * @param gardens      the lots laid out as gardens, their land not taking a house, as towns kept them before there
+     *                     were other grounds
+     * @param grounds      each lot laid out as what suits its land rather than what it was zoned for, then which
      */
     private record Recall(Optional<BlockPos> origin, Optional<Vec3> home, float reach, List<TownMemory> remembered,
-                          Optional<TownPlan.HomeLot> homeLot, int[] ends, int[] streetLevels, int[] crossings, int[] gardens) {
+                          Optional<TownPlan.HomeLot> homeLot, int[] ends, int[] streetLevels, int[] crossings, int[] gardens, int[] grounds) {
 
         static final MapCodec<Recall> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 BlockPos.CODEC.optionalFieldOf("origin").forGetter(Recall::origin),
@@ -243,7 +247,8 @@ public final class HexTown {
                 INTS.optionalFieldOf("street_ends", new int[0]).forGetter(Recall::ends),
                 INTS.optionalFieldOf("street_levels", new int[0]).forGetter(Recall::streetLevels),
                 INTS.optionalFieldOf("crossing_levels", new int[0]).forGetter(Recall::crossings),
-                INTS.optionalFieldOf("gardens", new int[0]).forGetter(Recall::gardens)
+                INTS.optionalFieldOf("gardens", new int[0]).forGetter(Recall::gardens),
+                INTS.optionalFieldOf("grounds", new int[0]).forGetter(Recall::grounds)
         ).apply(i, Recall::new));
     }
 
@@ -270,8 +275,11 @@ public final class HexTown {
     private final Int2ObjectOpenHashMap<int[]> streetLevels = new Int2ObjectOpenHashMap<>();
     /** How high crossings the runs meeting them were worked out to meet are to be laid, before they are begun. */
     private final Int2IntOpenHashMap plannedCrossings = new Int2IntOpenHashMap();
-    /** Lots whose land won't take a house, at the edge of a drop or too steep, laid out as gardens instead. */
-    private final IntOpenHashSet gardens = new IntOpenHashSet();
+    /**
+     * Lots whose land won't take what they were zoned for, under water, at the edge of a drop, too steep or out of reach
+     * of their street, laid out as what suits it instead.
+     */
+    private final Int2ObjectOpenHashMap<Use> grounds = new Int2ObjectOpenHashMap<>();
     private final IntOpenHashSet finished = new IntOpenHashSet();
     /** Parts being built, and when they began. */
     private final Int2LongOpenHashMap started = new Int2LongOpenHashMap();
@@ -469,9 +477,23 @@ public final class HexTown {
             town.plannedCrossings.put(crossings[k], crossings[k + 1]);
         }
         for (int id : recall.gardens()) {
-            town.gardens.add(id);
+            town.grounds.put(id, Use.GARDEN);
+        }
+        int[] grounds = recall.grounds();
+        for (int k = 0; k + 1 < grounds.length; k += 2) {
+            town.grounds.put(grounds[k], Use.byIndex(grounds[k + 1]));
         }
         return town;
+    }
+
+    private int[] groundsToSave() {
+        int[] saved = new int[grounds.size() * 2];
+        int k = 0;
+        for (Int2ObjectMap.Entry<Use> entry : grounds.int2ObjectEntrySet()) {
+            saved[k++] = entry.getIntKey();
+            saved[k++] = entry.getValue().ordinal();
+        }
+        return saved;
     }
 
     private int[] streetLevelsToSave() {
@@ -523,6 +545,28 @@ public final class HexTown {
 
     public int size() {
         return built.size();
+    }
+
+    /**
+     * The middle of every lot begun that isn't a house, by what it is: what it was zoned for, or what the town made of
+     * land that wouldn't take that. For seeing how a town turned out.
+     */
+    public java.util.Map<String, List<BlockPos>> lotsByUse() {
+        java.util.Map<String, List<BlockPos>> found = new java.util.TreeMap<>();
+        if (plan == null) {
+            return found;
+        }
+        for (Part part : plan.parts()) {
+            if (part.kind() != Kind.HOUSE || !levels.containsKey(part.id())) {
+                continue;
+            }
+            Use use = grounds.getOrDefault(part.id(), zoning().getOrDefault(part.id(), Use.HOUSE));
+            if (use != Use.HOUSE) {
+                BlockPos middle = new Frame(part.origin(), part.front()).at(part.width() / 2, part.depth() / 2, levels.get(part.id()));
+                found.computeIfAbsent(use.name().toLowerCase(java.util.Locale.ROOT), key -> new ArrayList<>()).add(middle);
+            }
+        }
+        return found;
     }
 
     /**
@@ -994,11 +1038,18 @@ public final class HexTown {
             }
             putBackLeftovers(level, part);
             Survey survey = survey(level, part, hexCenter, clip);
-            if (survey == null && part.kind() == Kind.HOUSE && gardens.add(id)) {
-                // land a house won't go on is still the town's: a garden, as much of it as will take one
+            if (survey == null && part.kind() == Kind.HOUSE && !grounds.containsKey(id)) {
+                // land a house won't go on is still the town's, laid out as what suits it, or failing that a garden, as
+                // much of it as will take one
+                Use suits = groundsFor(level, hexCenter, part);
+                grounds.put(id, suits);
                 survey = survey(level, part, hexCenter, clip);
+                if (survey == null && suits != Use.GARDEN) {
+                    grounds.put(id, Use.GARDEN);
+                    survey = survey(level, part, hexCenter, clip);
+                }
                 if (survey == null) {
-                    gardens.remove(id);
+                    grounds.remove(id);
                 } else {
                     changed = true;
                 }
@@ -1088,6 +1139,7 @@ public final class HexTown {
             }
         }
         int top = survey.ground();
+        boolean pond = clip == WHOLE && grounds.get(part.id()) == Use.POND;
         for (int b = 0; b < part.depth(); b++) {
             for (int a = 0; a < part.width(); a++) {
                 int index = b * part.width() + a;
@@ -1101,8 +1153,9 @@ public final class HexTown {
                     pos.setY(y);
                     long key = pos.asLong();
                     BlockState state = level.getBlockState(pos);
-                    // beside a building that stays, its garden's water stays too
-                    if (state.isAir() || built.containsKey(key) || standing.contains(key) || occupied[index] && !state.getFluidState().isEmpty()) {
+                    // beside a building that stays, its garden's water stays too, and a pond's water is the pond
+                    if (state.isAir() || built.containsKey(key) || standing.contains(key)
+                            || (occupied[index] || pond) && !state.getFluidState().isEmpty()) {
                         continue;
                     }
                     clearing.add(new Piece(pos.immutable(), Role.CLEAR, 0, AIR, 0, 0));
@@ -2434,7 +2487,8 @@ public final class HexTown {
             }
         }
         boolean road = graded(part) || part.kind() == Kind.CROSSING;
-        boolean forgiving = part.kind().isStreet() || clip != WHOLE || gardens.contains(part.id());
+        Use suits = clip == WHOLE ? grounds.get(part.id()) : null;
+        boolean forgiving = part.kind().isStreet() || clip != WHOLE || suits != null;
         if (count == 0 && !road) {
             return null;
         }
@@ -2456,14 +2510,25 @@ public final class HexTown {
             Streets.Profile profile = graded(part) ? profile(level, hexCenter, part, columns) : crossingProfile(level, hexCenter, part, columns);
             return new Survey(graded(part) ? ground : profile.levels()[0], columns, blocked, width, profile, null);
         }
-        int[] sidewalk = part.kind() == Kind.HOUSE && clip == WHOLE && !gardens.contains(part.id()) ? sidewalk(level, hexCenter, part) : null;
+        if (suits == Use.TERRACES) {
+            // laid up the slope as it goes: only what can't be broken, or lies under deep water, is left alone
+            int left = 0;
+            for (int index = 0; index < columns.length; index++) {
+                Terrain.Column column = columns[index];
+                blocked[index] = column == null || column.untouchable() || column.water() > SHALLOW;
+                left += column != null && blocked[index] ? 1 : 0;
+            }
+            return left * 2 <= inside ? new Survey(ground, columns, blocked, width, null, sidewalk(level, hexCenter, part)) : null;
+        }
+        boolean pond = suits == Use.POND;
+        int[] sidewalk = part.kind() == Kind.HOUSE && clip == WHOLE && suits == null ? sidewalk(level, hexCenter, part) : null;
         if (sidewalk != null) {
             // laid near its street's height, for its front to come down to the sidewalk, or up to it, in a few steps:
             // anything but a house within a step of it. Where the land won't have that, as it was
             int at = sidewalk[width / 2];
             boolean house = zoning().getOrDefault(part.id(), Use.HOUSE) == Use.HOUSE;
             int near = Math.clamp(ground, at - (house ? Houses.FRONT_DROP : 1), at + (house ? Houses.FRONT_RISE : 1));
-            if (near != ground && fits(columns, width, depth, near, inside, forgiving, blocked)) {
+            if (near != ground && fits(columns, width, depth, near, inside, forgiving, false, blocked)) {
                 return new Survey(near, columns, blocked, width, null, sidewalk);
             }
             if (Math.abs(ground - at) > UNREACHABLE) {
@@ -2472,7 +2537,7 @@ public final class HexTown {
                 return null;
             }
         }
-        return fits(columns, width, depth, ground, inside, forgiving, blocked) ? new Survey(ground, columns, blocked, width, null, sidewalk) : null;
+        return fits(columns, width, depth, ground, inside, forgiving, pond, blocked) ? new Survey(ground, columns, blocked, width, null, sidewalk) : null;
     }
 
     /**
@@ -2481,12 +2546,39 @@ public final class HexTown {
      * ground anywhere, as long as there isn't too much of it; where most of a side of the lot falls away, it is the edge
      * of a drop instead.
      *
+     * @param pond    whether water is part of what goes there, kept as it is, rather than left alone
      * @param blocked filled in with the columns it leaves alone
      */
     private static boolean fits(Terrain.@Nullable Column[] columns, int width, int depth, int ground, int inside, boolean forgiving,
-                                boolean[] blocked) {
+                                boolean pond, boolean[] blocked) {
         Arrays.fill(blocked, false);
-        // how much of each side falls away: front, back, left, right
+        boolean drop = dropsAway(columns, width, depth, ground);
+        int left = 0;
+        int holes = 0;
+        for (int index = 0; index < columns.length; index++) {
+            Terrain.Column column = columns[index];
+            if (column == null) {
+                blocked[index] = true;
+                continue;
+            }
+            boolean hole = !drop && falls(column, ground);
+            boolean usable = hole || pond && column.water() > 0 && !column.untouchable()
+                    || column.isLand(SHALLOW) && !column.untouchable() && column.surface() - ground <= MAX_CUT && ground - column.surface() <= MAX_FILL;
+            holes += hole ? 1 : 0;
+            if (!usable) {
+                if (!forgiving) {
+                    return false;
+                }
+                blocked[index] = true;
+                left++;
+            }
+        }
+        return left * 2 <= inside && holes * 10 <= inside * 3;
+    }
+
+    /** Whether most of a side of a part laid at a height falls away from it: the edge of a drop. */
+    private static boolean dropsAway(Terrain.@Nullable Column[] columns, int width, int depth, int ground) {
+        // front, back, left, right
         int[] sides = new int[4];
         for (int index = 0; index < columns.length; index++) {
             if (columns[index] != null && falls(columns[index], ground)) {
@@ -2498,28 +2590,97 @@ public final class HexTown {
                 sides[3] += a == width - 1 ? 1 : 0;
             }
         }
-        boolean drop = sides[0] * 2 > width || sides[1] * 2 > width || sides[2] * 2 > depth || sides[3] * 2 > depth;
-        int left = 0;
-        int holes = 0;
-        for (int index = 0; index < columns.length; index++) {
-            Terrain.Column column = columns[index];
-            if (column == null) {
-                blocked[index] = true;
-                continue;
-            }
-            boolean hole = !drop && falls(column, ground);
-            boolean usable = hole || column.isLand(SHALLOW) && !column.untouchable() && column.surface() - ground <= MAX_CUT
-                    && ground - column.surface() <= MAX_FILL;
-            holes += hole ? 1 : 0;
-            if (!usable) {
-                if (!forgiving) {
-                    return false;
+        return sides[0] * 2 > width || sides[1] * 2 > width || sides[2] * 2 > depth || sides[3] * 2 > depth;
+    }
+
+    /**
+     * What suits a lot whose land won't take what it was zoned for: a pond kept as a park where a good part of it lies
+     * under water with land round it, a lookout where a side of it falls away, terraces where it climbs too steeply to
+     * lay level, a ball court or a picnic grove where its street passes far over or under it, and otherwise a garden,
+     * or now and then a grove. In an orchard, a pond or a meadow.
+     */
+    private Use groundsFor(ServerLevel level, Vec3 hexCenter, Part lot) {
+        Frame frame = new Frame(lot.origin(), lot.front());
+        int width = lot.width();
+        int depth = lot.depth();
+        Terrain.Column[] columns = new Terrain.Column[width * depth];
+        int[] land = new int[columns.length];
+        int count = 0;
+        int wet = 0;
+        for (int b = 0; b < depth; b++) {
+            for (int a = 0; a < width; a++) {
+                BlockPos at = frame.at(a, b, 0);
+                Terrain.Column column = column(level, at.getX(), at.getZ());
+                columns[b * width + a] = column;
+                wet += column.water() > 0 && column.surface() != Terrain.NO_GROUND ? 1 : 0;
+                if (column.isLand(SHALLOW)) {
+                    land[count++] = column.surface();
                 }
-                blocked[index] = true;
-                left++;
             }
         }
-        return left * 2 <= inside && holes * 10 <= inside * 3;
+        if (wet * 5 >= columns.length && count * 4 >= columns.length) {
+            return Use.POND;
+        }
+        if (mode == HexBuild.ORCHARD || count == 0) {
+            return Use.GARDEN;
+        }
+        Arrays.sort(land, 0, count);
+        int ground = land[count / 2];
+        // a slope climbing steadily, however steep, is laid in terraces; a drop all at once is the edge of a cliff
+        int[] climb = climb(columns, width, depth);
+        boolean steady = climb[1] <= 2 * Grounds.TERRACE_WALL;
+        if (steady && climb[0] > TERRACE_CLIMB) {
+            return Use.TERRACES;
+        }
+        if (dropsAway(columns, width, depth, ground)) {
+            return Use.LOOKOUT;
+        }
+        if (climb[0] > TERRACE_CLIMB) {
+            return Use.TERRACES;
+        }
+        int[] sidewalk = sidewalk(level, hexCenter, lot);
+        float pick = hash(seedOf(lot), lot.id(), 13);
+        if (sidewalk != null && Math.abs(ground - sidewalk[width / 2]) > UNREACHABLE) {
+            return pick < 0.5F ? Use.COURT : Use.GROVE;
+        }
+        return pick < 0.3F ? Use.GROVE : Use.GARDEN;
+    }
+
+    /**
+     * How a lot's land climbs or falls from its front to its back, band by band, each band a terrace's rows deep: how
+     * far between its highest band and its lowest, and the most from one band to the next. A band mostly over a drop
+     * isn't counted, nor is the step past it.
+     */
+    private static int[] climb(Terrain.@Nullable Column[] columns, int width, int depth) {
+        int lowest = Integer.MAX_VALUE;
+        int highest = Integer.MIN_VALUE;
+        int steepest = 0;
+        int last = Integer.MIN_VALUE;
+        int[] band = new int[width * Grounds.TERRACE];
+        for (int from = 0; from < depth; from += Grounds.TERRACE) {
+            int n = 0;
+            for (int b = from; b < Math.min(depth, from + Grounds.TERRACE); b++) {
+                for (int a = 0; a < width; a++) {
+                    Terrain.Column column = columns[b * width + a];
+                    if (column != null && column.isLand(SHALLOW)) {
+                        band[n++] = column.surface();
+                    }
+                }
+            }
+            if (n * 2 < width * Math.min(Grounds.TERRACE, depth - from)) {
+                last = Integer.MIN_VALUE;
+                continue;
+            }
+            Arrays.sort(band, 0, n);
+            int middle = band[n / 2];
+            lowest = Math.min(lowest, middle);
+            highest = Math.max(highest, middle);
+            if (last != Integer.MIN_VALUE) {
+                steepest = Math.max(steepest, Math.abs(middle - last));
+            }
+            last = middle;
+        }
+        return new int[] {highest < lowest ? 0 : highest - lowest, steepest};
     }
 
     /** The stretch of street a lot faces, if it faces one. */
@@ -3042,7 +3203,7 @@ public final class HexTown {
         levels.remove(id);
         ends.remove(id);
         streetLevels.remove(id);
-        gardens.remove(id);
+        grounds.remove(id);
     }
 
     /**
@@ -3099,8 +3260,7 @@ public final class HexTown {
         if (mode == HexBuild.ORCHARD) {
             return switch (part.kind()) {
                 case HOME -> Houses.anchor(frame, ground, heights, random, homes);
-                case HOUSE -> random.nextFloat() < 0.18F || gardens.contains(part.id()) ? Orchard.meadow(frame, ground, heights, random, occupied)
-                        : Orchard.plot(frame, ground, heights, random, occupied);
+                case HOUSE -> plot(part, frame, survey, random, occupied);
                 case SQUARE -> Orchard.farmyard(frame, part.width(), part.depth(), ground, heights, random);
                 case STREET, CROSS_STREET -> survey.profile() != null ? Streets.lane(frame, part.width(), survey.profile(), heights)
                         : Orchard.lane(frame, part.width(), ground, heights);
@@ -3109,7 +3269,8 @@ public final class HexTown {
         }
         return switch (part.kind()) {
             case HOME -> Houses.anchor(frame, ground, heights, random, homes);
-            case HOUSE -> cutThrough || gardens.contains(part.id()) ? Houses.garden(frame, ground, heights, random)
+            case HOUSE -> cutThrough ? Houses.garden(frame, ground, heights, random)
+                    : grounds.containsKey(part.id()) ? grounds(grounds.get(part.id()), frame, survey, random)
                     : lot(part, frame, ground, heights, random, survey.sidewalk());
             case SQUARE -> Streets.square(frame, part.width(), part.depth(), ground, heights, random);
             case STREET -> survey.profile() != null ? Streets.graded(frame, part.width(), survey.profile(), heights, 0)
@@ -3132,15 +3293,77 @@ public final class HexTown {
             case SCHOOL -> Civic.school(frame, ground, heights, random);
             case PLAYGROUND -> Civic.playground(frame, ground, heights, random);
             case PARK -> Houses.park(frame, ground, heights, random);
+            case COURT -> Grounds.court(frame, ground, heights, random);
+            case GROVE -> Grounds.grove(frame, ground, heights, random);
+            case GAS_STATION -> Civic.gasStation(frame, ground, heights, random);
+            case GARDEN, POND, LOOKOUT, TERRACES -> Houses.garden(frame, ground, heights, random);
             case HOUSE -> Houses.house(frame, ground, heights, random, sidewalk);
         };
     }
 
+    /**
+     * What goes up on a lot laid out as what suits its land rather than what it was zoned for.
+     */
+    private static Blueprint grounds(Use use, Frame frame, Survey survey, RandomSource random) {
+        int ground = survey.ground();
+        Houses.Heights heights = survey::height;
+        return switch (use) {
+            case POND -> Grounds.pond(frame, ground, heights, survey::water, random);
+            case LOOKOUT -> Grounds.lookout(frame, ground, heights, random);
+            case TERRACES -> Grounds.terraces(frame, survey.sidewalk() != null ? survey.sidewalk()[survey.width() / 2] : Grounds.NO_STREET, heights, random);
+            case COURT -> Grounds.court(frame, ground, heights, random);
+            case GROVE -> Grounds.grove(frame, ground, heights, random);
+            default -> Houses.garden(frame, ground, heights, random);
+        };
+    }
+
+    /**
+     * What goes up on a plot of the orchard: mostly rows of fruit trees, now and then a meadow, and where nothing
+     * stands on it already, here and there a greenhouse, a chicken coop, a pumpkin patch or beehives. Land that won't
+     * take a plot is a meadow, or a pond kept as it is with a dock out over it.
+     */
+    private Blueprint plot(Part part, Frame frame, Survey survey, RandomSource random, boolean[] occupied) {
+        int ground = survey.ground();
+        Houses.Heights heights = survey::height;
+        Use use = grounds.get(part.id());
+        if (use == Use.POND) {
+            return Grounds.pond(frame, ground, heights, survey::water, random);
+        }
+        if (use != null) {
+            return Orchard.meadow(frame, ground, heights, random, occupied);
+        }
+        boolean clear = true;
+        for (boolean taken : occupied) {
+            clear &= !taken;
+        }
+        float pick = hash(seedOf(part), part.id(), 17);
+        if (clear && pick < 0.24F) {
+            return pick < 0.06F ? Orchard.greenhouse(frame, ground, heights, random)
+                    : pick < 0.12F ? Orchard.coop(frame, ground, heights, random)
+                    : pick < 0.18F ? Orchard.pumpkins(frame, ground, heights, random)
+                    : Orchard.hives(frame, ground, heights, random);
+        }
+        return random.nextFloat() < 0.18F ? Orchard.meadow(frame, ground, heights, random, occupied) : Orchard.plot(frame, ground, heights, random, occupied);
+    }
+
     // ---------------------------------------------------------------- zoning
 
-    /** What a lot of the town is for. */
+    /**
+     * What a lot of the town is for. Saved by position, for lots laid out as what suits their land, so new ones come
+     * last.
+     */
     private enum Use {
-        HOUSE, PARK, PLAYGROUND, SHOP, LIBRARY, CHAPEL, SCHOOL
+        HOUSE, PARK, PLAYGROUND, SHOP, LIBRARY, CHAPEL, SCHOOL,
+        // what suits land that won't take what a lot was zoned for
+        GARDEN, POND, LOOKOUT, TERRACES,
+        // here and there among the houses, and on lots out of reach of their street
+        COURT, GROVE, GAS_STATION;
+
+        private static final Use[] VALUES = values();
+
+        static Use byIndex(int index) {
+            return VALUES[Math.clamp(index, 0, VALUES.length - 1)];
+        }
     }
 
     /**
@@ -3214,6 +3437,8 @@ public final class HexTown {
         pick(uses, lots, layer, seed, Use.LIBRARY, 40.0, 85.0);
         pick(uses, lots, layer, seed, Use.CHAPEL, 55.0, 105.0);
         pick(uses, lots, layer, seed, Use.SCHOOL, 70.0, 130.0);
+        pick(uses, lots, layer, seed, Use.GAS_STATION, 40.0, 70.0);
+        pick(uses, lots, layer, seed, Use.GAS_STATION, 120.0, 220.0);
         for (Part lot : lots) {
             if (!uses.containsKey(layer | lot.id())) {
                 Use use = scattered(seed, lot.id(), lot.distanceSqr());
@@ -3225,16 +3450,21 @@ public final class HexTown {
     }
 
     /**
-     * Whether a lot not zoned for anything else is one of the parks or playgrounds here and there among the houses.
+     * Whether a lot not zoned for anything else is one of the parks, playgrounds, ball courts or picnic groves here and
+     * there among the houses.
      *
      * @param distanceSqr how far it is from the middle of its town
      */
     private static @Nullable Use scattered(long seed, int gridId, double distanceSqr) {
         float h = hash(seed, gridId, 7);
-        if (Math.sqrt(distanceSqr) >= 35.0 && h < 0.06F) {
+        boolean out = Math.sqrt(distanceSqr) >= 35.0;
+        if (out && h < 0.06F) {
             return Use.PLAYGROUND;
         }
-        return h >= 0.06F && h < 0.14F ? Use.PARK : null;
+        if (h < 0.14F) {
+            return h >= 0.06F ? Use.PARK : null;
+        }
+        return out && h < 0.17F ? Use.COURT : h >= 0.17F && h < 0.20F ? Use.GROVE : null;
     }
 
     /**
@@ -3339,6 +3569,13 @@ public final class HexTown {
             int index = b * width + a;
             Terrain.Column column = index >= 0 && index < columns.length ? columns[index] : null;
             return column == null ? ground : column.surface() == Terrain.NO_GROUND ? ground - BOTTOMLESS : column.surface();
+        }
+
+        /** How high the water over a column comes, or {@link Grounds#DRY} where there is none. */
+        int water(int a, int b) {
+            int index = b * width + a;
+            Terrain.Column column = a >= 0 && a < width && index >= 0 && index < columns.length ? columns[index] : null;
+            return column == null || column.water() == 0 || column.surface() == Terrain.NO_GROUND ? Grounds.DRY : column.surface() + column.water();
         }
 
         boolean isBlocked(int index) {

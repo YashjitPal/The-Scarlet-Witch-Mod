@@ -8,6 +8,7 @@ import static com.yashjit.scarlet.hex.town.Houses.FRAME;
 import static com.yashjit.scarlet.hex.town.Houses.FULL;
 import static com.yashjit.scarlet.hex.town.Houses.GROUND;
 import static com.yashjit.scarlet.hex.town.Houses.INTERIOR;
+import static com.yashjit.scarlet.hex.town.Houses.PANE;
 import static com.yashjit.scarlet.hex.town.Houses.ROOF;
 import static com.yashjit.scarlet.hex.town.Houses.STAGE_TICKS;
 import static com.yashjit.scarlet.hex.town.Houses.WALLS;
@@ -23,6 +24,7 @@ import static com.yashjit.scarlet.hex.town.TownPlan.LOT_WIDTH;
 import com.yashjit.scarlet.hex.town.Blueprint.Frame;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.BeehiveBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -43,6 +45,8 @@ final class Orchard {
     private static final int ROW_BACK = 3;
     private static final int ROW_ACROSS = 3;
     private static final int ROW_ALONG = 4;
+    /** A plot with nothing standing on it already. */
+    private static final boolean[] NOTHING = new boolean[LOT_WIDTH * LOT_DEPTH];
 
     private Orchard() {
     }
@@ -95,6 +99,210 @@ final class Orchard {
             }
         }
         lane(blueprint, g, occupied);
+        return blueprint;
+    }
+
+    /**
+     * A greenhouse among the trees: glass walls on a low stone base under a pitched glass roof, framed at its corners
+     * and every few blocks along, a door at the lane end, and inside, benches of potted plants down either side of a
+     * path, a rain barrel and a lamp; outside, beds of flowers along its sides.
+     */
+    static Blueprint greenhouse(Frame frame, int g, Houses.Heights heights, RandomSource random) {
+        Blueprint blueprint = new Blueprint(frame, PLOT_TICKS);
+        level(blueprint, g, heights, NOTHING);
+        lane(blueprint, g, NOTHING);
+        int left = 4;
+        int right = LOT_WIDTH - 5;
+        int front = 4;
+        int back = LOT_DEPTH - 4;
+        int top = g + 3;
+        int middle = LOT_WIDTH / 2;
+        blueprint.fill(left, right, front, back, g, g, Role.FOUNDATION, FULL, 1);
+        for (int b = 0; b <= back; b++) {
+            blueprint.set(middle, b, g, Role.WALKWAY, FULL, 1);
+        }
+        for (int a = left; a <= right; a++) {
+            for (int b = front; b <= back; b++) {
+                boolean wall = a == left || a == right || b == front || b == back;
+                if (!wall) {
+                    continue;
+                }
+                boolean post = (a - left) % 4 == 0 && (b == front || b == back) || (b - front) % 4 == 0 && (a == left || a == right);
+                blueprint.set(a, b, g + 1, Role.FOUNDATION, FULL, 1);
+                blueprint.fill(a, a, b, b, g + 2, top, post ? Role.TRIM : Role.WINDOW, post ? pillar(Direction.Axis.Y) : PANE, 2);
+            }
+        }
+        for (int a = left; a <= right; a++) {
+            int y = top + 1 + Math.min(a - left, right - a) / 2;
+            blueprint.fill(a, a, front, back, y, y, Role.GLASS, FULL, 2);
+            for (int b : new int[] {front, back}) {
+                blueprint.fill(a, a, b, b, top + 1, y - 1, Role.WINDOW, PANE, 2);
+            }
+        }
+        blueprint.set(middle, front, g + 1, Role.FLOOR, FULL, 1);
+        Houses.door(blueprint, middle, front, g + 2, frame.back(), 2);
+        for (int b = front + 1; b < back; b++) {
+            for (int a : new int[] {left + 1, right - 1}) {
+                blueprint.set(a, b, g + 1, Role.TABLE, slab(SlabType.TOP), 2);
+                if ((b - front) % 2 == 1) {
+                    blueprint.set(a, b, g + 2, Role.PLANT, Houses.POT, 2);
+                }
+            }
+        }
+        blueprint.set(right - 2, back - 1, g + 1, Role.SINK, Houses.CAULDRON, 2);
+        blueprint.set(middle, (front + back) / 2, top + 2, Role.LAMP, Houses.lantern(true), 2);
+        int kind = random.nextInt(EraStyle.FLOWERS);
+        for (int b = front + 1; b < back; b += 2) {
+            blueprint.set(left - 1, b, g + 1, Role.FLOWER, kind, FLOWER, 2);
+            blueprint.set(right + 1, b, g + 1, Role.FLOWER, kind, FLOWER, 2);
+        }
+        return blueprint;
+    }
+
+    /**
+     * A chicken coop: a little red shed under a pitched roof on a raised floor, a ramp up to its door, nesting boxes of
+     * hay inside, and in front of it a run fenced off with a gate, hay to scratch in and a trough of water.
+     */
+    static Blueprint coop(Frame frame, int g, Houses.Heights heights, RandomSource random) {
+        Blueprint blueprint = new Blueprint(frame, PLOT_TICKS);
+        level(blueprint, g, heights, NOTHING);
+        lane(blueprint, g, NOTHING);
+        int middle = LOT_WIDTH / 2;
+        int left = middle - 3;
+        int right = middle + 3;
+        int front = 11;
+        int back = 15;
+        int top = g + 4;
+        blueprint.fill(left, right, front, back, g + 1, g + 1, Role.FOUNDATION, FULL, 1);
+        for (int y = g + 2; y <= top; y++) {
+            for (int a = left; a <= right; a++) {
+                blueprint.set(a, front, y, Role.BARN_WALL, FULL, 2);
+                blueprint.set(a, back, y, Role.BARN_WALL, FULL, 2);
+            }
+            for (int b = front + 1; b < back; b++) {
+                blueprint.set(left, b, y, Role.BARN_WALL, FULL, 2);
+                blueprint.set(right, b, y, Role.BARN_WALL, FULL, 2);
+            }
+        }
+        for (int a = left - 1; a <= right + 1; a++) {
+            int rise = Math.min(a - (left - 1), right + 1 - a);
+            int y = top + 1 + rise;
+            for (int b = front - 1; b <= back + 1; b++) {
+                if (a == middle) {
+                    blueprint.set(a, b, y - 1, Role.ROOF_RIDGE, FULL, 2);
+                    blueprint.set(a, b, y, Role.ROOF_SLAB, slab(SlabType.BOTTOM), 2);
+                } else {
+                    blueprint.set(a, b, y, Role.ROOF, stairs(a < middle ? frame.right() : frame.left(), Half.BOTTOM), 2);
+                }
+            }
+            if (a >= left && a <= right) {
+                int under = a == middle ? y - 2 : y - 1;
+                for (int b : new int[] {front, back}) {
+                    blueprint.fill(a, a, b, b, top + 1, under, Role.BARN_WALL, FULL, 2);
+                }
+            }
+        }
+        Houses.door(blueprint, middle, front, g + 2, frame.back(), 2);
+        blueprint.set(middle, front - 1, g + 1, Role.STEP, stairs(frame.back(), Half.BOTTOM), 2);
+        Houses.window(blueprint, left, front + 2, g + 3, 1, 2);
+        Houses.window(blueprint, right, front + 2, g + 3, 1, 2);
+        for (int a = left + 1; a < right; a++) {
+            if (a != middle) {
+                blueprint.set(a, back - 1, g + 2, Role.HAY, FULL, 2);
+            }
+        }
+        // the run in front, fenced, with its gate on the walk in from the lane
+        int runFront = 3;
+        int runLeft = 2;
+        int runRight = LOT_WIDTH - 3;
+        for (int a = runLeft; a <= runRight; a++) {
+            blueprint.set(a, runFront, g + 1, a == middle ? Role.GATE : Role.PICKET, a == middle ? gate(frame.back()) : FENCE, 1);
+        }
+        for (int b = runFront + 1; b < front; b++) {
+            blueprint.set(runLeft, b, g + 1, Role.PICKET, FENCE, 1);
+            blueprint.set(runRight, b, g + 1, Role.PICKET, FENCE, 1);
+        }
+        for (int a = runLeft; a <= runRight; a++) {
+            if (a < left || a > right) {
+                blueprint.set(a, front, g + 1, Role.PICKET, FENCE, 1);
+            }
+        }
+        for (int b = 0; b < runFront; b++) {
+            blueprint.set(middle, b, g, Role.WALKWAY, FULL, 1);
+        }
+        blueprint.set(runLeft + 2, front - 2, g + 1, Role.HAY, FULL, 2);
+        blueprint.set(runRight - 2, runFront + 2, g + 1, Role.SINK, Houses.CAULDRON, 2);
+        fruitTree(blueprint, runRight - 3, runFront + 3, g, random, 2);
+        return blueprint;
+    }
+
+    /**
+     * A pumpkin patch: rows of pumpkins on bare earth with grass between, a scarecrow keeping watch over the middle of
+     * it, and hay bales stacked by the lane.
+     */
+    static Blueprint pumpkins(Frame frame, int g, Houses.Heights heights, RandomSource random) {
+        Blueprint blueprint = new Blueprint(frame, PLOT_TICKS);
+        level(blueprint, g, heights, NOTHING);
+        lane(blueprint, g, NOTHING);
+        int middle = LOT_WIDTH / 2;
+        int watch = LOT_DEPTH / 2;
+        for (int b = 3; b < LOT_DEPTH - 1; b += 2) {
+            for (int a = 1; a < LOT_WIDTH - 1; a++) {
+                if (a == middle && Math.abs(b - watch) <= 1) {
+                    continue;
+                }
+                blueprint.set(a, b, g, Role.LANE, FULL, 1);
+                if (random.nextFloat() < 0.45F) {
+                    blueprint.set(a, b, g + 1, Role.PUMPKIN, FULL, 2);
+                }
+            }
+        }
+        blueprint.fill(middle, middle, watch, watch, g + 1, g + 2, Role.PORCH_POST, FENCE, 2);
+        blueprint.set(middle, watch, g + 3, Role.HAY, FULL, 2);
+        blueprint.set(middle, watch, g + 4, Role.PUMPKIN, FULL, 2);
+        blueprint.set(middle - 1, watch, g + 3, Role.PICKET, FENCE, 2);
+        blueprint.set(middle + 1, watch, g + 3, Role.PICKET, FENCE, 2);
+        for (int[] bale : new int[][] {{1, 1, 1}, {2, 1, 1}, {1, 2, 1}, {1, 1, 2}}) {
+            blueprint.set(bale[0], bale[1], g + bale[2], Role.HAY, FULL, 2);
+        }
+        return blueprint;
+    }
+
+    /**
+     * Beehives among flowers: hives on posts in a row between beds of flowers of every kind, a fruit tree with a bench
+     * under it to watch them from, and by the lane a stand selling honey, its sign on a hive over a post.
+     */
+    static Blueprint hives(Frame frame, int g, Houses.Heights heights, RandomSource random) {
+        Blueprint blueprint = new Blueprint(frame, PLOT_TICKS);
+        level(blueprint, g, heights, NOTHING);
+        lane(blueprint, g, NOTHING);
+        int middle = LOT_WIDTH / 2;
+        for (int b = 0; b < LOT_DEPTH - 1; b++) {
+            blueprint.set(middle, b, g, Role.WALKWAY, FULL, 1);
+        }
+        for (int b = 4; b < LOT_DEPTH - 4; b += 2) {
+            int kind = random.nextInt(EraStyle.FLOWERS);
+            for (int a = 1; a < LOT_WIDTH - 1; a++) {
+                if (Math.abs(a - middle) > 1) {
+                    blueprint.set(a, b, g + 1, Role.FLOWER, kind, FLOWER, 1);
+                }
+            }
+        }
+        BlockState hive = Blocks.BEEHIVE.defaultBlockState().setValue(BeehiveBlock.FACING, frame.front());
+        for (int b = 5; b < LOT_DEPTH - 4; b += 4) {
+            for (int a : new int[] {3, LOT_WIDTH - 4}) {
+                blueprint.set(a, b, g + 1, Role.PORCH_POST, FENCE, 2);
+                blueprint.set(a, b, g + 2, Role.BEEHIVE, hive, 2);
+            }
+        }
+        fruitTree(blueprint, 4, LOT_DEPTH - 3, g, random, 2);
+        blueprint.set(6, LOT_DEPTH - 3, g + 1, Role.BENCH, stairs(frame.right(), Half.BOTTOM), 2);
+        // the honey stand
+        int stand = LOT_WIDTH - 3;
+        blueprint.fill(stand - 2, stand, 2, 2, g + 1, g + 1, Role.TABLE, slab(SlabType.TOP), 2);
+        blueprint.fill(stand + 1, stand + 1, 1, 1, g + 1, g + 2, Role.PORCH_POST, FENCE, 2);
+        blueprint.set(stand + 1, 1, g + 3, Role.BEEHIVE, hive, 2);
+        blueprint.set(stand + 1, 0, g + 3, Role.SIGN, Signs.HONEY, Houses.sign(frame.front()), 2);
         return blueprint;
     }
 

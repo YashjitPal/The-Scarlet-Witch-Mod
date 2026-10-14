@@ -106,7 +106,17 @@ public enum Role {
     LANE_DECK_STEP,
     /** The lining of a street's tunnel through a hill, and its ceiling. */
     TUNNEL_WALL,
-    TUNNEL_CEILING;
+    TUNNEL_CEILING,
+    /** A filling station's pumps. */
+    PUMP,
+    /** Chain-link: a ball court's fence, and its hoops. */
+    NET,
+    /** The stone walls holding up a garden's terraces, and a lookout's parapet. */
+    RETAINING,
+    PUMPKIN,
+    BEEHIVE,
+    /** A greenhouse's roof. */
+    GLASS;
 
     private static final Role[] VALUES = values();
 

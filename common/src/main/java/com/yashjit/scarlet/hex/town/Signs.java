@@ -24,15 +24,17 @@ public final class Signs {
     public static final int POST_OFFICE = 11;
     public static final int FIVE_AND_DIME = 12;
     public static final int FARM_STAND = 13;
+    public static final int GAS = 14;
+    public static final int HONEY = 15;
     /** The kinds a shop on main street can be. */
     public static final int[] SHOPS = {DINER, PHARMACY, GROCERY, BAKERY, HARDWARE, BARBER, ICE_CREAM, POST_OFFICE, FIVE_AND_DIME};
 
     private static final String[] KEYS = {"library", "chapel", "school", "town_hall", "diner", "pharmacy", "grocery", "bakery", "hardware",
-            "barber", "ice_cream", "post_office", "five_and_dime", "farm_stand"};
+            "barber", "ice_cream", "post_office", "five_and_dime", "farm_stand", "gas", "honey"};
     private static final String[][] FALLBACK = {
             {"PUBLIC", "LIBRARY"}, {"COMMUNITY", "CHURCH"}, {"ELEMENTARY", "SCHOOL"}, {"TOWN", "HALL"}, {"DINER", "OPEN"},
             {"PHARMACY", "& SODA"}, {"GROCERY", "FRESH FOOD"}, {"BAKERY", "FRESH BREAD"}, {"HARDWARE", "& TOOLS"}, {"BARBER", "SHOP"},
-            {"ICE CREAM", "PARLOR"}, {"POST", "OFFICE"}, {"FIVE", "& DIME"}, {"FARM", "STAND"}};
+            {"ICE CREAM", "PARLOR"}, {"POST", "OFFICE"}, {"FIVE", "& DIME"}, {"FARM", "STAND"}, {"SERVICE", "STATION"}, {"FRESH", "HONEY"}};
 
     private Signs() {
     }
