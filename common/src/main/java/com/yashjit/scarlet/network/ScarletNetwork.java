@@ -14,7 +14,7 @@ public final class ScarletNetwork {
     /**
      * Bump whenever a payload's format changes, so mismatched clients and servers refuse to connect.
      */
-    public static final String VERSION = "26";
+    public static final String VERSION = "27";
 
     private ScarletNetwork() {
     }

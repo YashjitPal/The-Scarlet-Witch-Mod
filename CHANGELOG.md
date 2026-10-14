@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.10
+
+- **The town keeps up with its wall again.** Since 0.1.8 a town had only a small, fixed share of each tick, so drawing a Hex in or letting it fall left its town standing outside the wall, coming down long after. Now what the wall passes goes first, with as much of each tick as the server can spare, and the wall waits for it if it has to: the town is gone as the wall goes by, drawn in or falling. Towns also build up to twice as fast, from whatever time each tick has to spare.
+- **What a fallen town left where no one was goes back as soon as you're near it**, nearest first and many times faster than before.
+- **Chaos bolts no longer jump back** while the server is behind: they fly at the server's own pace.
+- **The wall is drawn only as far as the world is,** fading out at the edge of your render distance like everything else.
+- **Out past where its caster can see, the show stops.** Townspeople there stand stock still, now and then glitching or jerking their heads like a scene stuck skipping. Anyone standing out there sees the picture drain and the signal fray, and hears the laugh track fall silent and every sound go far off. While the caster is away, it is like that all over their Hex.
+- **Townspeople turn up the town's way.** Nothing comes out of the dark into a Hex any more, onto its roofs as often as not. Instead, now and then someone new turns up out of sight, at home in a house or out on a sidewalk, walk or lawn, a few about anyone at most, of whatever kind the land would have brought out there.
+
 ## 0.1.9
 
 - **No land in the Hex is left as it was.** A lot a house won't go on is made into what suits its land. A pond is kept as it lies, with a railed boardwalk out over it to a deck. A slope, however steep, is laid in terraces held up by stone walls, with steps up through them, flowers along each, and a wall with steps along the street where it stands over or under the sidewalk. The edge of a drop is a lookout with a parapet, benches facing out and a telescope. A lot its street passes far over on a bridge, like a canyon's floor, is a ball court or a picnic grove.
