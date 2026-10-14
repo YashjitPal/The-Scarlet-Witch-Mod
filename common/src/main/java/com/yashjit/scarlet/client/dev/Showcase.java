@@ -1872,6 +1872,120 @@ public final class Showcase {
                         .dispelHexes()
                         .command("execute as @a run scarlet hex forget");
             }
+            // townspeople turning up about a town by day, at home and out on its streets and lawns, a few about anyone at
+            // most; and as night falls, nothing coming out of the dark onto its roofs
+            case "arrivals" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("difficulty normal")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -72; x <= 72; x += 8) {
+                    int x1 = Math.min(72, x + 7);
+                    for (int[] z : new int[][] {{-72, 0}, {1, 72}}) {
+                        s.command("execute at @a run fill ~" + x + " ~ ~" + z[0] + " ~" + x1 + " ~30 ~" + z[1] + " minecraft:air")
+                                .command("execute at @a run fill ~" + x + " ~-1 ~" + z[0] + " ~" + x1 + " ~-1 ~" + z[1] + " minecraft:grass_block");
+                    }
+                }
+                s.anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 400)
+                        .command("execute as @a run scarlet hex size 70").then(minecraft -> {
+                        }, 700).logHexSize("built")
+                        .command("kill @e[type=!minecraft:player]");
+                for (int k = 1; k <= 9; k++) {
+                    s.then(minecraft -> {
+                    }, 200).logMobs("by day, " + 10 * k + " s on");
+                }
+                s.command("time set midnight");
+                for (int k = 1; k <= 6; k++) {
+                    s.then(minecraft -> {
+                    }, 200).logMobs("by night, " + 10 * k + " s on");
+                }
+                s.command("difficulty peaceful").dispelHexes().command("execute as @a run scarlet hex forget");
+            }
+            // townspeople out past where the Hex's caster can see standing stock still, and picking up again once they
+            // can; and the stopped show as it looks to someone standing out there
+            case "outskirts" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("difficulty normal")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 600);
+                for (int[] at : new int[][] {{8, 0}, {-8, 0}, {44, 0}, {-44, 0}, {0, 44}, {0, -44}}) {
+                    s.command("execute at @a run summon minecraft:zombie ~" + at[0] + " ~ ~" + at[1]);
+                }
+                s.command("effect give @e[type=minecraft:zombie] minecraft:fire_resistance 600 0 true")
+                        .then(minecraft -> {
+                        }, 100).logMobs("seen")
+                        .then(minecraft -> {
+                            minecraft.options.renderDistance().set(2);
+                            minecraft.options.broadcastOptions();
+                        }, 100).logMobs("its caster seeing two chunks out")
+                        .then(minecraft -> {
+                        }, 60).logMobs("still, 3 s on")
+                        .then(minecraft -> {
+                            minecraft.options.renderDistance().set(12);
+                            minecraft.options.broadcastOptions();
+                        }, 100).logMobs("seeing again")
+                        .command("execute as @a run scarlet hex era 1980s").then(minecraft -> {
+                        }, 120)
+                        .hideHud(true)
+                        .view(0.0, 14.0, 26.0, 0.0, 2.0, 0.0).shot(name + "_watched", 20)
+                        .then(minecraft -> com.yashjit.scarlet.client.hex.ResidentsClient.showUnwatched(true), 60)
+                        .shot(name + "_unwatched", 2)
+                        .then(minecraft -> com.yashjit.scarlet.client.hex.ResidentsClient.showUnwatched(false), 40)
+                        .hideHud(false)
+                        .playerCamera()
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("difficulty peaceful").dispelHexes().command("execute as @a run scarlet hex forget");
+            }
+            // a big Hex seen from out past where the world is drawn, where its wall is not to be seen, and from within it
+            case "walldistance" -> {
+                s.land().dispelHexes()
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build nothing")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 300)
+                        .command("execute as @a run scarlet hex size 120").then(minecraft -> {
+                        }, 200)
+                        .then(minecraft -> {
+                            minecraft.options.renderDistance().set(6);
+                            minecraft.options.broadcastOptions();
+                        }, 60)
+                        .hideHud(true)
+                        .view(0.0, 30.0, 300.0, 0.0, 10.0, 0.0).shot(name + "_beyond", 60)
+                        .then(minecraft -> {
+                            minecraft.options.renderDistance().set(16);
+                            minecraft.options.broadcastOptions();
+                        }, 60)
+                        .view(0.0, 30.0, 220.0, 0.0, 10.0, 0.0).shot(name + "_within", 80)
+                        .then(minecraft -> {
+                            minecraft.options.renderDistance().set(12);
+                            minecraft.options.broadcastOptions();
+                        }, 20)
+                        .hideHud(false)
+                        .playerCamera()
+                        .dispelHexes().command("execute as @a run scarlet hex forget");
+            }
             // townspeople and one of them woken: with the player out of reach, in creative, it goes after the
             // townspeople, each it hurts waking and joining it; back in survival, every one of them goes after the player
             case "hunt" -> {
@@ -1949,6 +2063,63 @@ public final class Showcase {
                         .playerCamera()
                         .dispelHexes()
                         .command("execute as @a run scarlet hex forget");
+            }
+            // a copy of a world someone played, with no Hex standing in it: a new one cast where they stood, grown, drawn
+            // in and let fall, and how well its town keeps up with its wall all the while, going up and coming down
+            case "replaytown" -> {
+                s.then(minecraft -> {
+                }, 200).hideHud(false).logHexSize("loaded");
+                for (int k = 1; k <= 5; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("before casting, " + 2 * k + " s on");
+                }
+                s.command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("execute as @a run scarlet hex build town")
+                        .anchor().ensureUnsuited().select(Spell.HEX).tap();
+                for (int k = 1; k <= 15; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("cast, " + 2 * k + " s on");
+                }
+                s.command("execute as @a run scarlet hex size 200");
+                for (int k = 1; k <= 30; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("grown to 200, " + 2 * k + " s on");
+                }
+                s.shot(name + "_grown", 2).sneak(true).hold(true);
+                for (int k = 1; k <= 8; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("drawn in for " + 2 * k + " s");
+                }
+                s.hold(false).sneak(false);
+                for (int k = 1; k <= 8; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("let go, " + 2 * k + " s on");
+                }
+                s.command("execute as @a run scarlet hex dispel");
+                for (int k = 1; k <= 20; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("falling, " + 2 * k + " s on");
+                }
+                // and out where the town before it was let fall with no one there, to see what it left go back
+                s.then(minecraft -> {
+                    IntegratedServer server = minecraft.getSingleplayerServer();
+                    if (server != null) {
+                        server.execute(() -> {
+                            BlockPos middle = HexData.of(server.overworld()).leftoverMiddle();
+                            if (middle != null) {
+                                Scarlet.LOG.info("Showcase: going to what was left, about {} {}", middle.getX(), middle.getZ());
+                                server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), "gamemode spectator @a");
+                                server.getCommands().performPrefixedCommand(server.createCommandSourceStack(),
+                                        "tp @a " + middle.getX() + " 120 " + middle.getZ());
+                            }
+                        });
+                    }
+                }, 2);
+                for (int k = 1; k <= 20; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("among what was left, " + 2 * k + " s on");
+                }
             }
             // a copy of a world someone played, as they left it (-PshowcaseWorld=<folder> -PshowcaseAs=<name>:<uuid>): how
             // long the server's ticks take while their Hex stands, and then while it is drawn in, or falls from its
@@ -4579,10 +4750,12 @@ public final class Showcase {
                     for (long nanos : server.getTickTimesNanos()) {
                         longest = Math.max(longest, nanos);
                     }
-                    String size = hex == null ? "no Hex" : String.format(java.util.Locale.ROOT, "the Hex %s at %.0f blocks, its wall at %.0f, its town %d blocks",
-                            hex.phase(), hex.radius(), Hexes.wallRadius(hex, server.overworld().getGameTime()), hex.town() == null ? 0 : hex.town().size());
-                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, ticks taking %.1f ms on average and %.1f at most", when,
-                            size, server.getAverageTickTimeNanos() / 1.0E6, longest / 1.0E6));
+                    float wall = hex == null ? 0.0F : Hexes.wallRadius(hex, server.overworld().getGameTime());
+                    String size = hex == null ? "no Hex" : String.format(java.util.Locale.ROOT, "the Hex %s at %.0f blocks, its wall at %.0f, its town %d blocks, %d out past its wall",
+                            hex.phase(), hex.radius(), wall, hex.town() == null ? 0 : hex.town().size(), hex.town() == null ? 0 : hex.town().standingOutside(hex.center(), wall));
+                    HexData data = HexData.of(server.overworld());
+                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, %d left over in %d chunks, ticks taking %.1f ms on average and %.1f at most",
+                            when, size, data.leftoverCount(), data.leftoverChunks(), server.getAverageTickTimeNanos() / 1.0E6, longest / 1.0E6));
                 });
             }, 2);
         }
@@ -4964,8 +5137,11 @@ public final class Showcase {
                         String after = target == null ? "nothing" : target instanceof net.minecraft.world.entity.player.Player ? "the player"
                                 : BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).getPath() + (com.yashjit.scarlet.hex.Residents.isResident(target) ? " (townsperson)"
                                 : com.yashjit.scarlet.hex.Residents.isAwake(target) ? " (woken)" : "");
-                        found.append(String.format(java.util.Locale.ROOT, " %s%s with %.0f after %s;", BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()).getPath(),
-                                resident ? " (townsperson)" : awake ? " (woken)" : "", mob.getHealth(), after));
+                        Vec3 at = mob.position().subtract(anchor);
+                        found.append(String.format(java.util.Locale.ROOT, " %s%s%s with %.0f after %s, %.0f %.0f %.0f on %s;",
+                                BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()).getPath(), resident ? " (townsperson)" : awake ? " (woken)" : "",
+                                com.yashjit.scarlet.hex.Residents.isPaused(mob) ? " (still)" : "", mob.getHealth(), after, at.x, at.y, at.z,
+                                name(server.overworld().getBlockState(mob.getOnPos()))));
                     }
                     Scarlet.LOG.info("Showcase: {}: {} townspeople, {} woken:{}", when, residents, woken, found);
                 });
