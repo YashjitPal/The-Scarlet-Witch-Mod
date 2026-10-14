@@ -1776,6 +1776,143 @@ public final class Showcase {
                         .dispelHexes()
                         .command("execute as @a run scarlet hex forget");
             }
+            // a big town on land with a pond to the east, a cliff falling away to the west and a steep slope up to the
+            // north: what it makes of the lots there that won't take a house, and the courts, groves and filling stations
+            // here and there among the houses
+            case "grounds" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -104; x <= 104; x += 8) {
+                    int x1 = Math.min(104, x + 7);
+                    for (int[] z : new int[][] {{-104, 0}, {1, 104}}) {
+                        s.command("execute at @a run fill ~" + x + " ~ ~" + z[0] + " ~" + x1 + " ~30 ~" + z[1] + " minecraft:air")
+                                .command("execute at @a run fill ~" + x + " ~-6 ~" + z[0] + " ~" + x1 + " ~-2 ~" + z[1] + " minecraft:dirt")
+                                .command("execute at @a run fill ~" + x + " ~-1 ~" + z[0] + " ~" + x1 + " ~-1 ~" + z[1] + " minecraft:grass_block");
+                    }
+                }
+                // the slope, a block up for every block north, and level again at its top
+                for (int z = -34; z >= -104; z--) {
+                    int rise = Math.min(22, -34 - z);
+                    s.command("execute at @a run fill ~-104 ~ ~" + z + " ~104 ~" + (rise - 1) + " ~" + z + " minecraft:dirt")
+                            .command("execute at @a run fill ~-104 ~" + rise + " ~" + z + " ~104 ~" + rise + " ~" + z + " minecraft:grass_block");
+                }
+                // the cliff, and the pond
+                for (int z = -30; z <= 104; z += 8) {
+                    int z1 = Math.min(104, z + 7);
+                    s.command("execute at @a run fill ~-104 ~-24 ~" + z + " ~-40 ~-1 ~" + z1 + " minecraft:air");
+                }
+                s.command("execute at @a run fill ~28 ~-4 ~16 ~44 ~-1 ~34 minecraft:water");
+                s.anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 600).logHexSize("cast")
+                        .command("execute as @a run scarlet hex size 100");
+                for (int k = 1; k <= 10; k++) {
+                    s.then(minecraft -> {
+                    }, 100).logHexSize("grown, " + 5 * k + " s on");
+                }
+                s.logLots("its lots")
+                        .command("execute as @a run scarlet hex era 1970s").then(minecraft -> {
+                        }, 200)
+                        .hideHud(true)
+                        .view(0.0, 150.0, 1.0, 0.0, 0.0, 0.0).shot(name + "_above", 60)
+                        .view(36.0, 18.0, 52.0, 36.0, 0.0, 25.0).shot(name + "_pond", 30)
+                        .view(-20.0, 16.0, 30.0, -44.0, -4.0, 10.0).shot(name + "_cliff", 30)
+                        .view(10.0, 18.0, -14.0, 10.0, 12.0, -50.0).shot(name + "_slope", 30);
+                for (String use : new String[] {"pond", "lookout", "terraces", "court", "grove", "gas_station", "garden"}) {
+                    s.shotLot(use, 0, name + "_" + use);
+                }
+                s.shotLot("terraces", 1, name + "_terraces_b").shotLot("court", 5, name + "_court_b").shotLot("grove", 2, name + "_grove_b")
+                        .hideHud(false)
+                        .playerCamera()
+                        .dispelHexes()
+                        .command("execute as @a run scarlet hex forget");
+            }
+            // an orchard raised on clear land, for its plots to be the greenhouses, coops, pumpkin patches and beehives
+            // that now and then go up in place of fruit trees
+            case "orchardplots" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build orchard")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0");
+                for (int x = -72; x <= 72; x += 8) {
+                    int x1 = Math.min(72, x + 7);
+                    for (int[] z : new int[][] {{-72, 0}, {1, 72}}) {
+                        s.command("execute at @a run fill ~" + x + " ~ ~" + z[0] + " ~" + x1 + " ~30 ~" + z[1] + " minecraft:air")
+                                .command("execute at @a run fill ~" + x + " ~-6 ~" + z[0] + " ~" + x1 + " ~-2 ~" + z[1] + " minecraft:dirt")
+                                .command("execute at @a run fill ~" + x + " ~-1 ~" + z[0] + " ~" + x1 + " ~-1 ~" + z[1] + " minecraft:grass_block");
+                    }
+                }
+                s.anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 400)
+                        .command("execute as @a run scarlet hex size 70").then(minecraft -> {
+                        }, 900).logHexSize("grown")
+                        .command("execute as @a run scarlet hex era 1970s").then(minecraft -> {
+                        }, 200)
+                        .hideHud(true)
+                        .view(0.0, 110.0, 1.0, 0.0, 0.0, 0.0).shot(name + "_above", 60)
+                        .view(45.0, 30.0, 45.0, 0.0, 0.0, 0.0).shot(name + "_southeast", 30)
+                        .view(-45.0, 30.0, 45.0, 0.0, 0.0, 0.0).shot(name + "_southwest", 30)
+                        .view(45.0, 30.0, -45.0, 0.0, 0.0, 0.0).shot(name + "_northeast", 30)
+                        .view(-45.0, 30.0, -45.0, 0.0, 0.0, 0.0).shot(name + "_northwest", 30)
+                        .hideHud(false)
+                        .playerCamera()
+                        .dispelHexes()
+                        .command("execute as @a run scarlet hex forget");
+            }
+            // townspeople and one of them woken: with the player out of reach, in creative, it goes after the
+            // townspeople, each it hurts waking and joining it; back in survival, every one of them goes after the player
+            case "hunt" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("execute as @a run scarlet hex build home")
+                        .command("time set noon")
+                        .command("difficulty normal")
+                        .command("execute at @a run fill ~-24 ~ ~-24 ~24 ~12 ~24 minecraft:air")
+                        .command("execute at @a run fill ~-64 ~-1 ~-64 ~64 ~-1 ~64 minecraft:grass_block")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.HEX)
+                        .tap().then(minecraft -> {
+                        }, 200)
+                        .command("gamemode creative @a");
+                for (int k = 0; k < 6; k++) {
+                    s.command("execute at @a run summon minecraft:zombie ~" + (k * 3 - 8) + " ~ ~6");
+                }
+                s.command("execute at @a run summon minecraft:skeleton ~-6 ~ ~10")
+                        .command("execute at @a run summon minecraft:skeleton ~6 ~ ~10")
+                        .command("effect give @e[type=!minecraft:player] minecraft:fire_resistance 600 0 true")
+                        .then(minecraft -> {
+                        }, 200).logMobs("rewritten")
+                        .command("execute at @a run damage @e[type=minecraft:zombie,limit=1,sort=nearest] 1 minecraft:player_attack by @p")
+                        .then(minecraft -> {
+                        }, 20).logMobs("one struck, the player in creative");
+                for (int k = 1; k <= 8; k++) {
+                    s.then(minecraft -> {
+                    }, 60).logMobs(3 * k + " s on");
+                }
+                s.command("gamemode survival @a")
+                        .command("effect give @a minecraft:resistance 60 4 true")
+                        .then(minecraft -> {
+                        }, 30).logMobs("the player back in survival")
+                        .then(minecraft -> {
+                        }, 60).logMobs("3 s later")
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("difficulty peaceful")
+                        .dispelHexes();
+            }
             // a town raised on ordinary land among hills, where someone cast theirs, in a world from their own seed
             // (-PshowcaseSeed=<seed>), grown out over the hills around: whether its streets keep connected, and its houses
             // can be come to from them
@@ -4727,6 +4864,110 @@ public final class Showcase {
                                 item.getY() - anchor.y));
                     }
                     Scarlet.LOG.info("Showcase: {}: lying about {},{}", when, lying, pieces);
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log every lot of the player's town that isn't a house, by what it is, measured from the
+         * anchor.
+         */
+        Scene logLots(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    Hex hex = HexData.of(server.overworld()).byCaster(id);
+                    StringBuilder found = new StringBuilder();
+                    if (hex != null && hex.town() != null) {
+                        hex.town().lotsByUse().forEach((use, lots) -> {
+                            found.append(' ').append(use).append(" ×").append(lots.size()).append(':');
+                            for (BlockPos lot : lots) {
+                                found.append(String.format(java.util.Locale.ROOT, " (%.0f %.0f %.0f)", lot.getX() - anchor.x, lot.getY() - anchor.y, lot.getZ() - anchor.z));
+                            }
+                            found.append(';');
+                        });
+                    }
+                    Scarlet.LOG.info("Showcase: {}:{}", when, found);
+                });
+            }, 2);
+        }
+
+        /**
+         * Puts a free camera over one of the lots of the player's town of a use, the {@code k}th, looking down at it
+         * from the south and above, and takes a picture; none if the town has no such lot.
+         */
+        Scene shotLot(String use, int k, String name) {
+            java.util.concurrent.atomic.AtomicReference<BlockPos> lot = new java.util.concurrent.atomic.AtomicReference<>();
+            then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                UUID id = minecraft.player.getUUID();
+                lot.set(null);
+                server.execute(() -> {
+                    Hex hex = HexData.of(server.overworld()).byCaster(id);
+                    List<BlockPos> lots = hex == null || hex.town() == null ? List.of() : hex.town().lotsByUse().getOrDefault(use, List.of());
+                    lot.set(k < lots.size() ? lots.get(k) : BlockPos.ZERO.below(4096));
+                });
+            }, 4);
+            return then(minecraft -> {
+                BlockPos at = lot.get();
+                if (at == null || at.getY() < -2048 || minecraft.level == null) {
+                    Scarlet.LOG.info("Showcase: no {} lot {} to look at", use, k);
+                    return;
+                }
+                if (camera == null || camera.level() != minecraft.level) {
+                    camera = new ArmorStand(minecraft.level, 0, 0, 0);
+                    camera.setInvisible(true);
+                }
+                move = null;
+                Vec3 target = Vec3.atBottomCenterOf(at).add(0, 1, 0);
+                Vec3 eye = target.add(0, 16, 20);
+                Vec3 toTarget = target.subtract(eye);
+                float lookYaw = (float) Math.toDegrees(Math.atan2(-toTarget.x, toTarget.z));
+                float lookPitch = (float) Math.toDegrees(-Math.atan2(toTarget.y, Math.hypot(toTarget.x, toTarget.z)));
+                camera.snapTo(eye.x, eye.y - camera.getEyeHeight(), eye.z, lookYaw, lookPitch);
+                camera.setYHeadRot(lookYaw);
+                camera.yHeadRotO = lookYaw;
+                camera.setOldPosAndRot();
+                minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+                minecraft.setCameraEntity(camera);
+            }, 3).shot(name, 20);
+        }
+
+        /**
+         * Writes down in the log every mob near the anchor: what it is, whether a townsperson or woken from the spell,
+         * its health, and what it is after.
+         */
+        Scene logMobs(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                server.execute(() -> {
+                    StringBuilder found = new StringBuilder();
+                    int residents = 0;
+                    int woken = 0;
+                    for (var mob : server.overworld().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new net.minecraft.world.phys.AABB(anchor, anchor).inflate(48.0),
+                            mob -> mob.is(com.yashjit.scarlet.hex.Residents.CAN_LIVE_HERE))) {
+                        boolean resident = com.yashjit.scarlet.hex.Residents.isResident(mob);
+                        boolean awake = com.yashjit.scarlet.hex.Residents.isAwake(mob);
+                        residents += resident ? 1 : 0;
+                        woken += awake ? 1 : 0;
+                        var target = mob.getTarget();
+                        String after = target == null ? "nothing" : target instanceof net.minecraft.world.entity.player.Player ? "the player"
+                                : BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).getPath() + (com.yashjit.scarlet.hex.Residents.isResident(target) ? " (townsperson)"
+                                : com.yashjit.scarlet.hex.Residents.isAwake(target) ? " (woken)" : "");
+                        found.append(String.format(java.util.Locale.ROOT, " %s%s with %.0f after %s;", BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()).getPath(),
+                                resident ? " (townsperson)" : awake ? " (woken)" : "", mob.getHealth(), after));
+                    }
+                    Scarlet.LOG.info("Showcase: {}: {} townspeople, {} woken:{}", when, residents, woken, found);
                 });
             }, 2);
         }
