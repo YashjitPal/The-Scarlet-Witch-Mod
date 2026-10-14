@@ -18,7 +18,8 @@ import net.minecraft.world.entity.MobCategory;
 public final class ScarletEntities {
 
     public static final Supplier<EntityType<ChaosBolt>> CHAOS_BOLT = register("chaos_bolt",
-            EntityType.Builder.<ChaosBolt>of(ChaosBolt::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(16).updateInterval(10));
+            EntityType.Builder.<ChaosBolt>of(ChaosBolt::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(16)
+                    .updateInterval(ChaosBolt.SYNC_INTERVAL));
     public static final Supplier<EntityType<ParkedCar>> PARKED_CAR = register("parked_car",
             EntityType.Builder.<ParkedCar>of(ParkedCar::new, MobCategory.MISC).noLootTable().sized(2.2F, 1.6F).clientTrackingRange(10)
                     .updateInterval(3));

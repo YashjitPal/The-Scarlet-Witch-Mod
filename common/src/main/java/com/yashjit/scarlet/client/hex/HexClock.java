@@ -91,6 +91,18 @@ public final class HexClock {
         return shown;
     }
 
+    /**
+     * How fast the server is going, against the twenty ticks a second it should: what anything the client moves on its
+     * own between word from the server goes at, so it keeps with the server rather than running ahead and being set back.
+     */
+    public static double rate() {
+        if (!heardAny) {
+            return 1.0;
+        }
+        double unheard = pace * (Util.getNanos() - heardAt) / 1.0E9;
+        return unheard > MOST_UNHEARD_TICKS ? 0.0 : Math.clamp(pace / 20.0, 0.0, 1.5);
+    }
+
     private static void forget(@Nullable ClientLevel to) {
         level = to;
         heardAny = false;

@@ -51,7 +51,7 @@ public final class ChaosBoltRenderer extends EntityRenderer<ChaosBolt, ChaosBolt
      * drawn between where it was last tick and where it is now, a tick behind its age.
      */
     private static float flown(ChaosBolt bolt, Vec3 direction, float partialTicks) {
-        float flown = Math.max(0.0F, bolt.tickCount - 1 + partialTicks) * ChaosBolt.SPEED;
+        float flown = (float) Math.max(0.0, bolt.flownSinceSeen(partialTicks) - ChaosBolt.SPEED);
         if (bolt.getOwner() instanceof Player caster) {
             Vec3 head = bolt.getPosition(partialTicks);
             for (HumanoidArm arm : HumanoidArm.values()) {

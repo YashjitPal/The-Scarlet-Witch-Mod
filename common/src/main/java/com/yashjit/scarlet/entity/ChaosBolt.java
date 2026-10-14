@@ -6,7 +6,9 @@ import com.yashjit.scarlet.network.ChaosImpactPayload;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.registry.ScarletDamageTypes;
 import com.yashjit.scarlet.registry.ScarletEntities;
+import java.util.function.DoubleSupplier;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,6 +37,13 @@ public class ChaosBolt extends ThrowableProjectile {
 
     public static final float SPEED = 1.7F;
     private static final int LIFETIME = 200;
+    /**
+     * Ticks between word of where it is sent to clients: none once it is in flight. Its flight is a straight line they
+     * draw themselves at the server's pace, and word of where it was would only set it back.
+     */
+    public static final int SYNC_INTERVAL = LIFETIME + 1;
+    /** How fast the server is going, against the twenty ticks a second it should: set on a client, for it to fly at that pace. */
+    public static DoubleSupplier serverRate = () -> 1.0;
     /** How near where it strikes something must be to be caught in the blast too. */
     private static final double SPLASH = 1.0;
     /** How far off it is seen, as far as it flies before it fizzles out or players are told of it. */
@@ -42,6 +51,8 @@ public class ChaosBolt extends ThrowableProjectile {
 
     /** Whether what it flew into was hurt, which earns its caster their mastery without the blast around it. */
     private boolean landed;
+    /** On a client, where it was first seen, for how far it has flown since. */
+    private @Nullable Vec3 firstSeen;
 
     public ChaosBolt(EntityType<? extends ChaosBolt> type, Level level) {
         super(type, level);
@@ -71,7 +82,25 @@ public class ChaosBolt extends ThrowableProjectile {
     }
 
     @Override
+    public void recreateFromPacket(ClientboundAddEntityPacket packet) {
+        super.recreateFromPacket(packet);
+        firstSeen = position();
+    }
+
+    /** On a client, how far it has flown since it was first seen there, as drawn this frame. */
+    public double flownSinceSeen(float partialTicks) {
+        return firstSeen == null ? (tickCount + partialTicks) * SPEED : getPosition(partialTicks).distanceTo(firstSeen);
+    }
+
+    @Override
     public void tick() {
+        if (level().isClientSide()) {
+            Vec3 velocity = getDeltaMovement();
+            setDeltaMovement(velocity.scale(serverRate.getAsDouble()));
+            super.tick();
+            setDeltaMovement(velocity);
+            return;
+        }
         Vec3 from = position();
         super.tick();
         if (!(level() instanceof ServerLevel level) || !isAlive()) {
