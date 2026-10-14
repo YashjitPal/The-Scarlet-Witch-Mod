@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * A Hex's townspeople mean no one harm and no one means them any, they don't burn in the sitcom sun, and they turn
+ * A Hex's townspeople mean no one harm and none but the woken mean them any, they don't burn in the sitcom sun, and they turn
  * back once they find themselves outside. A creature held with Mind Control does nothing of its own accord, and one
  * set free stays loyal for a while. One bound by a Rune Trap only strains against it.
  */

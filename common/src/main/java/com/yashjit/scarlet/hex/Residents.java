@@ -24,6 +24,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.SoundType;
@@ -37,7 +38,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <ul>
  *     <li>Hit one and the spell breaks for it: it turns back into what it really is and fights back, and stays
- *     itself until it has left the Hex.</li>
+ *     itself until it has left the Hex. The woken go after players before anyone, and with no player about, after
+ *     the townspeople, any of whom they hurt wakes too and joins them. They never turn on each other.</li>
  *     <li>One that walks out turns back at the wall; when the Hex falls, each turns back as the wall rushes past.</li>
  *     <li>Which mobs can live in a Hex is the {@code scarlet:hex_residents} entity type tag. Animals stay animals and
  *     bosses resist it.</li>
@@ -54,6 +56,11 @@ public final class Residents {
     public static final TagKey<EntityType<?>> CAN_LIVE_HERE = TagKey.create(Registries.ENTITY_TYPE, Scarlet.id("hex_residents"));
 
     private static final int SCAN_INTERVAL = 10;
+    /** How far a woken mob looks for townspeople to go after, and how far off it keeps after one it is chasing. */
+    private static final double HUNT_REACH = 16.0;
+    private static final double CHASE_REACH = 24.0;
+    /** How near a player a woken mob knows they are there without seeing them. */
+    private static final double HEARS = 8.0;
 
     /** Each dimension's residents as last found, and a count of changes for knowing who needs telling. */
     private static final Map<ResourceKey<Level>, Found> FOUND = new HashMap<>();
@@ -79,6 +86,7 @@ public final class Residents {
         }
         Found found = FOUND.computeIfAbsent(level.dimension(), key -> new Found());
         IntOpenHashSet inside = new IntOpenHashSet();
+        List<Mob> woken = new ArrayList<>();
         List<Hex> standing = new ArrayList<>();
         List<Float> walls = new ArrayList<>();
         for (Hex hex : data.all()) {
@@ -92,7 +100,11 @@ public final class Residents {
             // a Hex can be as tall as the world and hundreds of blocks across: going through everything once costs
             // less than searching a box that size
             for (Entity entity : level.getAllEntities()) {
-                if (!(entity instanceof Mob mob) || !mob.isAlive() || !mob.is(CAN_LIVE_HERE) || isAwake(mob)) {
+                if (!(entity instanceof Mob mob) || !mob.isAlive() || !mob.is(CAN_LIVE_HERE)) {
+                    continue;
+                }
+                if (isAwake(mob)) {
+                    woken.add(mob);
                     continue;
                 }
                 for (int i = 0; i < standing.size(); i++) {
@@ -118,6 +130,56 @@ public final class Residents {
             found.ids = inside;
             found.version++;
         }
+        for (Mob mob : woken) {
+            hunt(level, mob);
+        }
+    }
+
+    /**
+     * Picks who a mob woken from the spell goes after: a player before anyone, keeping one it already has, or else the
+     * nearest it can see, or is near enough to know is there; and only with no player about, a townsperson, the one it
+     * is chasing or the nearest it can see. One that has woken too is let go.
+     */
+    private static void hunt(ServerLevel level, Mob mob) {
+        LivingEntity target = mob.getTarget();
+        if (target instanceof Player player && huntable(mob, player)) {
+            return;
+        }
+        double range = mob.getAttributeValue(Attributes.FOLLOW_RANGE);
+        Player nearest = null;
+        double best = range * range;
+        for (ServerPlayer player : level.players()) {
+            double distance = player.distanceToSqr(mob);
+            if (distance < best && huntable(mob, player) && (distance <= HEARS * HEARS || mob.getSensing().hasLineOfSight(player))) {
+                best = distance;
+                nearest = player;
+            }
+        }
+        if (nearest != null) {
+            mob.setTarget(nearest);
+            return;
+        }
+        if (target != null && target.isAlive() && isResident(target) && target.distanceToSqr(mob) <= CHASE_REACH * CHASE_REACH) {
+            return;
+        }
+        Mob prey = null;
+        best = HUNT_REACH * HUNT_REACH;
+        for (Mob other : level.getEntitiesOfClass(Mob.class, mob.getBoundingBox().inflate(HUNT_REACH), Residents::isResident)) {
+            double distance = other.distanceToSqr(mob);
+            if (distance < best && other.isAlive() && mob.getSensing().hasLineOfSight(other)) {
+                best = distance;
+                prey = other;
+            }
+        }
+        if (prey != null) {
+            mob.setTarget(prey);
+        } else if (target != null && !(target instanceof Player)) {
+            mob.setTarget(null);
+        }
+    }
+
+    private static boolean huntable(Mob mob, Player player) {
+        return player.isAlive() && !player.isCreative() && !player.isSpectator() && player.level() == mob.level();
     }
 
     /**
@@ -158,7 +220,9 @@ public final class Residents {
     }
 
     /**
-     * Hitting a resident breaks the spell for it: it turns back into what it really is, and turns on whoever hit it.
+     * Hitting a resident breaks the spell for it: it turns back into what it really is, and turns on the player who hit
+     * it. Hurt by anything else, one of the woken most likely, it joins them, and goes after a player rather than its
+     * own kind; whatever hit it lets it go.
      */
     public static void struck(Mob mob, @Nullable Entity attacker) {
         if (!isResident(mob) || attacker == null || attacker == mob) {
@@ -167,10 +231,18 @@ public final class Residents {
         mob.removeTag(RESIDENT);
         mob.addTag(AWAKE);
         Sitcom.detach(mob);
-        if (attacker instanceof LivingEntity living && !(living instanceof Player player && (player.isCreative() || player.isSpectator()))) {
-            mob.setTarget(living);
+        mob.setTarget(null);
+        if (attacker instanceof Player player) {
+            if (!player.isCreative() && !player.isSpectator()) {
+                mob.setTarget(player);
+            }
+        } else if (attacker instanceof Mob hunter && hunter.getTarget() == mob) {
+            hunter.setTarget(null);
         }
         if (mob.level() instanceof ServerLevel level) {
+            if (!(attacker instanceof Player)) {
+                hunt(level, mob);
+            }
             Found found = FOUND.get(level.dimension());
             if (found != null && found.ids.remove(mob.getId())) {
                 found.version++;
@@ -182,8 +254,9 @@ public final class Residents {
 
     /**
      * What a townsperson sounds like, in place of the monster underneath: no groans, hisses, rattles or clicks, just
-     * footsteps like anyone's on whatever they walk on, and a person's cry when they're hurt or killed. Splashes,
-     * swimming and falls sound as they would for a player. Hit one and its own voice comes back with its true self.
+     * footsteps like anyone's on whatever they walk on, a gulp like anyone's when they drink, and a person's cry when
+     * they're hurt or killed. Splashes, swimming and falls sound as they would for a player. Hit one and its own voice
+     * comes back with its true self.
      *
      * @return whether the sound was taken over, so isn't to be played as it was
      */
@@ -200,6 +273,8 @@ public final class Residents {
             // the monster versions of what a player sounds like
             BuiltInRegistries.SOUND_EVENT.get(Identifier.withDefaultNamespace("entity.player." + path.substring("entity.hostile.".length())))
                     .ifPresent(human -> entity.playSound(human.value(), volume, pitch));
+        } else if (path.endsWith(".drink")) {
+            entity.playSound(SoundEvents.GENERIC_DRINK.value(), volume, pitch);
         } else if (path.contains(".hurt")) {
             entity.playSound(SoundEvents.PLAYER_HURT, volume, pitch);
         } else if (path.endsWith(".death")) {
@@ -209,10 +284,11 @@ public final class Residents {
     }
 
     /**
-     * Whether a mob is kept from targeting another: residents mean no one harm, and no one means them any.
+     * Whether a mob is kept from targeting another: residents mean no one harm, and none but the woken mean them any;
+     * the woken never turn on each other.
      */
     public static boolean keepsPeace(Mob mob, @Nullable LivingEntity target) {
-        return target != null && (isResident(mob) || isResident(target));
+        return target != null && (isResident(mob) || isResident(target) && !isAwake(mob) || isAwake(mob) && isAwake(target));
     }
 
     /**

@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "BlockStateBaseMixin",
+    "EndermanMixin",
     "EntityMixin",
     "ExperienceOrbMixin",
     "ItemEntityMixin",
@@ -20,7 +21,8 @@
     "ServerLevelMixin",
     "ServerPlayerGameModeInvoker",
     "ServerPlayerGameModeMixin",
-    "ServerPlayerMixin"
+    "ServerPlayerMixin",
+    "WitchMixin"
   ],
   "client": [
     "client.AvatarRendererMixin",
