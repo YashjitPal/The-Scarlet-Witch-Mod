@@ -54,8 +54,8 @@ public final class HexClient {
         if (minecraft.level == null) {
             return;
         }
-        RIPPLES.add(new Ripple(payload.at(), minecraft.level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false),
-                payload.strength()));        if (RIPPLES.size() > HexScreen.MAX_RIPPLES) {
+        RIPPLES.add(new Ripple(payload.at(), HexClock.now(minecraft), payload.strength()));
+        if (RIPPLES.size() > HexScreen.MAX_RIPPLES) {
             RIPPLES.removeFirst();
         }
     }
@@ -80,7 +80,7 @@ public final class HexClient {
         if (minecraft.level == null) {
             return;
         }
-        double now = minecraft.level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        double now = HexClock.now(minecraft);
         for (HexSnapshot hex : payload.hexes()) {
             HexSnapshot old = before.get(hex.caster());
             boolean entered = old == null || old.phase() != hex.phase();

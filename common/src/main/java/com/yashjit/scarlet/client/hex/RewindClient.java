@@ -119,7 +119,7 @@ public final class RewindClient {
     private static @Nullable HexSnapshot around(Minecraft minecraft) {
         Entity camera = minecraft.getCameraEntity() != null ? minecraft.getCameraEntity() : minecraft.player;
         Vec3 eye = camera.getEyePosition();
-        double now = minecraft.level.getGameTime();
+        double now = HexClock.now(minecraft);
         for (HexSnapshot hex : Hexes.clientHexes()) {
             if (HexShape.contains(hex.center(), HexClient.drawnRadius(hex, now), eye)) {
                 return hex;
@@ -266,7 +266,7 @@ public final class RewindClient {
         if (shown <= 0.01F) {
             return;
         }
-        double now = minecraft.level.getGameTime() + deltaTracker.getGameTimeDeltaPartialTick(false);
+        double now = HexClock.now(minecraft);
         Font font = minecraft.font;
         int width = graphics.guiWidth();
         int height = graphics.guiHeight();

@@ -46,7 +46,7 @@ public final class EraAudio {
             Entity listener = minecraft.getCameraEntity() != null ? minecraft.getCameraEntity() : minecraft.player;
             Vec3 ear = listener != null ? listener.getEyePosition() : null;
             if (ear != null) {
-                double now = minecraft.level.getGameTime();
+                double now = HexClock.now(minecraft);
                 HexSnapshot hex = Hexes.clientHexAt(ear, now);
                 if (hex != null) {
                     Era era = Hexes.eraAt(hex, ear, now);

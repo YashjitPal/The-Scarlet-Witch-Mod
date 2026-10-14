@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.mixin.client;
 
+import com.yashjit.scarlet.client.hex.HexClock;
 import com.yashjit.scarlet.client.hex.TownSlips;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -18,5 +19,13 @@ abstract class ClientLevelMixin {
     @Inject(method = "setServerVerifiedBlockState", at = @At("HEAD"))
     private void scarlet$letSlipsGo(BlockPos pos, BlockState state, int flags, CallbackInfo ci) {
         TownSlips.changed(pos);
+    }
+
+    /**
+     * The server's word of its time, for Hexes to be drawn by its own clock however far behind it has fallen.
+     */
+    @Inject(method = "setTimeFromServer", at = @At("HEAD"))
+    private void scarlet$heardTime(long gameTime, CallbackInfo ci) {
+        HexClock.heard((ClientLevel) (Object) this, gameTime);
     }
 }

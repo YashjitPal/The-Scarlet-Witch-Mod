@@ -75,7 +75,7 @@ public final class Remnants {
             return;
         }
         BUILT.put(payload.id(), new Built(Era.byIndex(payload.era()), payload.positions(), payload.roles(), payload.paints(),
-                minecraft.level.getGameTime()));
+                (long) HexClock.now(minecraft)));
         SHOWN.remove(payload.id());
     }
 
@@ -85,7 +85,7 @@ public final class Remnants {
         if (level == null || minecraft.isPaused()) {
             return;
         }
-        long now = level.getGameTime();
+        long now = (long) HexClock.now(minecraft);
         List<RemnantSnapshot> remnants = Hexes.clientRemnants();
         BUILT.int2ObjectEntrySet().removeIf(entry -> remnants.stream().noneMatch(remnant -> remnant.id() == entry.getIntKey())
                 && now - entry.getValue().receivedAt() > UNCLAIMED_TICKS);
@@ -217,7 +217,7 @@ public final class Remnants {
         if (level == null || BUILT.isEmpty()) {
             return;
         }
-        double now = level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        double now = HexClock.now(minecraft);
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         List<Draw> draws = new ArrayList<>();
         for (RemnantSnapshot remnant : Hexes.clientRemnants()) {

@@ -174,7 +174,7 @@ public final class HexSkyClient {
             return HexSky.WORLD;
         }
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
-        double now = minecraft.level.getGameTime();
+        double now = HexClock.now(minecraft);
         for (HexSnapshot hex : Hexes.clientHexes()) {
             if (HexShape.contains(hex.center(), HexClient.drawnRadius(hex, now), camera)) {
                 return hex.sky();

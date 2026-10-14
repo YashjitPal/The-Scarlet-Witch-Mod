@@ -179,7 +179,7 @@ public final class Founding {
             RAISINGS.clear();
             return;
         }
-        double now = level.getGameTime();
+        double now = HexClock.now(minecraft);
         if (!minecraft.isPaused()) {
             List<TownFx.Form> fresh = TownFx.formsAfter(formsSeen);
             formsSeen = TownFx.formsTold();
@@ -461,7 +461,7 @@ public final class Founding {
         if (!filming || player == null || minecraft.level == null) {
             return null;
         }
-        double now = minecraft.level.getGameTime() + partialTick;
+        double now = HexClock.now(minecraft);
         double angle = Math.toRadians(filmYaw) + (now - filmFrom) / ORBIT_TICKS * Math.PI * 2.0;
         // close on the caster at first, floating with the magic pouring out of them, then drawing back to the house
         float back = Ease.inOutCubic(Ease.clamp01((float) ((now - filmFrom - DRAW_BACK_FROM) / DRAW_BACK_TICKS)));
@@ -517,7 +517,7 @@ public final class Founding {
         if (level == null) {
             return;
         }
-        double now = level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        double now = HexClock.now(minecraft);
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         // beams out of the raised hands of casters raising their homes far off

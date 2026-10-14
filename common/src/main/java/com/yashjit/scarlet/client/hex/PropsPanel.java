@@ -149,7 +149,7 @@ public final class PropsPanel extends AbstractWidget {
         if (minecraft.level == null || !Props.crowned(player)) {
             return false;
         }
-        double now = minecraft.level.getGameTime();
+        double now = HexClock.now(minecraft);
         for (HexSnapshot hex : Hexes.clientHexes()) {
             if (hex.caster().equals(player.getUUID()) && hex.phaseValue() != Hex.Phase.COLLAPSING
                     && HexShape.contains(hex.center(), Hexes.wallRadius(hex, now), player.position())) {

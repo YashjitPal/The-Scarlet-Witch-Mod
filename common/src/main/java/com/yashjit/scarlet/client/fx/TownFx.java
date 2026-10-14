@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.hex.HexClient;
+import com.yashjit.scarlet.client.hex.HexClock;
 import com.yashjit.scarlet.client.render.Glow;
 import com.yashjit.scarlet.client.render.GlowPass;
 import com.yashjit.scarlet.hex.Hex;
@@ -72,6 +73,8 @@ public final class TownFx {
     private static final List<Unform> UNFORMS = new ArrayList<>();
     private static final AABB FULL = new AABB(0, 0, 0, 1, 1, 1);
     private static int formsTold;
+    /** The tick last gone through, by {@link HexClock}, for what lands between it and the next. */
+    private static long lastTick = Long.MIN_VALUE;
 
     private TownFx() {
     }
@@ -81,11 +84,11 @@ public final class TownFx {
     }
 
     public static void onForm(TownFormPayload payload) {
-        ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
             return;
         }
-        long now = level.getGameTime();
+        long now = (long) HexClock.now(minecraft);
         int[] blocks = payload.blocks();
         for (int i = 0; i + 3 < blocks.length; i += 4) {
             FORMS.add(new Form(++formsTold, new BlockPos(blocks[i], blocks[i + 1], blocks[i + 2]), now, now + blocks[i + 3]));
@@ -100,11 +103,12 @@ public final class TownFx {
      * now, while it still stands, to draw what is left of it after.
      */
     public static void onUnform(TownUnformPayload payload) {
-        ClientLevel level = Minecraft.getInstance().level;
+        Minecraft minecraft = Minecraft.getInstance();
+        ClientLevel level = minecraft.level;
         if (level == null) {
             return;
         }
-        long now = level.getGameTime();
+        long now = (long) HexClock.now(minecraft);
         int[] blocks = payload.blocks();
         for (int i = 0; i + 3 < blocks.length; i += 4) {
             BlockPos pos = new BlockPos(blocks[i], blocks[i + 1], blocks[i + 2]);
@@ -177,11 +181,11 @@ public final class TownFx {
     }
 
     public static void onCut(TownCutPayload payload) {
-        ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
             return;
         }
-        long now = level.getGameTime();
+        long now = (long) HexClock.now(minecraft);
         int[] cells = payload.cells();
         for (int i = 0; i + 3 < cells.length; i += 4) {
             CUTS.add(new Cut(cells[i], cells[i + 1], cells[i + 2], cells[i + 3], now));
@@ -203,7 +207,9 @@ public final class TownFx {
         if (minecraft.isPaused()) {
             return;
         }
-        long now = level.getGameTime();
+        long now = (long) HexClock.now(minecraft);
+        long since = lastTick == Long.MIN_VALUE ? now - 1 : Math.min(lastTick, now - 1);
+        lastTick = now;
         BUILDS.removeIf(build -> now - build.start() > build.duration() + AFTERGLOW + 2);
         CUTS.removeIf(cut -> now - cut.start > CUT_TICKS || now < cut.start);
         FORMS.removeIf(form -> now - form.lands() > BlockGlitch.SETTLE + 1 || now < form.told());
@@ -211,8 +217,8 @@ public final class TownFx {
         RandomSource random = ScarletFx.random();
         float density = ScarletFx.density();
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
-        formTick(level, now, camera);
-        unformTick(level, now, camera, random);
+        formTick(level, since, now, camera);
+        unformTick(level, since, now, camera, random);
         for (TownBuildPayload build : BUILDS) {
             boolean street = TownPlan.Kind.values()[Math.clamp(build.kind(), 0, TownPlan.Kind.values().length - 1)].isStreet();
             boolean home = build.kind() == TownPlan.Kind.HOME.ordinal();
@@ -313,10 +319,10 @@ public final class TownFx {
      * Each block of a home that lands this tick sets itself down with its own sound, softly, a couple at most a tick so a
      * whole course of a wall landing at once is not a din.
      */
-    private static void formTick(ClientLevel level, long now, Vec3 camera) {
+    private static void formTick(ClientLevel level, long since, long now, Vec3 camera) {
         int sounds = 0;
         for (Form form : FORMS) {
-            if (form.lands() != now || sounds >= 2 || camera.distanceToSqr(Vec3.atCenterOf(form.pos())) > FORM_REACH * FORM_REACH) {
+            if (form.lands() <= since || form.lands() > now || sounds >= 2 || camera.distanceToSqr(Vec3.atCenterOf(form.pos())) > FORM_REACH * FORM_REACH) {
                 continue;
             }
             BlockState state = level.getBlockState(form.pos());
@@ -334,10 +340,10 @@ public final class TownFx {
      * Each block of a home left behind that goes this tick comes apart with its own sound, softly, a couple at most a
      * tick, and a puff of static where it stood.
      */
-    private static void unformTick(ClientLevel level, long now, Vec3 camera, RandomSource random) {
+    private static void unformTick(ClientLevel level, long since, long now, Vec3 camera, RandomSource random) {
         int sounds = 0;
         for (Unform unform : UNFORMS) {
-            if (unform.goes() != now || camera.distanceToSqr(Vec3.atCenterOf(unform.pos())) > FORM_REACH * FORM_REACH) {
+            if (unform.goes() <= since || unform.goes() > now || camera.distanceToSqr(Vec3.atCenterOf(unform.pos())) > FORM_REACH * FORM_REACH) {
                 continue;
             }
             Vec3 at = Vec3.atCenterOf(unform.pos());
@@ -393,7 +399,7 @@ public final class TownFx {
         if (level == null) {
             return;
         }
-        double now = level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        double now = HexClock.now(minecraft);
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         List<TownBuildPayload> builds = List.copyOf(BUILDS);
         List<Cut> cuts = List.copyOf(CUTS);

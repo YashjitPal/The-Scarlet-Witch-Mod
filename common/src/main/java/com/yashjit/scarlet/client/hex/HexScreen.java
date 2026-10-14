@@ -138,7 +138,7 @@ public final class HexScreen {
             wanted = false;
             return;
         }
-        double now = minecraft.level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        double now = HexClock.now(minecraft);
         double reach = minecraft.options.getEffectiveRenderDistance() * 16.0;
         List<HexClient.Shown> hexes = HexClient.shown(cameraPos, now, reach, MAX_HEXES);
         HexClient.Shown around = null;
