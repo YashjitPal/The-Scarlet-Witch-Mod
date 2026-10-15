@@ -6,6 +6,7 @@ import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.hex.town.HexTown;
 import com.yashjit.scarlet.hex.town.HomeRemnant;
 import com.yashjit.scarlet.hex.town.TownMemory;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
@@ -71,6 +72,7 @@ public final class HexData extends SavedData implements HexTown.Leftovers {
     private final Long2ObjectOpenHashMap<HexTown.Built> pending;
     /** Where among {@link #pending} each chunk's blocks are, for them to go back as soon as it is loaded. */
     private final Long2ObjectOpenHashMap<LongOpenHashSet> pendingByChunk = new Long2ObjectOpenHashMap<>();
+    private final Long2LongOpenHashMap fetchingLeftovers = new Long2LongOpenHashMap();
     /** Paintings, armor stands and the like a town took up, waiting for their chunk to load to be set back down. */
     private final List<HexTown.Kept> pendingKept;
     /** The towns fallen Hexes left behind, oldest first. */
@@ -245,6 +247,18 @@ public final class HexData extends SavedData implements HexTown.Leftovers {
         return pendingByChunk.keySet().toLongArray();
     }
 
+    boolean hasPendingIn(long chunk) {
+        return pendingByChunk.containsKey(chunk);
+    }
+
+    /**
+     * Chunks what towns and Hexes gone left waits to go back in that have been asked to be loaded, for it to go back
+     * without anyone having to go there, and when. Not saved: what is still waiting is asked for again.
+     */
+    Long2LongOpenHashMap fetchingLeftovers() {
+        return fetchingLeftovers;
+    }
+
     /** How many blocks of towns gone wait to be put back, and in how many chunks: for seeing how well that keeps up. */
     public int leftoverCount() {
         return pending.size();
@@ -252,6 +266,15 @@ public final class HexData extends SavedData implements HexTown.Leftovers {
 
     public int leftoverChunks() {
         return pendingByChunk.size();
+    }
+
+    /** How many painted blocks of Hexes gone, and things towns gone took up, wait to go back. */
+    public int leftoverPaintCount() {
+        return pendingPaint.size();
+    }
+
+    public int leftoverKeptCount() {
+        return pendingKept.size();
     }
 
     /** About the middle of where blocks of towns gone wait to be put back, in block columns, or null if none do. */

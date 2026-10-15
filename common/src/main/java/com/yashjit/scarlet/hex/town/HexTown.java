@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
@@ -119,10 +120,16 @@ public final class HexTown {
     private static final int FETCH_PATIENCE = 400;
     private static final int KEEP_LOADED_INTERVAL = 10;
     /**
-     * No more land is asked for while the server's ticks take longer than this on average, in nanoseconds, for all but
-     * the towns: making new land is what makes the rest of them long.
+     * How far ahead of the wall moving in the land it is about to pass over is asked to be loaded; how many chunks of it
+     * at once, and how many more each tick the server has room for it; how many of the town's blocks are looked over
+     * for it each tick; and how long a chunk's land is waited for before what stands on it is left to go back once
+     * anyone goes there.
      */
-    private static final long FETCH_WHILE_UNDER_NANOS = 40_000_000L;
+    private static final float FETCH_AHEAD = 40.0F;
+    private static final int MAX_WALL_FETCHING = 128;
+    private static final int WALL_FETCHES_PER_TICK = 4;
+    private static final int FETCH_SCAN = 8192;
+    private static final int WALL_FETCH_PATIENCE = 600;
     /** How near a player must be to a slipping part to be shown it. */
     private static final double SLIP_SEEN_FROM = 160.0;
     /** Parts slip only this near someone, where they can be seen to. */
@@ -331,6 +338,13 @@ public final class HexTown {
     private @Nullable Leftovers leftovers;
     /** Parts out where no one is whose land the town has asked to be loaded, to build them, and when it asked. */
     private final Int2LongOpenHashMap fetching = new Int2LongOpenHashMap();
+    /**
+     * Chunks of land the wall moving in is about to pass over that weren't loaded, asked to be, and when: so the town
+     * there comes down as the wall goes by, rather than whenever anyone next goes there. Each is let go of once the wall
+     * has gone by it, by how far out its innermost corner stands.
+     */
+    private final Long2LongOpenHashMap wallFetching = new Long2LongOpenHashMap();
+    private final Long2FloatOpenHashMap wallFetchedInner = new Long2FloatOpenHashMap();
     /** Where bits of the town went back this tick, by two-by-two cell, with the lowest and highest y that went. */
     private final Long2LongOpenHashMap gone = new Long2LongOpenHashMap();
 
@@ -888,7 +902,7 @@ public final class HexTown {
         this.leftovers = leftovers;
         float seen = seen(wall, now);
         if (falling) {
-            fall(level, hexCenter, wall);
+            fall(level, hexCenter, wall, now);
             sendGone(level, hexCenter, wall);
             return;
         }
@@ -961,13 +975,19 @@ public final class HexTown {
         if (!closing && now - lastClosing > CUT_LINGER && caughtUp) {
             cut = null;
             cutFresh.clear();
+            wallFetching.clear();
+            wallFetchedInner.clear();
             return;
         }
         if (cut == null) {
             // sorted once, however far it is drawn in, and kept up with what goes up meanwhile
             cut = Sweep.outsideIn(built, hexCenter);
             cutFresh.clear();
+            wallFetching.clear();
+            wallFetchedInner.clear();
         }
+        // its land loaded ahead of it where no one is, for the town there to go back as the wall goes by
+        fetchAhead(level, hexCenter, cut, wall, now);
         int budget = CUT_BUDGET;
         boolean any = false;
         LongPredicate passed = other -> built.containsKey(other) && reachOf(hexCenter, other) > wall;
@@ -978,9 +998,13 @@ public final class HexTown {
             if (Sweep.ring(cut.reach[at]) <= inner) {
                 break;
             }
-            cut.cursor++;
             long key = cut.order[at];
             Built entry = built.get(key);
+            if (entry != null && !Terrain.canPutBack(level, key) && waitFor(level, hexCenter, key, now)) {
+                // its land isn't loaded yet: the wall waits for it
+                break;
+            }
+            cut.cursor++;
             if (entry != null && restore(level, key, entry, passed)) {
                 budget--;
                 gone(key);
@@ -992,7 +1016,7 @@ public final class HexTown {
             long key = cutFresh.getLong(k);
             Built entry = built.get(key);
             float reach = reachOf(hexCenter, key);
-            if (entry != null && reach <= wall) {
+            if (entry != null && (reach <= wall || !Terrain.canPutBack(level, key) && waitFor(level, hexCenter, key, now))) {
                 continue;
             }
             cutFresh.set(k, cutFresh.getLong(cutFresh.size() - 1));
@@ -1911,7 +1935,7 @@ public final class HexTown {
         long asked = fetching.getOrDefault(part.id(), Long.MIN_VALUE);
         if (asked == Long.MIN_VALUE) {
             // making new land is hard work for the server: only so much at once, and only while it has time to spare
-            if (fetching.size() >= MAX_FETCHING || Hexes.othersNanos(level.getServer()) > FETCH_WHILE_UNDER_NANOS) {
+            if (fetching.size() >= MAX_FETCHING || !Hexes.hasRoomToLoad()) {
                 return;
             }
             fetching.put(part.id(), now);
@@ -1934,6 +1958,77 @@ public final class HexTown {
                 level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_SPAWN, new ChunkPos(cx, cz), 0);
             }
         }
+    }
+
+    /**
+     * Asks for the land the wall moving in is about to pass over to be loaded, where it isn't, a few chunks more each
+     * tick the server has room for it and those nearest the wall first, so it is there by the time the wall gets to it;
+     * keeps what was asked for loaded until the wall has gone by it; and lets it go after.
+     */
+    private void fetchAhead(ServerLevel level, Vec3 hexCenter, Sweep sweep, float wall, long now) {
+        var asked = wallFetching.long2LongEntrySet().iterator();
+        while (asked.hasNext()) {
+            var entry = asked.next();
+            long chunk = entry.getLongKey();
+            if (wall < wallFetchedInner.get(chunk) - 1.0F) {
+                asked.remove();
+                wallFetchedInner.remove(chunk);
+            } else if (now % KEEP_LOADED_INTERVAL == 0 && now - entry.getLongValue() <= WALL_FETCH_PATIENCE) {
+                Terrain.fetchAround(level, ChunkPos.getX(chunk), ChunkPos.getZ(chunk));
+            }
+        }
+        if (!Hexes.hasRoomToLoad()) {
+            return;
+        }
+        int ahead = Sweep.ring(Math.max(0.0F, wall - FETCH_AHEAD));
+        int added = 0;
+        int at = Math.max(sweep.fetched, sweep.cursor);
+        int end = Math.min(sweep.order.length, at + FETCH_SCAN);
+        for (; at < end && Sweep.ring(sweep.reach[at]) >= ahead; at++) {
+            if (added >= WALL_FETCHES_PER_TICK || wallFetching.size() >= MAX_WALL_FETCHING) {
+                break;
+            }
+            long key = sweep.order[at];
+            int chunkX = BlockPos.getX(key) >> 4;
+            int chunkZ = BlockPos.getZ(key) >> 4;
+            long chunk = ChunkPos.pack(chunkX, chunkZ);
+            if (!built.containsKey(key) || wallFetching.containsKey(chunk) || Terrain.isReadyAround(level, chunkX, chunkZ)) {
+                continue;
+            }
+            ask(level, hexCenter, chunk, now);
+            added++;
+        }
+        sweep.fetched = at;
+    }
+
+    /**
+     * Waits for the land a block of the town the wall has passed stands on to be loaded, asking for it if it hasn't been:
+     * true while it is waited for, false once it has been waited for too long, for the block to go back once anyone next
+     * goes there instead.
+     */
+    private boolean waitFor(ServerLevel level, Vec3 hexCenter, long key, long now) {
+        long chunk = ChunkPos.pack(BlockPos.getX(key) >> 4, BlockPos.getZ(key) >> 4);
+        long asked = wallFetching.getOrDefault(chunk, Long.MIN_VALUE);
+        if (asked == Long.MIN_VALUE) {
+            ask(level, hexCenter, chunk, now);
+            return true;
+        }
+        return now - asked <= WALL_FETCH_PATIENCE;
+    }
+
+    private void ask(ServerLevel level, Vec3 hexCenter, long chunk, long now) {
+        int chunkX = ChunkPos.getX(chunk);
+        int chunkZ = ChunkPos.getZ(chunk);
+        wallFetching.put(chunk, now);
+        // a little in from its innermost corner, for the hexagon's side to run across it anywhere
+        float inner = Float.MAX_VALUE;
+        for (int x : new int[] {chunkX << 4, (chunkX << 4) + 15}) {
+            for (int z : new int[] {chunkZ << 4, (chunkZ << 4) + 15}) {
+                inner = Math.min(inner, reachOf(hexCenter, BlockPos.asLong(x, 0, z)));
+            }
+        }
+        wallFetchedInner.put(chunk, inner - 16.0F);
+        Terrain.fetchAround(level, chunkX, chunkZ);
     }
 
     /** Puts back first whatever a town left on a part's ground where it couldn't then, for the part to go up on the land. */
@@ -2034,13 +2129,17 @@ public final class HexTown {
      * Brings the town down behind the wall as it rushes in. A town too big to keep up with the wall goes on coming down
      * a moment after it has gone in, rather than all at once.
      */
-    private void fall(ServerLevel level, Vec3 hexCenter, float wall) {
+    private void fall(ServerLevel level, Vec3 hexCenter, float wall, long now) {
         builds.clear();
         started.clear();
         if (collapse == null) {
             collapse = Sweep.outsideIn(built, hexCenter);
+            wallFetching.clear();
+            wallFetchedInner.clear();
         }
         lastFallWall = wall;
+        // its land loaded ahead of it where no one is, for the town there to come down as the wall goes by
+        fetchAhead(level, hexCenter, collapse, wall, now);
         int budget = COLLAPSE_BUDGET;
         // a ring at a time, the wall's own with it: within one the sweep keeps no order
         int last = Sweep.ring(wall);
@@ -2049,9 +2148,13 @@ public final class HexTown {
             if (Sweep.ring(collapse.reach[at]) < last) {
                 break;
             }
-            collapse.cursor++;
             long key = collapse.order[at];
             Built entry = built.get(key);
+            if (entry != null && !Terrain.canPutBack(level, key) && waitFor(level, hexCenter, key, now)) {
+                // its land isn't loaded yet: the wall waits for it
+                break;
+            }
+            collapse.cursor++;
             if (entry != null && restore(level, key, entry, built::containsKey)) {
                 budget--;
                 gone(key);
@@ -3774,6 +3877,8 @@ public final class HexTown {
         final float[] reach;
         final it.unimi.dsi.fastutil.longs.LongArrayList touched = new it.unimi.dsi.fastutil.longs.LongArrayList();
         int cursor;
+        /** How far on from {@link #cursor} its blocks' land has been looked over, for what isn't loaded to be asked for. */
+        int fetched;
         /** How many of {@link #touched} have had their connections worked out again. */
         int reshaped;
         @Nullable Era era;

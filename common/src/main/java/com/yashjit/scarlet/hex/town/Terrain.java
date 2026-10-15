@@ -5,8 +5,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.FlowerBedBlock;
@@ -42,6 +44,43 @@ public final class Terrain {
 
     public static boolean isReady(ServerLevel level, int chunkX, int chunkZ) {
         return level.getChunkSource().getChunkNow(chunkX, chunkZ) != null;
+    }
+
+    /**
+     * Whether a chunk and the eight round it are all ready: everything putting blocks back in it reads, or tells of
+     * what changed, without holding the server up while some of it loads.
+     */
+    public static boolean isReadyAround(ServerLevel level, int chunkX, int chunkZ) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!isReady(level, chunkX + dx, chunkZ + dz)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether a block can be put back now: its chunk ready, and at the chunk's edge the one beside it, which the
+     * block's neighbors there are in.
+     */
+    public static boolean canPutBack(ServerLevel level, long key) {
+        int x = BlockPos.getX(key);
+        int z = BlockPos.getZ(key);
+        int chunkX = x >> 4;
+        int chunkZ = z >> 4;
+        return isReady(level, chunkX, chunkZ)
+                && ((x & 15) != 0 || isReady(level, chunkX - 1, chunkZ)) && ((x & 15) != 15 || isReady(level, chunkX + 1, chunkZ))
+                && ((z & 15) != 0 || isReady(level, chunkX, chunkZ - 1)) && ((z & 15) != 15 || isReady(level, chunkX, chunkZ + 1));
+    }
+
+    /**
+     * Asks for a chunk and the eight round it to be loaded, for a moment, without anything there being set going: for
+     * as long as it goes on being asked.
+     */
+    public static void fetchAround(ServerLevel level, int chunkX, int chunkZ) {
+        level.getChunkSource().addTicketWithRadius(TicketType.PLAYER_SPAWN, new ChunkPos(chunkX, chunkZ), 1);
     }
 
     public static boolean isGround(BlockState state) {

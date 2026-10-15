@@ -31,6 +31,7 @@ public final class ScarletNeoForge {
         NeoForge.EVENT_BUS.addListener(ScarletNeoForge::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(ScarletNeoForge::onEquipmentChange);
         NeoForge.EVENT_BUS.addListener(ScarletNeoForge::onIncomingDamage);
+        NeoForge.EVENT_BUS.addListener((ServerTickEvent.Pre event) -> ScarletEvents.onServerTickStart(event.getServer()));
         NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post event) -> ScarletEvents.onServerTick(event.getServer()));
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> ScarletCommands.register(event.getDispatcher()));
     }

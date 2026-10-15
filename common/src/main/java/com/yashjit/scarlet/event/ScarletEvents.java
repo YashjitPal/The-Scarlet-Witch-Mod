@@ -69,6 +69,10 @@ public final class ScarletEvents {
         return true;
     }
 
+    public static void onServerTickStart(MinecraftServer server) {
+        Hexes.tickStarted(server);
+    }
+
     public static void onServerTick(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
             // what the Hex does to the world itself is no part of the scene its tape records

@@ -167,6 +167,11 @@ public final class Hex {
         return town;
     }
 
+    /** How many blocks in it stand painted. */
+    public int paintedCount() {
+        return paint.size();
+    }
+
     public boolean contains(Vec3 point) {
         return HexShape.contains(center, radius, point);
     }

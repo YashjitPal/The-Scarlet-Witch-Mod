@@ -19,6 +19,7 @@ public final class ScarletFabric implements ModInitializer {
         FabricPlayerDataService.bootstrap();
         ScarletNetwork.registerPayloads(new FabricPayloadRegistry());
 
+        ServerTickEvents.START_SERVER_TICK.register(ScarletEvents::onServerTickStart);
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             ScarletEvents.onServerTick(server);
             server.getPlayerList().getPlayers().forEach(ScarletEvents::onPlayerTick);

@@ -12,6 +12,7 @@ import com.yashjit.scarlet.config.ScarletServerConfig;
 import com.yashjit.scarlet.magic.Magic;
 import com.yashjit.scarlet.network.HexSyncPayload;
 import com.yashjit.scarlet.platform.Services;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -97,11 +98,19 @@ public final class Hexes {
     private static final int DRIFT_SETTLE = 9;
     public static final int WARNING_TICKS = 100;
     /**
-     * How long a tick the server should take, all told, in nanoseconds: what is left of that after its own work is what
-     * the Hexes of a dimension and their towns take between them. Whatever a town has left to do carries on next tick,
-     * so however big it grows the server keeps its pace.
+     * How long a tick the server should take, all told, in nanoseconds: what is left of that once the rest of the tick
+     * is done is what the Hexes of a dimension and their towns take between them, and the rest of the 50 is the server's
+     * for its work between ticks, such as loading land. Whatever a town has left to do carries on next tick, so however
+     * big it grows the server keeps its pace.
      */
     private static final long TICK_NANOS = 45_000_000L;
+    /**
+     * How many ticks the server's pace is taken over, and how much longer than it should those may take, in twentieths,
+     * before the towns take only the least they can and no land is asked to be loaded: it isn't keeping up, most often
+     * with land being loaded between ticks.
+     */
+    private static final int PACE_TICKS = 20;
+    private static final long BEHIND_TWENTIETHS = 21;
     /**
      * The least and most of each tick the towns take for putting back what their walls have passed, which goes first;
      * what they can't keep up with, their walls wait for.
@@ -114,18 +123,27 @@ public final class Hexes {
     /** The same for putting back what towns gone left in chunks that weren't loaded, nearest anyone first. */
     private static final long LEFTOVER_LEAST = 1_000_000L;
     private static final long LEFTOVER_MOST = 10_000_000L;
+    /**
+     * How many chunks of what towns gone left are asked to be loaded at once, for it to go back without anyone going
+     * there; how often each is asked again to stay loaded; how long one is waited for before another's turn; and how
+     * often one more is asked for while the server has no time to spare, for all of it to go back in the end.
+     */
+    private static final int MOST_LEFTOVERS_FETCHING = 6;
+    private static final int LEFTOVER_FETCH_RENEW = 10;
+    private static final int LEFTOVER_FETCH_PATIENCE = 400;
+    private static final int LEFTOVER_FETCH_TRICKLE = 20;
     /** How many of a town's blocks may stand out past its wall still to go back before the wall waits for them. */
     private static final int MOST_BEHIND = 2048;
     /** Longest a falling wall waits for its town, all told, before it carries on anyway. */
     private static final int LONGEST_WAIT = 2400;
     /** Longest a fallen Hex's town goes on coming down after its wall has gone in, before the rest goes at once. */
     private static final int FALL_GRACE_TICKS = 1200;
-    /** Ticks the Hexes' own share of the server's ticks is averaged over, as the server averages its own. */
-    private static final int OWN_AVERAGE_TICKS = 100;
-    /** How long the Hexes and their towns have been taking a tick, on average, and so far this tick. */
-    private static long ownNanos;
-    private static long ownThisTick;
-    private static int ownTick = -1;
+    /** When this tick began, in {@link System#nanoTime} nanoseconds, and each of the {@link #PACE_TICKS} before it. */
+    private static long tickStartedAt;
+    private static final long[] TICKS_STARTED_AT = new long[PACE_TICKS];
+    private static int ticksStarted;
+    /** Whether the server has been falling behind its pace. */
+    private static boolean behind;
     /** Ticks between updates sent while a Hex keeps changing, such as while it is being resized. */
     public static final int SYNC_INTERVAL = 2;
     /**
@@ -735,39 +753,45 @@ public final class Hexes {
         }
     }
 
+    /** As the server begins a tick: for how long the rest of it takes, and whether it is keeping its pace. */
+    public static void tickStarted(MinecraftServer server) {
+        long now = System.nanoTime();
+        int slot = ticksStarted % PACE_TICKS;
+        long paceAgo = TICKS_STARTED_AT[slot];
+        TICKS_STARTED_AT[slot] = now;
+        tickStartedAt = now;
+        ticksStarted++;
+        // a server running ahead of its pace, as it does to catch up, is keeping up whatever it is behind
+        behind = ticksStarted > PACE_TICKS
+                && (now - paceAgo) * 20 > BEHIND_TWENTIETHS * PACE_TICKS * server.tickRateManager().nanosecondsPerTick();
+    }
+
+    private static boolean isBehind() {
+        return behind;
+    }
+
+    /**
+     * How much of this tick is left for the Hexes and their towns, in nanoseconds; nothing while the server is behind.
+     * It goes by how long the tick has taken so far rather than by the server's own tick times, which on Fabric leave
+     * out what is done at the end of a tick, the Hexes' own work.
+     */
+    private static long spareNanos() {
+        return isBehind() ? 0L : TICK_NANOS - (System.nanoTime() - tickStartedAt);
+    }
+
+    /**
+     * Whether land may be asked to be loaded this tick: loading it is work the server does between ticks, and none is
+     * asked for while it is behind.
+     */
+    public static boolean hasRoomToLoad() {
+        return !isBehind();
+    }
+
     public static void tick(ServerLevel level) {
-        MinecraftServer server = level.getServer();
-        if (server.getTickCount() != ownTick) {
-            if (ownTick >= 0) {
-                ownNanos += (ownThisTick - ownNanos) / OWN_AVERAGE_TICKS;
-            }
-            ownTick = server.getTickCount();
-            ownThisTick = 0L;
-        }
-        long started = System.nanoTime();
-        try {
-            tick(level, TICK_NANOS - othersNanos(server));
-        } finally {
-            ownThisTick += System.nanoTime() - started;
-        }
-    }
-
-    /**
-     * How long the server's ticks take on average for everything but the Hexes and their towns, in nanoseconds: what
-     * is left of a tick after that is theirs.
-     */
-    public static long othersNanos(MinecraftServer server) {
-        return Math.max(0L, server.getAverageTickTimeNanos() - ownNanos);
-    }
-
-    /**
-     * @param spare how much of this tick is left for the Hexes and their towns, in nanoseconds
-     */
-    private static void tick(ServerLevel level, long spare) {
         HexData data = HexData.of(level);
         long now = level.getGameTime();
         if (!data.pending().isEmpty() || !data.pendingKept().isEmpty() || !data.pendingPaint().isEmpty()) {
-            putBackLeftovers(level, data, System.nanoTime() + Math.clamp(spare / 2, LEFTOVER_LEAST, LEFTOVER_MOST));
+            putBackLeftovers(level, data, System.nanoTime() + Math.clamp(spareNanos() / 2, LEFTOVER_LEAST, LEFTOVER_MOST), now);
         }
         Residents.tick(level, data, now);
         tickRemnants(level, data, now);
@@ -777,7 +801,8 @@ public final class Hexes {
             return;
         }
         List<Hex> fallen = new ArrayList<>();
-        // the towns take what the server has left of each tick; what their walls have passed goes first
+        // the towns take what the server has left of this tick; what their walls have passed goes first
+        long spare = spareNanos();
         long share = Math.clamp(spare, TOWN_LEAST, TOWN_MOST) / data.all().size();
         long wallShare = Math.clamp(spare, WALL_LEAST, WALL_MOST) / data.all().size();
         for (Hex hex : data.all()) {
@@ -1083,28 +1108,25 @@ public final class Hexes {
     /**
      * @param until when this tick's time for it runs out, in {@link System#nanoTime} nanoseconds
      */
-    private static void putBackLeftovers(ServerLevel level, HexData data, long until) {
+    private static void putBackLeftovers(ServerLevel level, HexData data, long until, long now) {
         // paint first, so the town finds its own blocks under it
         HexPaint.putBackLeftovers(level, data);
-        // the blocks first, so what hung on them has somewhere to hang; a chunk at a time, those that are loaded, nearest
-        // anyone first, for as long as there is time this tick: a town drawn in past where no one is can leave a million
+        // the blocks first, so what hung on them has somewhere to hang; a chunk at a time, those loaded with all round
+        // them, nearest anyone first, for as long as there is time this tick: a town can leave a million of them
         long[] chunks = data.pendingChunks();
         long[] order = new long[chunks.length];
         int ready = 0;
+        LongOpenHashSet unready = new LongOpenHashSet();
         for (int i = 0; i < chunks.length; i++) {
             int chunkX = (int) (chunks[i] >> 32);
             int chunkZ = (int) chunks[i];
-            if (!Terrain.isReady(level, chunkX, chunkZ)) {
-                continue;
+            if (Terrain.isReadyAround(level, chunkX, chunkZ)) {
+                order[ready++] = nearestSq(level, chunkX, chunkZ) << 32 | i;
+            } else {
+                unready.add(chunks[i]);
             }
-            long nearest = Integer.MAX_VALUE;
-            for (ServerPlayer player : level.players()) {
-                long dx = (chunkX << 4) + 8 - player.getBlockX();
-                long dz = (chunkZ << 4) + 8 - player.getBlockZ();
-                nearest = Math.min(nearest, dx * dx + dz * dz);
-            }
-            order[ready++] = Math.min(nearest, Integer.MAX_VALUE) << 32 | i;
         }
+        fetchLeftovers(level, data, unready, now);
         Arrays.sort(order, 0, ready);
         for (int k = 0; k < ready && System.nanoTime() <= until; k++) {
             for (long key : data.pendingIn(chunks[(int) order[k]])) {
@@ -1124,6 +1146,73 @@ public final class Hexes {
                 data.setDirty();
             }
         }
+    }
+
+    /**
+     * Asks for the land where what towns and Hexes gone left waits to go back to be loaded, where it isn't, nearest anyone
+     * first and a few chunks at a time while the server has time to spare, for it to go back without anyone having to go
+     * there; and keeps it loaded until it has.
+     *
+     * @param unready the chunks blocks wait in that aren't loaded with all round them
+     */
+    private static void fetchLeftovers(ServerLevel level, HexData data, LongOpenHashSet unready, long now) {
+        var fetching = data.fetchingLeftovers();
+        var asked = fetching.long2LongEntrySet().iterator();
+        while (asked.hasNext()) {
+            var entry = asked.next();
+            long chunk = entry.getLongKey();
+            int chunkX = (int) (chunk >> 32);
+            int chunkZ = (int) chunk;
+            // paint and what was kept go back the tick their chunk is loaded, and it stays loaded a moment after
+            boolean done = !data.hasPendingIn(chunk) && Terrain.isReady(level, chunkX, chunkZ);
+            if (done || now - entry.getLongValue() > LEFTOVER_FETCH_PATIENCE) {
+                asked.remove();
+            } else if (now % LEFTOVER_FETCH_RENEW == 0) {
+                Terrain.fetchAround(level, chunkX, chunkZ);
+            }
+        }
+        int most = !isBehind() ? MOST_LEFTOVERS_FETCHING : now % LEFTOVER_FETCH_TRICKLE == 0 ? fetching.size() + 1 : 0;
+        most = Math.min(most, MOST_LEFTOVERS_FETCHING);
+        if (fetching.size() >= most) {
+            return;
+        }
+        for (long key : data.pendingPaint().keySet()) {
+            addIfUnready(level, unready, BlockPos.getX(key) >> 4, BlockPos.getZ(key) >> 4);
+        }
+        for (HexTown.Kept kept : data.pendingKept()) {
+            BlockPos at = BlockPos.containing(kept.at());
+            addIfUnready(level, unready, at.getX() >> 4, at.getZ() >> 4);
+        }
+        long[] chunks = unready.toLongArray();
+        long[] order = new long[chunks.length];
+        for (int k = 0; k < chunks.length; k++) {
+            order[k] = nearestSq(level, (int) (chunks[k] >> 32), (int) chunks[k]) << 32 | k;
+        }
+        Arrays.sort(order);
+        for (int k = 0; k < order.length && fetching.size() < most; k++) {
+            long chunk = chunks[(int) order[k]];
+            if (!fetching.containsKey(chunk)) {
+                fetching.put(chunk, now);
+                Terrain.fetchAround(level, (int) (chunk >> 32), (int) chunk);
+            }
+        }
+    }
+
+    private static void addIfUnready(ServerLevel level, LongOpenHashSet unready, int chunkX, int chunkZ) {
+        if (!Terrain.isReady(level, chunkX, chunkZ)) {
+            unready.add(HexData.chunk(chunkX, chunkZ));
+        }
+    }
+
+    /** How far the nearest player is from the middle of a chunk, squared, at most {@link Integer#MAX_VALUE}. */
+    private static long nearestSq(ServerLevel level, int chunkX, int chunkZ) {
+        long nearest = Integer.MAX_VALUE;
+        for (ServerPlayer player : level.players()) {
+            long dx = (chunkX << 4) + 8 - player.getBlockX();
+            long dz = (chunkZ << 4) + 8 - player.getBlockZ();
+            nearest = Math.min(nearest, dx * dx + dz * dz);
+        }
+        return nearest;
     }
 
     /**
