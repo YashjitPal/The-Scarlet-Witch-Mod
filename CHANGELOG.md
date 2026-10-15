@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.11
+
+- **The town comes down with its Hex wherever it stands**, as it used to. Out where no one was, a Hex drawn in or falling left its town standing there until someone went near it. Now the land just ahead of the wall is loaded as the wall comes, and the wall waits for it if it must, so every part of the town is gone as the wall goes by, whoever is there.
+- **What towns left out where no one was goes back on its own**, a few chunks at a time while the server has time to spare, without anyone going near it. So does paint a fallen Hex left there.
+- **The server keeps its pace while a big town goes up or comes down.** A town's share of each tick was worked out from the server's own tick times, which leave out the time it spends loading land between ticks, and on Fabric the town's own work too, so a big town could take more than there was and slow everything down. It now times each tick itself and takes only what is really left of it, and while the server is falling behind, it takes only the least it can and holds off loading more land.
+
 ## 0.1.10
 
 - **The town keeps up with its wall again.** Since 0.1.8 a town had only a small, fixed share of each tick, so drawing a Hex in or letting it fall left its town standing outside the wall, coming down long after. Now what the wall passes goes first, with as much of each tick as the server can spare, and the wall waits for it if it has to: the town is gone as the wall goes by, drawn in or falling. Towns also build up to twice as fast, from whatever time each tick has to spare.
