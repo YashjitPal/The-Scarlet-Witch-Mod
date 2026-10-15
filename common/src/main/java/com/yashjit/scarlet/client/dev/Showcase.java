@@ -2064,6 +2064,70 @@ public final class Showcase {
                         .dispelHexes()
                         .command("execute as @a run scarlet hex forget");
             }
+            // a copy of a world someone played: what a town before left where no one is going back by itself, and then a
+            // Hex cast and grown far out past where anyone is, its town built out there, let fall, and whether any of it
+            // is left standing out there rather than coming down with the wall
+            case "replayfar" -> {
+                s.then(minecraft -> {
+                }, 200).hideHud(false).logHexSize("loaded");
+                for (int k = 1; k <= 15; k++) {
+                    s.then(minecraft -> {
+                    }, 80).logHexSize("before casting, " + 4 * k + " s on");
+                }
+                s.command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("execute as @a run scarlet hex build town")
+                        .anchor().ensureUnsuited().select(Spell.HEX).tap();
+                for (int k = 1; k <= 8; k++) {
+                    s.then(minecraft -> {
+                    }, 80).logHexSize("cast, " + 4 * k + " s on");
+                }
+                s.command("execute as @a run scarlet hex size 360");
+                for (int k = 1; k <= 30; k++) {
+                    s.then(minecraft -> {
+                    }, 80).logHexSize("grown to 360, " + 4 * k + " s on");
+                }
+                s.command("execute as @a run scarlet hex dispel");
+                for (int k = 1; k <= 40; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logHexSize("falling, " + 2 * k + " s on");
+                }
+            }
+            // the caster paints the ground of a Hex that builds nothing, goes far off and lets it fall: the paint, out where
+            // no one is, changes back without anyone going there
+            case "farpaint" -> {
+                Vec3[] cast = new Vec3[1];
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build nothing")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("item replace entity @a weapon.offhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 300)
+                        .command("item replace entity @a weapon.offhand with minecraft:bricks").then(minecraft -> {
+                        }, 10)
+                        .face(0, 55).hold(true).turn(-50, 0, 10).turn(100, 10, 24).turn(-100, 0, 24).hold(false)
+                        .command("item replace entity @a weapon.offhand with minecraft:air").then(minecraft -> {
+                        }, 10)
+                        .logPaint("painted", cast)
+                        .command("execute as @a at @s run tp @s ~ ~ ~900").then(minecraft -> {
+                        }, 400).land()
+                        .logPaint("far off", cast)
+                        .command("execute as @a run scarlet hex dispel");
+                for (int k = 1; k <= 15; k++) {
+                    s.then(minecraft -> {
+                    }, 40).logPaint("falling, " + 2 * k + " s on", cast);
+                }
+                s.command("execute as @a at @s run tp @s ~ ~ ~-900").then(minecraft -> {
+                        }, 200).logPaint("back", cast)
+                        .command("execute as @a run scarlet hex forget");
+            }
             // a copy of a world someone played, with no Hex standing in it: a new one cast where they stood, grown, drawn
             // in and let fall, and how well its town keeps up with its wall all the while, going up and coming down
             case "replaytown" -> {
@@ -3814,6 +3878,9 @@ public final class Showcase {
 
     private static final class Scene {
         final List<Step> steps = new ArrayList<>();
+        /** When the Hex's size was last written down, in {@link System#nanoTime} nanoseconds, and the server's tick then. */
+        private long loggedAt;
+        private int loggedTick;
 
         Scene then(Consumer<Minecraft> action, int waitAfter) {
             steps.add(new Step(action, waitAfter));
@@ -4754,8 +4821,53 @@ public final class Showcase {
                     String size = hex == null ? "no Hex" : String.format(java.util.Locale.ROOT, "the Hex %s at %.0f blocks, its wall at %.0f, its town %d blocks, %d out past its wall",
                             hex.phase(), hex.radius(), wall, hex.town() == null ? 0 : hex.town().size(), hex.town() == null ? 0 : hex.town().standingOutside(hex.center(), wall));
                     HexData data = HexData.of(server.overworld());
-                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, %d left over in %d chunks, ticks taking %.1f ms on average and %.1f at most",
-                            when, size, data.leftoverCount(), data.leftoverChunks(), server.getAverageTickTimeNanos() / 1.0E6, longest / 1.0E6));
+                    // how many ticks the server has got through a second since last written down, out of 20
+                    long nanos = System.nanoTime();
+                    double pace = loggedAt == 0L ? 20.0 : (server.getTickCount() - loggedTick) * 1.0E9 / (nanos - loggedAt);
+                    loggedAt = nanos;
+                    loggedTick = server.getTickCount();
+                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, %d left over in %d chunks, ticks taking %.1f ms on average and %.1f at most, %.1f ticks a second",
+                            when, size, data.leftoverCount(), data.leftoverChunks(), server.getAverageTickTimeNanos() / 1.0E6, longest / 1.0E6, pace));
+                });
+            }, 2);
+        }
+
+        /**
+         * Writes down in the log how much the player's Hex has painted, how much paint waits to change back where it
+         * couldn't yet, and how many bricks there are about where it was cast, if the land there is loaded.
+         */
+        Scene logPaint(String when, Vec3[] cast) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (minecraft.player == null || server == null) {
+                    return;
+                }
+                UUID id = minecraft.player.getUUID();
+                server.execute(() -> {
+                    ServerLevel level = server.overworld();
+                    HexData data = HexData.of(level);
+                    Hex hex = data.byCaster(id);
+                    if (hex != null) {
+                        cast[0] = hex.center();
+                    }
+                    String there = "not cast";
+                    if (cast[0] != null) {
+                        BlockPos middle = BlockPos.containing(cast[0]);
+                        if (com.yashjit.scarlet.hex.town.Terrain.isReady(level, middle)) {
+                            int bricks = 0;
+                            for (BlockPos pos : BlockPos.betweenClosed(middle.offset(-10, -6, -10), middle.offset(10, 6, 10))) {
+                                if (level.getBlockState(pos).is(Blocks.BRICKS)) {
+                                    bricks++;
+                                }
+                            }
+                            there = bricks + " bricks about where it was cast";
+                        } else {
+                            there = "the land where it was cast not loaded";
+                        }
+                    }
+                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, %d painted blocks and %d kept things left over, %s",
+                            when, hex == null ? "no Hex" : hex.phase() + " with " + hex.paintedCount() + " painted",
+                            data.leftoverPaintCount(), data.leftoverKeptCount(), there));
                 });
             }, 2);
         }
