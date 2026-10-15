@@ -35,18 +35,28 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *     <li>Held: tendrils of scarlet wind out of both of the caster's palms and wrap around whoever they hold, who hangs
  *     in the air in a red haze, light rings turning around them.</li>
- *     <li>Thrown: they streak away in a long arc of red light, high over the town and out through the wall, shedding
- *     sparks and dust as they go.</li>
+ *     <li>Thrown: they fly away backward, laid back on the air with their arms and legs flung out before them, in a
+ *     streak of red light, shedding sparks and dust as they go; they come down hard, skid and roll over, lie winded a
+ *     moment and get up.</li>
  * </ul>
  *
- * <p>If you are the one held or thrown, your own game carries you, so you hang there and fly along the same arc the
- * server has worked out.
+ * <p>If you are the one held or thrown, your own game carries you along the same path the server has worked out: you
+ * hang there, fly, skid, and see the sky from the ground a moment before you get up.
  */
 public final class Ejections {
 
     private static final int TENDRILS = 4;
     private static final int POINTS = 12;
     private static final int TRAIL = 14;
+    /** How far back a body lies on the air as it flies, from upright, and how soon it is laid back. */
+    private static final float FLYING_TILT = 72.0F;
+    private static final float LAID_BACK_IN = 4.0F;
+    /** How far the view drops while you lie on the ground. */
+    private static final float LYING_EYES = 1.3F;
+    /** How hard the view shakes as you are thrown and as you come down, in degrees, and for how many ticks. */
+    private static final float LAUNCH_SHAKE = 2.5F;
+    private static final float LANDING_SHAKE = 3.5F;
+    private static final float SHAKE_TICKS = 8.0F;
 
     private static final Int2ObjectMap<Held> HELD = new Int2ObjectOpenHashMap<>();
     private static final Int2ObjectMap<Throw> THROWS = new Int2ObjectOpenHashMap<>();
@@ -70,7 +80,7 @@ public final class Ejections {
             }
             case EjectPayload.FLUNG -> {
                 HELD.remove(target);
-                THROWS.put(target, new Throw(payload.from(), payload.to(), now, payload.ticks()));
+                THROWS.put(target, new Throw(payload.from(), payload.to(), payload.rest(), payload.control(), now, payload.ticks()));
                 if (level.getEntity(payload.casterId()) instanceof Player caster) {
                     // the caster's arms fly open as they throw
                     HexClient.flingFrom(caster, now);
@@ -92,6 +102,71 @@ public final class Ejections {
         return false;
     }
 
+    /**
+     * How a thrown body is laid, if it is thrown: which way it faces, back toward where it was thrown from; how far it
+     * lies back, from upright; how far it rolls over about its own length; how wildly its arms and legs are flung about;
+     * and how far down on the ground it lies rather than in the air.
+     */
+    public static @Nullable Pose pose(Entity entity, float partialTick) {
+        Throw thrown = THROWS.get(entity.getId());
+        if (thrown == null) {
+            return null;
+        }
+        float elapsed = (float) (entity.level().getGameTime() + partialTick - thrown.start);
+        int ticks = thrown.ticks;
+        Vec3 back = thrown.from.subtract(thrown.to);
+        float facing = (float) (Mth.atan2(back.z, back.x) * Mth.RAD_TO_DEG) - 90.0F;
+        if (elapsed < ticks) {
+            float laid = Ease.outCubic(Math.min(1.0F, elapsed / LAID_BACK_IN));
+            float wobble = Mth.sin(elapsed * 0.25F) * 12.0F;
+            return new Pose(facing, FLYING_TILT * laid, wobble * laid, 1.0F, 0.0F);
+        }
+        float skid = elapsed - ticks;
+        if (skid < HexEjection.SKID) {
+            float k = skid / HexEjection.SKID;
+            float down = Ease.outCubic(Math.min(1.0F, skid / 3.0F));
+            float rolled = 1.0F - (1.0F - k) * (1.0F - k);
+            return new Pose(facing, Mth.lerp(down, FLYING_TILT, 90.0F), 360.0F * rolled, 1.0F - 0.7F * k, down);
+        }
+        float lying = skid - HexEjection.SKID;
+        if (lying < HexEjection.DOWN) {
+            return new Pose(facing, 90.0F, 0.0F, 0.0F, 1.0F);
+        }
+        float up = (lying - HexEjection.DOWN) / HexEjection.RISE;
+        if (up < 1.0F) {
+            float risen = Ease.inOutCubic(up);
+            return new Pose(facing, 90.0F * (1.0F - risen), 0.0F, 0.0F, 1.0F - risen);
+        }
+        return null;
+    }
+
+    /**
+     * How far your view drops, if you are the one thrown and down on the ground.
+     */
+    public static float eyeDrop(float partialTick) {
+        Minecraft minecraft = Minecraft.getInstance();
+        Pose pose = minecraft.player == null ? null : pose(minecraft.player, partialTick);
+        return pose == null ? 0.0F : -LYING_EYES * pose.lie();
+    }
+
+    /**
+     * How far your view shakes, if you are the one thrown, as you are blasted away and as you come down: across, then up.
+     */
+    public static float[] shake(float partialTick) {
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = minecraft.player;
+        Throw thrown = player == null ? null : THROWS.get(player.getId());
+        if (thrown == null) {
+            return new float[2];
+        }
+        float elapsed = (float) (player.level().getGameTime() + partialTick - thrown.start);
+        float launch = Math.max(0.0F, 1.0F - elapsed / SHAKE_TICKS) * LAUNCH_SHAKE;
+        float landed = elapsed - thrown.ticks;
+        float landing = landed < 0.0F ? 0.0F : Math.max(0.0F, 1.0F - landed / SHAKE_TICKS) * LANDING_SHAKE;
+        float amount = launch + landing;
+        return new float[] {Mth.sin(elapsed * 2.9F) * amount, Mth.cos(elapsed * 3.7F) * amount * 0.7F};
+    }
+
     public static void tick(Minecraft minecraft) {
         ClientLevel level = minecraft.level;
         if (level != seenLevel) {
@@ -104,18 +179,19 @@ public final class Ejections {
         }
         double now = level.getGameTime();
         HELD.int2ObjectEntrySet().removeIf(entry -> now - entry.getValue().since > 80 || level.getEntity(entry.getIntKey()) == null);
-        THROWS.int2ObjectEntrySet().removeIf(entry -> now - entry.getValue().start > entry.getValue().ticks + 4 || level.getEntity(entry.getIntKey()) == null);
+        THROWS.int2ObjectEntrySet().removeIf(entry -> now - entry.getValue().start > entry.getValue().ticks + HexEjection.SKID + HexEjection.DOWN
+                + HexEjection.RISE + 4 || level.getEntity(entry.getIntKey()) == null);
         LocalPlayer player = minecraft.player;
         if (player != null) {
-            carry(player, now);
+            carry(level, player, now);
         }
         RandomSource random = ScarletFx.random();
         for (Int2ObjectMap.Entry<Throw> entry : THROWS.int2ObjectEntrySet()) {
             Entity entity = level.getEntity(entry.getIntKey());
-            if (entity == null) {
+            Throw thrown = entry.getValue();
+            if (entity == null || now - thrown.start >= thrown.ticks) {
                 continue;
             }
-            Throw thrown = entry.getValue();
             Vec3 at = entity.position().add(0.0, entity.getBbHeight() * 0.5, 0.0);
             thrown.trail.addFirst(at);
             while (thrown.trail.size() > TRAIL) {
@@ -141,23 +217,24 @@ public final class Ejections {
     }
 
     /**
-     * Carries you, if you are the one held or thrown: up into the air to hang there, or along the arc of the throw.
+     * Carries you, if you are the one held or thrown: up into the air to hang there, along the throw and the skid at the
+     * end of it, and holds you down where you came to rest until you get up.
      */
-    private static void carry(LocalPlayer player, double now) {
+    private static void carry(ClientLevel level, LocalPlayer player, double now) {
         Throw thrown = THROWS.get(player.getId());
         if (thrown != null) {
-            float t = (float) ((now - thrown.start) / thrown.ticks);
-            if (t <= 1.0F) {
-                Vec3 at = HexEjection.position(thrown.from, thrown.to, t);
-                player.setPos(at.x, at.y, at.z);
-                player.setDeltaMovement(Vec3.ZERO);
-                player.resetFallDistance();
-            } else if (!thrown.landed) {
-                // touching down skidding on, away from the Hex
-                thrown.landed = true;
-                Vec3 skid = thrown.to.subtract(thrown.from).multiply(1.0, 0.0, 1.0).normalize().scale(0.6);
-                player.setDeltaMovement(skid.x, 0.15, skid.z);
+            float elapsed = (float) (now - thrown.start);
+            Vec3 at;
+            if (elapsed <= thrown.ticks + HexEjection.SKID) {
+                at = HexEjection.position(level, thrown.from, thrown.to, thrown.rest, thrown.control, thrown.ticks, elapsed);
+            } else if (elapsed <= thrown.ticks + HexEjection.SKID + HexEjection.DOWN + HexEjection.RISE) {
+                at = thrown.rest;
+            } else {
+                return;
             }
+            player.setPos(at.x, at.y, at.z);
+            player.setDeltaMovement(Vec3.ZERO);
+            player.resetFallDistance();
             return;
         }
         Held held = HELD.get(player.getId());
@@ -195,10 +272,11 @@ public final class Ejections {
         List<Vector3f[]> trails = new ArrayList<>();
         for (Int2ObjectMap.Entry<Throw> entry : THROWS.int2ObjectEntrySet()) {
             Entity entity = level.getEntity(entry.getIntKey());
-            if (entity == null || entity == minecraft.getCameraEntity() || entry.getValue().trail.size() < 2) {
+            Throw thrown = entry.getValue();
+            if (entity == null || entity == minecraft.getCameraEntity() || thrown.trail.size() < 2 || now - thrown.start > thrown.ticks + 2) {
                 continue;
             }
-            List<Vec3> points = new ArrayList<>(entry.getValue().trail);
+            List<Vec3> points = new ArrayList<>(thrown.trail);
             points.set(0, entity.getPosition(partialTick).add(0.0, entity.getBbHeight() * 0.5, 0.0));
             Vector3f[] trail = new Vector3f[points.size()];
             for (int i = 0; i < points.size(); i++) {
@@ -297,6 +375,18 @@ public final class Ejections {
         }
     }
 
+    /**
+     * How a thrown body is laid.
+     *
+     * @param facing which way it faces, as a yaw
+     * @param tilt   how far it lies back from upright, in degrees
+     * @param roll   how far it has rolled over about its own length, in degrees
+     * @param flail  how wildly its arms and legs are flung about, from 0 to 1
+     * @param lie    how far down on the ground it lies rather than in the air, from 0 to 1
+     */
+    public record Pose(float facing, float tilt, float roll, float flail, float lie) {
+    }
+
     private record HeldDraw(Vector3f center, float size, Vector3f rightPalm, Vector3f leftPalm, float shown, boolean own, float seed) {
     }
 
@@ -306,14 +396,17 @@ public final class Ejections {
     private static final class Throw {
         final Vec3 from;
         final Vec3 to;
+        final Vec3 rest;
+        final double control;
         final double start;
         final int ticks;
         final ArrayDeque<Vec3> trail = new ArrayDeque<>();
-        boolean landed;
 
-        Throw(Vec3 from, Vec3 to, double start, int ticks) {
+        Throw(Vec3 from, Vec3 to, Vec3 rest, double control, double start, int ticks) {
             this.from = from;
             this.to = to;
+            this.rest = rest;
+            this.control = control;
             this.start = start;
             this.ticks = ticks;
         }

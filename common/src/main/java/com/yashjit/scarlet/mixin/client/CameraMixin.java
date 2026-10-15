@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.mixin.client;
 
 import com.yashjit.scarlet.client.fx.DreamFx;
+import com.yashjit.scarlet.client.hex.Ejections;
 import com.yashjit.scarlet.client.hex.Founding;
 import com.yashjit.scarlet.entity.ParkedCar;
 import net.minecraft.client.Camera;
@@ -60,7 +61,11 @@ abstract class CameraMixin {
         if (shake[0] != 0.0F || shake[1] != 0.0F) {
             setRotation(yRot() + shake[0], xRot() + shake[1]);
         }
-        float drop = DreamFx.eyeDrop(partialTick);
+        float[] thrown = Ejections.shake(partialTick);
+        if (thrown[0] != 0.0F || thrown[1] != 0.0F) {
+            setRotation(yRot() + thrown[0], xRot() + thrown[1]);
+        }
+        float drop = DreamFx.eyeDrop(partialTick) + Ejections.eyeDrop(partialTick);
         if (drop != 0.0F) {
             setPosition(position().add(0.0, drop, 0.0));
         }

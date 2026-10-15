@@ -10,12 +10,15 @@ import net.minecraft.world.phys.Vec3;
 /**
  * A caster throwing someone out of their Hex, for everyone who can see it, and for whoever is thrown.
  *
- * @param stage one of the constants below
- * @param from  where they hang while held, and where the throw starts from
- * @param to    where the throw lands them, outside the wall
- * @param ticks how long the throw takes
+ * @param stage   one of the constants below
+ * @param from    where they hang while held, and where the throw starts from
+ * @param to      where the throw brings them down, outside the wall
+ * @param rest    where they skid to a stop from there
+ * @param control how high the arc of the throw is drawn up, as the height of its middle control point
+ * @param ticks   how long they are in the air
  */
-public record EjectPayload(int casterId, int targetId, int stage, Vec3 from, Vec3 to, int ticks) implements CustomPacketPayload {
+public record EjectPayload(int casterId, int targetId, int stage, Vec3 from, Vec3 to, Vec3 rest, double control, int ticks)
+        implements CustomPacketPayload {
 
     /** Lifted off the ground and held hanging there. */
     public static final int SEIZED = 0;
@@ -31,8 +34,15 @@ public record EjectPayload(int casterId, int targetId, int stage, Vec3 from, Vec
             ByteBufCodecs.VAR_INT, EjectPayload::stage,
             Vec3.STREAM_CODEC, EjectPayload::from,
             Vec3.STREAM_CODEC, EjectPayload::to,
+            Vec3.STREAM_CODEC, EjectPayload::rest,
+            ByteBufCodecs.DOUBLE, EjectPayload::control,
             ByteBufCodecs.VAR_INT, EjectPayload::ticks,
             EjectPayload::new);
+
+    /** Held, or let down, where they are. */
+    public static EjectPayload at(int casterId, int targetId, int stage, Vec3 at) {
+        return new EjectPayload(casterId, targetId, stage, at, at, at, at.y, 0);
+    }
 
     @Override
     public Type<EjectPayload> type() {
