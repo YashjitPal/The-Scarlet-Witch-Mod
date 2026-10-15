@@ -5,8 +5,6 @@ import java.util.function.Function;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionResult;
@@ -25,6 +23,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
@@ -38,16 +37,18 @@ import org.jspecify.annotations.Nullable;
 public class RefrigeratorBlock extends DecorBlock implements EntityBlock {
 
     public static final EnumProperty<DoubleBlockHalf> HALF = BlockStateProperties.DOUBLE_BLOCK_HALF;
+    /** While anyone has it open: its door swung wide and the light on inside, both halves alike. */
+    public static final BooleanProperty OPEN = BlockStateProperties.OPEN;
 
     public RefrigeratorBlock(BlockBehaviour.Properties properties, Function<BlockState, VoxelShape> north) {
         super(properties, north);
-        registerDefaultState(defaultBlockState().setValue(HALF, DoubleBlockHalf.LOWER));
+        registerDefaultState(defaultBlockState().setValue(HALF, DoubleBlockHalf.LOWER).setValue(OPEN, false));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);
-        builder.add(HALF);
+        builder.add(HALF, OPEN);
     }
 
     @Override
@@ -58,7 +59,7 @@ public class RefrigeratorBlock extends DecorBlock implements EntityBlock {
             return null;
         }
         BlockState state = super.getStateForPlacement(context);
-        return state == null ? null : state.setValue(HALF, DoubleBlockHalf.LOWER);
+        return state == null ? null : state.setValue(HALF, DoubleBlockHalf.LOWER).setValue(OPEN, false);
     }
 
     @Override
@@ -114,11 +115,17 @@ public class RefrigeratorBlock extends DecorBlock implements EntityBlock {
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         BlockPos lower = state.getValue(HALF) == DoubleBlockHalf.LOWER ? pos : pos.below();
         if (!level.isClientSide() && level.getBlockEntity(lower) instanceof RefrigeratorBlockEntity fridge) {
-            // the door coming off its seal, and the light inside
-            level.playSound(null, pos, SoundEvents.BARREL_OPEN, SoundSource.BLOCKS, 0.5F, 1.4F);
             player.openMenu(fridge);
         }
         return InteractionResult.SUCCESS;
+    }
+
+    /** A few ticks after it was opened, and every few after: whether anyone still has it open. */
+    @Override
+    protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+        if (level.getBlockEntity(pos) instanceof RefrigeratorBlockEntity fridge) {
+            fridge.recheckOpen();
+        }
     }
 
     @Override

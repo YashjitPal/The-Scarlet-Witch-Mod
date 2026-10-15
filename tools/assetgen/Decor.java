@@ -31,6 +31,8 @@ public final class Decor {
     static final Map<String, Tex> TEXTURES = new LinkedHashMap<>();
     /** Animated textures' frame times, by path. */
     static final Map<String, Integer> ANIMATED = new LinkedHashMap<>();
+    /** Textures the game draws with by itself rather than through a model, by full id: written though no model uses them. */
+    static final java.util.Set<String> DRAWN = new java.util.HashSet<>();
     /** Every model to write, by its path under {@code models/block/}. */
     static final Map<String, Model> MODELS = new LinkedHashMap<>();
 
@@ -68,6 +70,7 @@ public final class Decor {
                 }
             }
         }
+        used.addAll(DRAWN);
         Path textures = assets.resolve("textures/block");
         deleteTree(textures.resolve("decor"));
         for (Map.Entry<String, Tex> entry : TEXTURES.entrySet()) {
@@ -574,6 +577,13 @@ public final class Decor {
     static String texture(String path, Tex tex) {
         TEXTURES.put(path, tex);
         return NS + ":block/" + path;
+    }
+
+    /** Registers a texture the game draws with by itself, under {@code textures/block/<path>}, returning its full id. */
+    static String drawn(String path, Tex tex) {
+        String id = texture(path, tex);
+        DRAWN.add(id);
+        return id;
     }
 
     static String animated(String path, Tex tex, int frametime) {

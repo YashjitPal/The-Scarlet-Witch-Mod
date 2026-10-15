@@ -14,6 +14,8 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
@@ -21,13 +23,18 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * A clock on the wall, which tells whoever looks at it the time: the Hex's own hour, where its caster has set one, or
- * else the world's.
+ * A clock on the wall, its hands turning with the time: the Hex's own hour, where its caster has set one, or else the
+ * world's. Clicked, it tells the time.
  */
-public class ClockBlock extends WallDecorBlock {
+public class ClockBlock extends WallDecorBlock implements EntityBlock {
 
     public ClockBlock(BlockBehaviour.Properties properties, Function<BlockState, VoxelShape> north) {
         super(properties, north);
+    }
+
+    @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new ClockBlockEntity(pos, state);
     }
 
     @Override

@@ -13,6 +13,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.DoubleHighBlockItem;
+import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 
@@ -22,6 +23,9 @@ public final class ScarletItems {
     public static final Supplier<CrownItem> WARLOCK_CROWN = crown("warlock_crown", CrownStyle.WARLOCK);
     public static final Supplier<ParkedCarItem> PARKED_CAR = register("parked_car", ParkedCarItem::new, () -> new Item.Properties().stacksTo(1));
     public static final Supplier<DarkholdItem> DARKHOLD = register("darkhold", DarkholdItem::new, DarkholdItem::properties);
+    /** A slice of toast, out of a toaster: a little more filling than the bread it was. */
+    public static final Supplier<Item> TOAST = register("toast", Item::new,
+            () -> new Item.Properties().food(new FoodProperties.Builder().nutrition(3).saturationModifier(0.7F).build()));
 
     private ScarletItems() {
     }

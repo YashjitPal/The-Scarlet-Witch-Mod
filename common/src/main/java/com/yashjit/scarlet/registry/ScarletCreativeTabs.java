@@ -25,6 +25,7 @@ public final class ScarletCreativeTabs {
                             stacks.add(new ItemStack(decor.get()));
                         }
                         stacks.add(new ItemStack(ScarletItems.PARKED_CAR.get()));
+                        stacks.add(new ItemStack(ScarletItems.TOAST.get()));
                         return stacks;
                     }));
 

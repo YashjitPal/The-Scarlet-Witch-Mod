@@ -444,6 +444,8 @@ final class DecorLiving {
     static final class Telephone extends Decor.EraPiece {
         Telephone() {
             super("telephone", false);
+            // ringing looks no different; it is heard
+            property("ringing", "false", "true");
         }
 
         @Override

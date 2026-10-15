@@ -9,9 +9,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
@@ -67,6 +71,25 @@ public class DecorBlock extends HorizontalDirectionalBlock {
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         return shapes.apply(state);
+    }
+
+    /**
+     * Whether it has something to stand on: anything solid under it, a floor, a rug, a table or a counter.
+     */
+    @Override
+    protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
+        BlockPos below = pos.below();
+        return !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
+    }
+
+    /** With nothing left under it, it falls. */
+    @Override
+    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction direction,
+                                     BlockPos neighborPos, BlockState neighbor, RandomSource random) {
+        if (direction == Direction.DOWN && !canSurvive(state, level, pos)) {
+            return Blocks.AIR.defaultBlockState();
+        }
+        return super.updateShape(state, level, ticks, pos, direction, neighborPos, neighbor, random);
     }
 
     @Override

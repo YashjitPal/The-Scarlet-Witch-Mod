@@ -11,6 +11,8 @@ import net.minecraft.client.entity.ClientMannequin;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -18,6 +20,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.PlayerModelType;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
@@ -43,6 +47,13 @@ public final class NeoForgeClientPlatform implements ClientPlatform {
         }
     }
 
+    private record BlockRenderer<T extends BlockEntity, S extends BlockEntityRenderState>(Supplier<BlockEntityType<T>> type,
+                                                                                         BlockEntityRendererProvider<T, S> provider) {
+        void register(EntityRenderersEvent.RegisterRenderers event) {
+            event.registerBlockEntityRenderer(type.get(), provider);
+        }
+    }
+
     private record Hud(Identifier id, HudLayer layer) {
     }
 
@@ -51,6 +62,7 @@ public final class NeoForgeClientPlatform implements ClientPlatform {
     private static final List<WorldGeometryListener> WORLD = new ArrayList<>();
     private static final List<Receiver<?>> RECEIVERS = new ArrayList<>();
     private static final List<Renderer<?>> RENDERERS = new ArrayList<>();
+    private static final List<BlockRenderer<?, ?>> BLOCK_RENDERERS = new ArrayList<>();
     private static final List<Hud> HUDS = new ArrayList<>();
     private static final List<StatusBarLift> LIFTS = new ArrayList<>();
     private static final List<BooleanSupplier> HIDE_VANILLA = new ArrayList<>();
@@ -78,6 +90,12 @@ public final class NeoForgeClientPlatform implements ClientPlatform {
     @Override
     public <E extends Entity> void registerEntityRenderer(Supplier<EntityType<E>> type, EntityRendererProvider<E> provider) {
         RENDERERS.add(new Renderer<>(type, provider));
+    }
+
+    @Override
+    public <T extends BlockEntity, S extends BlockEntityRenderState> void registerBlockEntityRenderer(Supplier<BlockEntityType<T>> type,
+                                                                                                      BlockEntityRendererProvider<T, S> provider) {
+        BLOCK_RENDERERS.add(new BlockRenderer<>(type, provider));
     }
 
     @Override
@@ -127,6 +145,7 @@ public final class NeoForgeClientPlatform implements ClientPlatform {
 
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         RENDERERS.forEach(renderer -> renderer.register(event));
+        BLOCK_RENDERERS.forEach(renderer -> renderer.register(event));
     }
 
     private static void registerReceivers(RegisterClientPayloadHandlersEvent event) {

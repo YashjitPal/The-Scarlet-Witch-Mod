@@ -83,9 +83,14 @@ import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.entity.ChaosBolt;
 import com.yashjit.scarlet.registry.ScarletEntities;
 import com.yashjit.scarlet.client.hex.RadioMusic;
+import com.yashjit.scarlet.client.hex.TelevisionAudio;
 import com.yashjit.scarlet.client.hex.EraAudio;
 import com.yashjit.scarlet.client.entity.ParkedCarRenderer;
+import com.yashjit.scarlet.client.entity.ClockRenderer;
+import com.yashjit.scarlet.client.entity.StoveRenderer;
+import com.yashjit.scarlet.registry.ScarletBlockEntities;
 import com.yashjit.scarlet.decor.RadioSounds;
+import com.yashjit.scarlet.decor.ScreenSounds;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.NoopRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -113,8 +118,11 @@ public final class ScarletClient {
         platform.registerEntityRenderer(ScarletEntities.SEAT, NoopRenderer::new);
         platform.registerEntityRenderer(ScarletEntities.PARKED_CAR, ParkedCarRenderer::new);
         platform.registerEntityRenderer(ScarletEntities.DREAM_BODY, ClientDreamBody::renderer);
+        platform.registerBlockEntityRenderer(ScarletBlockEntities.STOVE, StoveRenderer::new);
+        platform.registerBlockEntityRenderer(ScarletBlockEntities.WALL_CLOCK, ClockRenderer::new);
         ClientDreamBody.registerOverride();
         RadioSounds.listen(RadioMusic::heard);
+        ScreenSounds.listen(TelevisionAudio::watched);
         DarkholdItem.viewerCorruption = () -> CorruptionClient.corruption(Minecraft.getInstance().player);
         platform.registerClientbound(ChaosImpactPayload.TYPE, BoltFx::impact);
         platform.registerClientbound(MagicEventPayload.TYPE, payload -> {
@@ -214,6 +222,7 @@ public final class ScarletClient {
         TitleCard.tick(minecraft);
         LaughTrack.tick(minecraft);
         RadioMusic.tick(minecraft);
+        TelevisionAudio.tick(minecraft);
         CarEngine.tick(minecraft);
         EraAudio.tick(minecraft);
         SpellWheel.tick(minecraft);

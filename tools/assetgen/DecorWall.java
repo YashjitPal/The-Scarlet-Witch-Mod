@@ -34,22 +34,55 @@ final class DecorWall {
         }
 
         @Override
+        void build() {
+            super.build();
+            // carried, the clock shows its hands painted on at ten past ten; on the wall they are drawn turning, tinted
+            // from plain white
+            put("present_item", clock(Decor.ERAS.length - 1, true));
+            Decor.Tex white = new Decor.Tex(16, 16);
+            white.fill(Decor.hex(0xFFFFFF));
+            Decor.drawn("decor/wall_clock/hands", white);
+        }
+
+        @Override
+        String itemModel() {
+            return "present_item";
+        }
+
+        @Override
         Decor.Model model(int era, boolean on) {
+            return clock(era, false);
+        }
+
+        private Decor.Model clock(int era, boolean hands) {
             Decor.Model model = new Decor.Model();
             switch (era) {
-                case 0 -> sunburst(model);
-                case 1 -> ballClock(model);
-                case 2 -> pendulum(model);
-                case 3 -> round(model, 3, 3, 13, "plastic_neon_pink", 0xF6F4EE, 0x2E9C9A, 0x262426, false);
-                case 4 -> round(model, 4, 3, 13, "brushed_steel", 0xF4F4F2, 0x1F1F22, 0x1F1F22, true);
-                default -> round(model, 5, 1.5F, 14.5F, "plastic_black", 0xF2F2F0, 0x1A1A1C, 0xC8C8C4, false);
+                case 0 -> sunburst(model, hands);
+                case 1 -> ballClock(model, hands);
+                case 2 -> pendulum(model, hands);
+                case 3 -> round(model, 3, 3, 13, "plastic_neon_pink", 0xF6F4EE, 0x2E9C9A, 0x262426, false, hands);
+                case 4 -> round(model, 4, 3, 13, "brushed_steel", 0xF4F4F2, 0x1F1F22, 0x1F1F22, true, hands);
+                default -> round(model, 5, 1.5F, 14.5F, "plastic_black", 0xF2F2F0, 0x1A1A1C, 0xC8C8C4, false, hands);
             }
             model.particle(model.elements.getFirst().faces.values().iterator().next().texture());
             return model;
         }
 
+        /** A face with its hands painted on, or with none, under hands drawn turning; each its own texture. */
+        private static void face(Decor.Tex t, double cx, double cy, double r, int face, int hands, int marks, boolean numerals, boolean painted) {
+            if (painted) {
+                DecorPaint.clockFace(t, cx, cy, r, face, hands, marks, numerals);
+            } else {
+                DecorPaint.clockDial(t, cx, cy, r, face, marks, numerals);
+            }
+        }
+
+        private static String faceName(String name, boolean hands) {
+            return hands ? name + "_item" : name;
+        }
+
         /** The atomic sunburst: brass rays out from a cream face, a little ball at the end of every other one. */
-        private void sunburst(Decor.Model model) {
+        private void sunburst(Decor.Model model, boolean hands) {
             Decor.Element rays = model.box(0, 0, 15.4F, 16, 16, 15.6F);
             model.paint(rays, N, Decor.detail("wall_clock", 0, "rays"), t -> {
                 int brass = DecorPaint.color("brass");
@@ -64,14 +97,14 @@ final class DecorWall {
             });
             rays.only(N);
             Decor.Element face = model.box(5, 5, 14.75F, 11, 11, 15.75F, m("brass"));
-            model.paint(face, N, Decor.detail("wall_clock", 0, "face"), t -> {
+            model.paint(face, N, Decor.detail("wall_clock", 0, faceName("face", hands)), t -> {
                 t.disc(3, 3, 3, Decor.hex(0xC9A54E));
-                DecorPaint.clockFace(t, 3, 3, 2.4, 0xF2EAD3, 0x1C1A19, 0x8C6A2E, false);
+                face(t, 3, 3, 2.4, 0xF2EAD3, 0x1C1A19, 0x8C6A2E, false, hands);
             });
         }
 
         /** A ball clock: spokes out from the middle, a colored ball at the end of each. */
-        private void ballClock(Decor.Model model) {
+        private void ballClock(Decor.Model model, boolean hands) {
             Decor.Element spokes = model.box(0, 0, 15.4F, 16, 16, 15.6F);
             model.paint(spokes, N, Decor.detail("wall_clock", 1, "spokes"), t -> {
                 int[] balls = {0xE07A2E, 0x3FB8AF, 0xD9A93A, 0xC8303A, 0x3D6FB6, 0x7C8C3C};
@@ -85,18 +118,19 @@ final class DecorWall {
             });
             spokes.only(N);
             Decor.Element hub = model.box(6, 6, 14.75F, 10, 10, 15.75F, m("teak"));
-            model.paint(hub, N, Decor.detail("wall_clock", 1, "face"), t -> {
+            model.paint(hub, N, Decor.detail("wall_clock", 1, faceName("face", hands)), t -> {
                 t.disc(2, 2, 2, Decor.hex(DecorPaint.color("teak")));
-                DecorPaint.clockFace(t, 2, 2, 1.6, 0xEDE6D1, 0x1C1A19, 0x1C1A19, false);
+                face(t, 2, 2, 1.6, 0xEDE6D1, 0x1C1A19, 0x1C1A19, false, hands);
             });
         }
 
         /** A wooden wall clock with a pendulum swinging behind its glass. */
-        private void pendulum(Decor.Model model) {
+        private void pendulum(Decor.Model model, boolean hands) {
             Decor.Element body = model.box(4, 1, 14, 12, 15, 16, m("veneer"));
-            model.paintAnimated(body, N, Decor.detail("wall_clock", 2, "front"), 8, 3, (t, f) -> {
+            model.paintAnimated(body, N, Decor.detail("wall_clock", 2, faceName("front", hands)), 8, 3, (t, f) -> {
                 DecorPaint.under(t, "veneer", 4, 1);
-                DecorPaint.clockFace(t, 4, 4, 3, 0xF2EAD3, 0x1C1A19, 0x6B4423, true);
+                // too small a face for twelve marks: they would crowd its middle, where the hands turn
+                face(t, 4, 4, 3, 0xF2EAD3, 0x1C1A19, 0x6B4423, false, hands);
                 t.rect(2, 8, 4, 5, Decor.hex(0x2A1A10));
                 double swing = Math.sin(f * Math.PI * 2 / 8) * 1.2;
                 t.line(4, 8, 4 + swing * 0.6, 11, Decor.hex(0xC9A54E));
@@ -107,14 +141,15 @@ final class DecorWall {
         }
 
         /** A round clock: its rim, its face and hands, its marks. */
-        private void round(Decor.Model model, int era, float from, float to, String rim, int face, int hands, int marks, boolean numerals) {
+        private void round(Decor.Model model, int era, float from, float to, String rim, int face, int hands, int marks, boolean numerals,
+                           boolean painted) {
             // a disc: only its face, so no square edge shows round it from the side
             Decor.Element body = model.box(from, from, 15, to, to, 16, m(rim));
             body.only(N);
-            model.paint(body, N, Decor.detail("wall_clock", era, "face"), t -> {
+            model.paint(body, N, Decor.detail("wall_clock", era, faceName("face", painted)), t -> {
                 double c = t.w / 2.0;
                 t.disc(c, c, c, Decor.hex(DecorPaint.color(rim)));
-                DecorPaint.clockFace(t, c, c, c - 1, face, hands, marks, true);
+                face(t, c, c, c - 1, face, hands, marks, true, painted);
                 if (numerals) {
                     t.px((int) c - 1, 1, Decor.hex(marks)).px((int) c, 1, Decor.hex(marks));
                 }

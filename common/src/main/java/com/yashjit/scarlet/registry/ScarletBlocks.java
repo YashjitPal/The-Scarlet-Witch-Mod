@@ -2,14 +2,16 @@ package com.yashjit.scarlet.registry;
 
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.decor.CarBodyBlock;
-import com.yashjit.scarlet.decor.ChimeDecorBlock;
 import com.yashjit.scarlet.decor.ClockBlock;
 import com.yashjit.scarlet.decor.CouchBlock;
 import com.yashjit.scarlet.decor.DecorBlock;
 import com.yashjit.scarlet.decor.EraDecor;
 import com.yashjit.scarlet.decor.RefrigeratorBlock;
 import com.yashjit.scarlet.decor.SeatBlock;
+import com.yashjit.scarlet.decor.StoveBlock;
 import com.yashjit.scarlet.decor.SwitchedDecorBlock;
+import com.yashjit.scarlet.decor.TelephoneBlock;
+import com.yashjit.scarlet.decor.ToasterBlock;
 import com.yashjit.scarlet.decor.WallDecorBlock;
 import com.yashjit.scarlet.platform.Services;
 import java.util.ArrayList;
@@ -58,9 +60,9 @@ public final class ScarletBlocks {
                     box(0.5, 0, 5, 15.5, 9, 12), box(5, 0, 5, 11, 9.5, 11)),
                     SwitchedDecorBlock.Kind.RADIO, false, SoundEvents.STONE_BUTTON_CLICK_ON, SoundEvents.STONE_BUTTON_CLICK_OFF),
             decor(MapColor.WOOD, SoundType.WOOD).lightLevel(lit(3)), false);
-    public static final Supplier<Block> TELEPHONE = register("telephone", p -> new ChimeDecorBlock(p, DecorBlock.byEra(
+    public static final Supplier<Block> TELEPHONE = register("telephone", p -> new TelephoneBlock(p, DecorBlock.byEra(
                     box(3, 0, 4.5, 13, 7, 11), box(4, 0, 5, 12, 4.5, 11), box(3.5, 0, 5, 12.5, 5, 11), box(4, 0, 5, 12, 5.5, 11),
-                    box(5, 0, 6, 11, 10, 11), box(5, 0, 4, 11, 1.5, 12)), ChimeDecorBlock.Kind.TELEPHONE),
+                    box(5, 0, 6, 11, 10, 11), box(5, 0, 4, 11, 1.5, 12))),
             decor(MapColor.COLOR_BLACK, SoundType.STONE), false);
     public static final Supplier<Block> COUCH = register("couch", p -> new CouchBlock(p, state -> {
                 int era = state.getValue(EraDecor.ERA).ordinal();
@@ -83,14 +85,13 @@ public final class ScarletBlocks {
                 }
                 return box(0.5, 0, 2.5, 15.5, FRIDGE_TOPS[state.getValue(EraDecor.ERA).ordinal()], 15);
             }),
-            decor(MapColor.SNOW, SoundType.METAL).strength(1.5F), true);
-    public static final Supplier<Block> STOVE = register("stove", p -> new SwitchedDecorBlock(p, state -> box(0, 0, 2, 16, 16, 16),
-                    SwitchedDecorBlock.Kind.STOVE, false, SoundEvents.STONE_BUTTON_CLICK_ON, SoundEvents.STONE_BUTTON_CLICK_OFF),
+            decor(MapColor.SNOW, SoundType.METAL).strength(1.5F).lightLevel(state -> state.getValue(RefrigeratorBlock.OPEN) ? 6 : 0), true);
+    public static final Supplier<Block> STOVE = register("stove", p -> new StoveBlock(p, state -> box(0, 0, 2, 16, 16, 16)),
             decor(MapColor.SNOW, SoundType.METAL).strength(1.5F).lightLevel(lit(6)), false);
-    public static final Supplier<Block> TOASTER = register("toaster", p -> new ChimeDecorBlock(p, DecorBlock.byEra(
+    public static final Supplier<Block> TOASTER = register("toaster", p -> new ToasterBlock(p, DecorBlock.byEra(
                     box(4, 0, 6, 12.75, 5.75, 10), box(3.5, 0, 6, 13.25, 5, 10), box(4, 0, 5.9, 12.75, 5, 10.1), box(4, 0, 5.6, 12.75, 5.5, 10),
-                    box(3, 0, 4.8, 13.75, 6, 11), box(4, 0, 5.8, 12.75, 6, 10)), ChimeDecorBlock.Kind.TOASTER),
-            decor(MapColor.METAL, SoundType.METAL), false);
+                    box(3, 0, 4.8, 13.75, 6, 11), box(4, 0, 5.8, 12.75, 6, 10))),
+            decor(MapColor.METAL, SoundType.METAL).lightLevel(lit(3)), false);
     public static final Supplier<Block> WALL_CLOCK = register("wall_clock", p -> new ClockBlock(p, DecorBlock.byEra(
                     box(0, 0, 14.75, 16, 16, 16), box(0, 0, 14.75, 16, 16, 16), box(3.5, 1, 13.5, 12.5, 15.5, 16), box(3, 3, 15, 13, 13, 16),
                     box(3, 3, 15, 13, 13, 16), box(1.5, 1.5, 15, 14.5, 14.5, 16))),

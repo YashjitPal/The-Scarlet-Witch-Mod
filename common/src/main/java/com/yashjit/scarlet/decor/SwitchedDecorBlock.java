@@ -1,21 +1,15 @@
 package com.yashjit.scarlet.decor;
 
-import java.util.Map;
+import com.yashjit.scarlet.hex.Era;
 import java.util.function.Function;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Prediction;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -30,8 +24,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A decoration that switches on and off with a click: a television, a radio, a lamp, a range. A range that is on cooks
- * what is held to it, the way a campfire would, there and then.
+ * A decoration that switches on and off with a click: a television, a radio, a lamp, a range.
  */
 public class SwitchedDecorBlock extends DecorBlock {
 
@@ -69,23 +62,6 @@ public class SwitchedDecorBlock extends DecorBlock {
     }
 
     @Override
-    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand,
-                                          BlockHitResult hit) {
-        Item cooked = kind == Kind.STOVE && state.getValue(LIT) ? Cooking.COOKED.get(stack.getItem()) : null;
-        if (cooked == null) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
-        if (level instanceof ServerLevel server) {
-            stack.consume(1, player);
-            player.getInventory().placeItemBackInInventory(new ItemStack(cooked), Prediction.SERVER_ONLY);
-            server.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.35F, 1.6F);
-            server.playSound(null, pos, SoundEvents.SMOKER_SMOKE, SoundSource.BLOCKS, 0.8F, 1.0F);
-            server.sendParticles(ParticleTypes.SMOKE, pos.getX() + 0.5, pos.getY() + 1.05, pos.getZ() + 0.5, 8, 0.2, 0.05, 0.2, 0.01);
-        }
-        return InteractionResult.SUCCESS;
-    }
-
-    @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         BlockState next = state.cycle(LIT);
         level.setBlock(pos, next, Block.UPDATE_ALL);
@@ -94,6 +70,15 @@ public class SwitchedDecorBlock extends DecorBlock {
         level.gameEvent(player, on ? GameEvent.BLOCK_ACTIVATE : GameEvent.BLOCK_DEACTIVATE, pos);
         if (on && kind == Kind.RADIO && level.isClientSide()) {
             RadioSounds.heard(level, pos, next);
+        }
+        if (kind == Kind.TELEVISION) {
+            // a picture tube warming up, or going dark; today's set only chimes
+            boolean tube = state.getValue(EraDecor.ERA) != Era.PRESENT;
+            level.playSound(player, pos, tube ? (on ? SoundEvents.BEACON_ACTIVATE : SoundEvents.BEACON_DEACTIVATE) : SoundEvents.NOTE_BLOCK_CHIME.value(),
+                    SoundSource.BLOCKS, tube ? 0.22F : 0.35F, tube ? 2.0F : on ? 1.8F : 1.2F);
+            if (on && level.isClientSide()) {
+                ScreenSounds.watched(level, pos, next);
+            }
         }
         return InteractionResult.SUCCESS;
     }
@@ -111,6 +96,9 @@ public class SwitchedDecorBlock extends DecorBlock {
         if (kind == Kind.RADIO) {
             RadioSounds.heard(level, pos, state);
         }
+        if (kind == Kind.TELEVISION) {
+            ScreenSounds.watched(level, pos, state);
+        }
     }
 
     public enum Kind {
@@ -118,12 +106,5 @@ public class SwitchedDecorBlock extends DecorBlock {
         RADIO,
         LAMP,
         STOVE
-    }
-
-    /** What a range cooks, and into what: whatever a campfire would. */
-    private static final class Cooking {
-        static final Map<Item, Item> COOKED = Map.of(Items.BEEF, Items.COOKED_BEEF, Items.PORKCHOP, Items.COOKED_PORKCHOP, Items.CHICKEN,
-                Items.COOKED_CHICKEN, Items.MUTTON, Items.COOKED_MUTTON, Items.RABBIT, Items.COOKED_RABBIT, Items.COD, Items.COOKED_COD,
-                Items.SALMON, Items.COOKED_SALMON, Items.POTATO, Items.BAKED_POTATO, Items.KELP, Items.DRIED_KELP);
     }
 }

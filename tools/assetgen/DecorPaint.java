@@ -315,6 +315,16 @@ final class DecorPaint {
 
     /** A clock face with its hands at ten past ten. */
     static void clockFace(Decor.Tex t, double cx, double cy, double r, int face, int hands, int marks, boolean numerals) {
+        clockDial(t, cx, cy, r, face, marks, numerals);
+        double hour = Math.PI * 2 * (10 + 10 / 60.0) / 12;
+        double minute = Math.PI * 2 * 10 / 60.0;
+        t.line(cx - 0.5, cy - 0.5, cx - 0.5 + Math.sin(hour) * r * 0.5, cy - 0.5 - Math.cos(hour) * r * 0.5, Decor.hex(hands));
+        t.line(cx - 0.5, cy - 0.5, cx - 0.5 + Math.sin(minute) * r * 0.8, cy - 0.5 - Math.cos(minute) * r * 0.8, Decor.hex(hands));
+        t.px((int) Math.floor(cx - 0.5), (int) Math.floor(cy - 0.5), Decor.hex(0xC8303A));
+    }
+
+    /** A clock's face with its marks and no hands, for a clock on the wall, whose hands are drawn turning over it. */
+    static void clockDial(Decor.Tex t, double cx, double cy, double r, int face, int marks, boolean numerals) {
         t.disc(cx, cy, r, Decor.hex(face));
         if (numerals) {
             for (int k = 0; k < 12; k++) {
@@ -324,10 +334,5 @@ final class DecorPaint {
                 t.px(x, y, Decor.hex(marks));
             }
         }
-        double hour = Math.PI * 2 * (10 + 10 / 60.0) / 12;
-        double minute = Math.PI * 2 * 10 / 60.0;
-        t.line(cx - 0.5, cy - 0.5, cx - 0.5 + Math.sin(hour) * r * 0.5, cy - 0.5 - Math.cos(hour) * r * 0.5, Decor.hex(hands));
-        t.line(cx - 0.5, cy - 0.5, cx - 0.5 + Math.sin(minute) * r * 0.8, cy - 0.5 - Math.cos(minute) * r * 0.8, Decor.hex(hands));
-        t.px((int) Math.floor(cx - 0.5), (int) Math.floor(cy - 0.5), Decor.hex(0xC8303A));
     }
 }

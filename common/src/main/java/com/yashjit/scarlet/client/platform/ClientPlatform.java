@@ -11,6 +11,8 @@ import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
@@ -19,6 +21,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 
 /**
  * Client-only loader hooks. Implementations queue registrations until their loader's events fire.
@@ -43,6 +47,9 @@ public interface ClientPlatform {
     <T extends CustomPacketPayload> void registerClientbound(CustomPacketPayload.Type<T> type, Consumer<T> handler);
 
     <E extends Entity> void registerEntityRenderer(Supplier<EntityType<E>> type, EntityRendererProvider<E> provider);
+
+    <T extends BlockEntity, S extends BlockEntityRenderState> void registerBlockEntityRenderer(Supplier<BlockEntityType<T>> type,
+                                                                                               BlockEntityRendererProvider<T, S> provider);
 
     /**
      * Draws above the crosshair.
