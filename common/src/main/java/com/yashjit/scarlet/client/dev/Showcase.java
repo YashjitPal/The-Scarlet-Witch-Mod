@@ -2717,6 +2717,420 @@ public final class Showcase {
                     .camera(CameraType.FIRST_PERSON)
                     .then(minecraft -> minecraft.options.keyShift.setDown(true), 4).then(minecraft -> minecraft.options.keyShift.setDown(false), 10)
                     .logCar("got out");
+            // the couch and the armchair of four eras sat on, seen from in front and from the side
+            case "sitting" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("time set noon")
+                        .command("gamemode survival @a")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-8 ~ ~-4 ~8 ~5 ~10 minecraft:air")
+                        .command("execute at @a run fill ~-8 ~-1 ~-4 ~8 ~-1 ~10 minecraft:oak_planks")
+                        .command("execute at @a run fill ~-8 ~ ~6 ~8 ~4 ~6 minecraft:smooth_quartz")
+                        .anchor().then(minecraft -> {
+                        }, 100);
+                for (String era : new String[] {"1950s", "1970s", "1980s", "present"}) {
+                    s.command("execute at @a run setblock ~-2 ~ ~5 scarlet:couch[facing=north,era=" + era + "]")
+                            .command("execute at @a run setblock ~-1 ~ ~5 scarlet:couch[facing=north,era=" + era + "]")
+                            .command("execute at @a run setblock ~ ~ ~5 scarlet:couch[facing=north,era=" + era + "]")
+                            .command("execute at @a run setblock ~3 ~ ~5 scarlet:armchair[facing=north,era=" + era + "]").then(minecraft -> {
+                            }, 6)
+                            .useBlock(-1, 0, 5).then(minecraft -> {
+                            }, 10)
+                            .view(-1, 1.5, 1.4, -1, 0.7, 5).shot("sitting_couch_" + era, 4)
+                            .view(2.4, 1.2, 4.4, -1, 0.7, 5).shot("sitting_couch_" + era + "_side", 4)
+                            .playerCamera()
+                            .then(minecraft -> minecraft.options.keyShift.setDown(true), 4).then(minecraft -> minecraft.options.keyShift.setDown(false), 10)
+                            .useBlock(3, 0, 5).then(minecraft -> {
+                            }, 10)
+                            .view(3, 1.5, 1.6, 3, 0.7, 5).shot("sitting_armchair_" + era, 4)
+                            .view(5.8, 1.2, 4.2, 3, 0.7, 5).shot("sitting_armchair_" + era + "_side", 4)
+                            .playerCamera()
+                            .then(minecraft -> minecraft.options.keyShift.setDown(true), 4).then(minecraft -> minecraft.options.keyShift.setDown(false), 10);
+                }
+                s.command("gamemode creative @a");
+            }
+            // bread toasted, popping up as toast; a telephone ringing and answered, then picked up to dial out; a television
+            // switched on to its show
+            case "kitchen" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("time set noon")
+                        .command("gamemode survival @a")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-6 ~ ~-3 ~6 ~5 ~8 minecraft:air")
+                        .command("execute at @a run fill ~-6 ~-1 ~-3 ~6 ~-1 ~8 minecraft:oak_planks")
+                        .command("execute at @a run fill ~-6 ~ ~5 ~6 ~ ~5 minecraft:smooth_quartz")
+                        .anchor()
+                        .command("execute at @a run setblock ~-1 ~1 ~5 scarlet:toaster[facing=north]")
+                        .command("execute at @a run setblock ~2 ~1 ~5 scarlet:telephone[facing=north]")
+                        .command("execute at @a run setblock ~-4 ~ ~4 scarlet:television[facing=north]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:bread 3").face(0, 30).then(minecraft -> {
+                        }, 6)
+                        .useBlock(-1, 1, 5).then(minecraft -> {
+                        }, 20)
+                        .view(-1, 2.3, 3.4, -1, 1.2, 5).shot("kitchen_toasting", 4)
+                        .then(minecraft -> {
+                        }, 100).shot("kitchen_toast_popped", 3).logDropped("popped")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .ring(2, 1, 5).then(minecraft -> {
+                        }, 30)
+                        .view(2, 2.3, 3.4, 2, 1.2, 5).shot("kitchen_ringing", 4)
+                        .playerCamera().hideHud(false).face(28, 32).useBlock(2, 1, 5).then(minecraft -> {
+                        }, 6).shot("kitchen_answered", 4)
+                        .then(minecraft -> {
+                        }, 60).useBlock(2, 1, 5).then(minecraft -> {
+                        }, 6).shot("kitchen_dialed", 4).hideHud(true)
+                        .useBlock(-4, 0, 4).then(minecraft -> {
+                        }, 100).logLiving("with the television on")
+                        // a range switched on, and raw beef and a potato put down on its burners to cook
+                        .command("kill @e[type=minecraft:item]")
+                        .command("execute at @a run setblock ~4 ~ ~4 scarlet:stove[facing=north]")
+                        .useBlock(4, 0, 4)
+                        .command("item replace entity @a weapon.mainhand with minecraft:beef 2")
+                        .useBlock(4, 0, 4).useBlock(4, 0, 4)
+                        .command("item replace entity @a weapon.mainhand with minecraft:potato")
+                        .useBlock(4, 0, 4).then(minecraft -> {
+                        }, 20)
+                        .view(4, 2.4, 2.4, 4, 0.9, 4).shot("kitchen_stove_cooking", 4)
+                        .then(minecraft -> {
+                        }, 230).shot("kitchen_stove_done", 2).logDropped("off the range")
+                        .command("gamemode creative @a");
+            }
+            // townspeople sat straight down on a couch and an armchair in a Hex, seen from in front and from the side
+            case "residentsit" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("difficulty easy")
+                        .command("gamerule spawn_mobs false")
+                        .command("execute as @a run scarlet hex build nothing")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-8 ~ ~-4 ~8 ~5 ~10 minecraft:air")
+                        .command("execute at @a run fill ~-8 ~-1 ~-4 ~8 ~-1 ~10 minecraft:oak_planks")
+                        .command("execute at @a run fill ~-8 ~ ~7 ~8 ~4 ~7 minecraft:smooth_quartz")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().anchor()
+                        .tap().then(minecraft -> {
+                        }, 200)
+                        .command("execute as @a run scarlet hex era present").then(minecraft -> {
+                        }, 60)
+                        .command("execute at @a run setblock ~-2 ~ ~5 scarlet:couch[facing=north]")
+                        .command("execute at @a run setblock ~-1 ~ ~5 scarlet:couch[facing=north]")
+                        .command("execute at @a run setblock ~ ~ ~5 scarlet:couch[facing=north]")
+                        .command("execute at @a run setblock ~3 ~ ~5 scarlet:armchair[facing=north]")
+                        .command("execute at @a run summon minecraft:zombie ~-2 ~ ~3 {PersistenceRequired:1b}")
+                        .command("execute at @a run summon minecraft:skeleton ~ ~ ~3 {PersistenceRequired:1b}")
+                        .command("execute at @a run summon minecraft:zombie ~3 ~ ~3 {PersistenceRequired:1b}").then(minecraft -> {
+                        }, 60)
+                        .seat(-2, 0, 5).seat(0, 0, 5).seat(3, 0, 5).then(minecraft -> {
+                        }, 20)
+                        .residents("seated")
+                        .place(0, 0.1, -3).face(0, 0)
+                        .view(0.5, 1.6, 1.4, 0.5, 0.8, 5).shot("residentsit_front", 6)
+                        .view(5.6, 1.3, 4.2, 0.5, 0.8, 5).shot("residentsit_side", 4)
+                        .view(-4.4, 1.3, 3.8, 0.5, 0.8, 5).shot("residentsit_other_side", 4)
+                        .playerCamera()
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("difficulty peaceful");
+            }
+            // someone thrown out of a Hex, seen close by along the way and where they come down, skid, lie and get up
+            case "ejectpose" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("difficulty easy")
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex build nothing")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-12 ~ ~-6 ~12 ~10 ~110 minecraft:air")
+                        .command("execute at @a run fill ~-12 ~-1 ~-6 ~12 ~-1 ~110 minecraft:grass_block")
+                        .ensureUnsuited().face(0, 0).select(Spell.HEX).anchor()
+                        .tap().then(minecraft -> {
+                        }, 200)
+                        .command("execute as @a run scarlet hex era present").then(minecraft -> {
+                        }, 60)
+                        .command("execute at @a run summon minecraft:zombie ~ ~ ~6 {PersistenceRequired:1b,Rotation:[180f,0f],"
+                                + "equipment:{head:{id:\"minecraft:leather_helmet\",count:1}}}").then(minecraft -> {
+                        }, 40)
+                        .face(0, 4).view(-5, 2.5, -3, 0, 1.5, 6)
+                        .hold(true).shot("ejectpose_held", 16)
+                        .logThrown("held")
+                        .hold(false).logThrown("let go").viewMob(7, 1, -3).shot("ejectpose_flying_a", 4).logThrown("flying a")
+                        .viewMob(7, 1, -2).shot("ejectpose_flying_b", 6).logThrown("flying b")
+                        .viewMob(-6, 2, -4).shot("ejectpose_flying_c", 8).logThrown("flying c");
+                for (int k = 1; k <= 3; k++) {
+                    s.then(minecraft -> {
+                    }, 5).logThrown("thrown, " + k * 5 + " ticks after the third shot");
+                }
+                // brought down, skidding, lying winded and getting up, each caught as it happens
+                s.until(minecraft -> {
+                            com.yashjit.scarlet.client.hex.Ejections.Pose pose = thrownPose(minecraft);
+                            return pose != null && pose.lie() > 0.3F && pose.roll() > 40.0F;
+                        }, 200)
+                        .viewMob(5, 1.5, -4).shot("ejectpose_skid", 0).logThrown("skid")
+                        .until(minecraft -> {
+                            com.yashjit.scarlet.client.hex.Ejections.Pose pose = thrownPose(minecraft);
+                            return pose != null && pose.lie() >= 1.0F && pose.roll() == 0.0F;
+                        }, 60)
+                        .viewMob(4, 1.5, 3).shot("ejectpose_down", 0).logThrown("down")
+                        .viewMob(4, 1.2, -3).shot("ejectpose_lying", 6).logThrown("lying")
+                        .until(minecraft -> {
+                            com.yashjit.scarlet.client.hex.Ejections.Pose pose = thrownPose(minecraft);
+                            return pose != null && pose.lie() > 0.25F && pose.lie() < 0.75F;
+                        }, 80)
+                        .viewMob(-4, 1.2, 3).shot("ejectpose_rising", 0).logThrown("rising")
+                        .until(minecraft -> thrownPose(minecraft) == null, 60)
+                        .viewMob(4, 1.5, 3).shot("ejectpose_up", 4).logThrown("up")
+                        .playerCamera()
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("difficulty peaceful");
+            }
+            // a car driven into someone standing in its way and on into a wall; then struck with chaos bolts until it is
+            // wrecked, and another blown up beside some TNT
+            case "carhits" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("difficulty easy")
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("gamemode survival @a")
+                        .command("effect give @a minecraft:resistance 600 4 true")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-10 ~ ~-4 ~10 ~8 ~46 minecraft:air")
+                        .command("execute at @a run fill ~-10 ~-1 ~-4 ~10 ~-1 ~46 minecraft:smooth_stone")
+                        .command("execute at @a run fill ~-6 ~ ~42 ~6 ~4 ~42 minecraft:stone_bricks")
+                        .anchor()
+                        .command("execute at @a run summon scarlet:parked_car ~ ~ ~3 {Rotation:[0f,0f],paint:1}")
+                        .command("execute at @a run summon minecraft:zombie ~ ~ ~14 {NoAI:1b,PersistenceRequired:1b,Rotation:[180f,0f],"
+                                + "equipment:{head:{id:\"minecraft:leather_helmet\",count:1}}}").then(minecraft -> {
+                        }, 10)
+                        .face(0, 10).getInCar().then(minecraft -> {
+                        }, 10).logCar("got in").logLiving("before")
+                        .camera(CameraType.THIRD_PERSON_BACK)
+                        .walk(true).then(minecraft -> {
+                        }, 20).logCar("going").logLiving("coming").shot("carhit_before", 0)
+                        .view(5.5, 2.0, 12, 0, 1.0, 14).then(minecraft -> {
+                        }, 2).logCar("closing").logLiving("closing")
+                        .then(minecraft -> {
+                        }, 2).shot("carhit_a", 0).logCar("at it").logLiving("at it")
+                        .then(minecraft -> {
+                        }, 2).shot("carhit_b", 0).logLiving("hit").logCar("having hit")
+                        .then(minecraft -> {
+                        }, 3).shot("carhit_c", 0).logLiving("knocked").playerCamera().camera(CameraType.THIRD_PERSON_BACK)
+                        .then(minecraft -> {
+                        }, 50).logCar("into the wall").shot("carhit_wall", 4).walk(false).then(minecraft -> {
+                        }, 10)
+                        .logCar("crashed").logLiving("after")
+                        .camera(CameraType.FIRST_PERSON)
+                        .then(minecraft -> minecraft.options.keyShift.setDown(true), 4).then(minecraft -> minecraft.options.keyShift.setDown(false), 10)
+                        // back off a way, and bolt it
+                        .place(0, 0.1, 30).face(0, 6).select(Spell.CHAOS_BOLT).then(minecraft -> {
+                        }, 10);
+                for (int k = 1; k <= 3; k++) {
+                    s.tap().then(minecraft -> {
+                    }, 14).logCar("bolted " + k);
+                }
+                s.view(-4.5, 2.4, 33, 0, 0.8, 39).shot("carhit_dented", 4)
+                        // an iron ingot hammers some of it out
+                        .command("item replace entity @a weapon.mainhand with minecraft:iron_ingot 2")
+                        .getInCar().logCar("hammered")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("execute as @a at @s run damage @e[type=scarlet:parked_car,limit=1,sort=nearest] 18 minecraft:player_attack by @s").then(minecraft -> {
+                        }, 30)
+                        .logCar("battered").shot("carhit_battered", 4)
+                        .command("execute as @a at @s run damage @e[type=scarlet:parked_car,limit=1,sort=nearest] 40 scarlet:chaos_bolt by @s").then(minecraft -> {
+                        }, 4)
+                        .logCar("wrecked").shot("carhit_wreck_burning", 20).shot("carhit_wreck_burning_b", 40)
+                        .getInCar().logCar("trying to get into the wreck")
+                        .then(minecraft -> {
+                        }, 220).logCar("burned out").shot("carhit_wreck_smoldering", 4)
+                        // beaten apart for scrap
+                        .command("execute as @a at @s run damage @e[type=scarlet:parked_car,limit=1,sort=nearest] 25 minecraft:player_attack by @s").then(minecraft -> {
+                        }, 6)
+                        .logCar("beaten apart")
+                        // another, and TNT beside it
+                        .command("execute at @a run summon scarlet:parked_car ~6 ~ ~32 {Rotation:[90f,0f],paint:3}")
+                        .command("execute at @a run summon minecraft:tnt ~6 ~ ~30 {fuse:40}").then(minecraft -> {
+                        }, 60)
+                        .view(0, 3, 26, 6, 0.8, 32).shot("carhit_blown", 10)
+                        .playerCamera()
+                        .command("kill @e[type=!minecraft:player]")
+                        .command("difficulty peaceful")
+                        .command("gamemode creative @a");
+            }
+            // a wall clock of each era telling three in the afternoon, each close up, then twenty to eight in the morning
+            case "clocks" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("time set 9000")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-8 ~ ~-4 ~8 ~5 ~8 minecraft:air")
+                        .command("execute at @a run fill ~-8 ~-1 ~-4 ~8 ~-1 ~8 minecraft:oak_planks")
+                        .command("execute at @a run fill ~-8 ~ ~6 ~8 ~4 ~6 minecraft:smooth_quartz")
+                        .anchor().then(minecraft -> {
+                        }, 100);
+                String[] clockEras = {"1950s", "1960s", "1970s", "1980s", "2000s", "present"};
+                for (int k = 0; k < clockEras.length; k++) {
+                    s.command("execute at @a run setblock ~" + (-5 + 2 * k) + " ~1 ~5 scarlet:wall_clock[facing=north,era=" + clockEras[k] + "]");
+                }
+                s.place(0, 0.1, -4).then(minecraft -> {
+                        }, 10)
+                        .view(0, 1.6, -1.5, 0, 1.4, 5).shot("clocks_three_pm", 4);
+                for (int k = 0; k < clockEras.length; k++) {
+                    int x = -5 + 2 * k;
+                    s.view(x, 1.5, 4.25, x, 1.5, 5.4).shot("clock_" + clockEras[k], 4);
+                }
+                s.command("time set 1667").then(minecraft -> {
+                        }, 10)
+                        .view(0, 1.6, -1.5, 0, 1.4, 5).shot("clocks_seven_forty_am", 4)
+                        .view(5, 1.5, 4.25, 5, 1.5, 5.4).shot("clock_present_seven_forty", 4)
+                        .playerCamera()
+                        .command("time set noon");
+            }
+            // a refrigerator of each era, shut, then swung open with the light on inside, by day and by night; and one
+            // opened and shut as a player does, its door following
+            case "fridges" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("time set noon")
+                        .command("gamemode survival @a")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-9 ~ ~-4 ~7 ~5 ~8 minecraft:air")
+                        .command("execute at @a run fill ~-9 ~-1 ~-4 ~7 ~-1 ~8 minecraft:oak_planks")
+                        .command("execute at @a run fill ~-9 ~ ~6 ~7 ~4 ~6 minecraft:smooth_quartz")
+                        .anchor().then(minecraft -> {
+                        }, 100);
+                String[] eras = {"1950s", "1960s", "1970s", "1980s", "2000s", "present"};
+                for (int k = 0; k < eras.length; k++) {
+                    s.command("execute at @a run setblock ~" + (-6 + 2 * k) + " ~ ~5 scarlet:refrigerator[facing=north,half=lower,era=" + eras[k] + "]")
+                            .command("execute at @a run setblock ~" + (-6 + 2 * k) + " ~1 ~5 scarlet:refrigerator[facing=north,half=upper,era=" + eras[k] + "]");
+                }
+                s.then(minecraft -> {
+                        }, 10)
+                        .view(-1, 2.2, -3.5, -1, 1, 5).shot("fridges_shut", 4);
+                for (int k = 0; k < eras.length; k++) {
+                    s.command("execute at @a run setblock ~" + (-6 + 2 * k) + " ~ ~5 scarlet:refrigerator[facing=north,half=lower,open=true,era=" + eras[k] + "]")
+                            .command("execute at @a run setblock ~" + (-6 + 2 * k) + " ~1 ~5 scarlet:refrigerator[facing=north,half=upper,open=true,era=" + eras[k] + "]");
+                }
+                s.then(minecraft -> {
+                        }, 10)
+                        .shot("fridges_open", 4);
+                for (int k = 0; k < eras.length; k++) {
+                    int x = -6 + 2 * k;
+                    s.view(x + 1.6, 1.7, 2.3, x, 1, 5).shot("fridge_open_" + eras[k], 4);
+                }
+                s.command("time set midnight").then(minecraft -> {
+                        }, 10)
+                        .view(-1, 2.2, -3.5, -1, 1, 5).shot("fridges_open_night", 4)
+                        .command("time set noon");
+                for (int k = 0; k < eras.length; k++) {
+                    // strictly, or each half would take the other's open door back
+                    s.command("execute at @a run setblock ~" + (-6 + 2 * k) + " ~ ~5 scarlet:refrigerator[facing=north,half=lower,era=" + eras[k] + "] strict")
+                            .command("execute at @a run setblock ~" + (-6 + 2 * k) + " ~1 ~5 scarlet:refrigerator[facing=north,half=upper,era=" + eras[k] + "] strict");
+                }
+                // the 1980s one, opened by hand and let go
+                s.playerCamera().place(0, 0.1, 2.5).face(0, 20).then(minecraft -> {
+                        }, 10)
+                        .logBlock("before", 0, 0, 5)
+                        .useBlock(0, 0, 5).then(minecraft -> {
+                        }, 10)
+                        .logBlock("opened", 0, 0, 5).shot("fridge_in_use", 2)
+                        .then(minecraft -> {
+                            if (minecraft.player != null) {
+                                minecraft.player.closeContainer();
+                            }
+                        }, 10)
+                        .logBlock("shut", 0, 0, 5)
+                        .useBlock(0, 1, 5).then(minecraft -> {
+                        }, 10)
+                        .logBlock("opened from the top", 0, 0, 5)
+                        .then(minecraft -> {
+                            if (minecraft.player != null) {
+                                minecraft.player.closeContainer();
+                            }
+                        }, 10)
+                        .logBlock("shut again", 0, 0, 5)
+                        .command("gamemode creative @a");
+            }
+            // a car driven through a ford, slowing as it wades, then off the end into deep water, its engine flooding, and
+            // floating a moment before it goes down
+            case "carwater" -> {
+                s.then(minecraft -> minecraft.gui.setScreen(null), 2)
+                        .land()
+                        .dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("gamemode survival @a")
+                        .command("effect give @a minecraft:resistance 600 4 true")
+                        .command("effect give @a minecraft:water_breathing 600 0 true")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .command("execute at @a run fill ~-10 ~ ~-4 ~10 ~8 ~44 minecraft:air")
+                        .command("execute at @a run fill ~-10 ~-5 ~-4 ~10 ~-1 ~44 minecraft:dirt")
+                        .command("execute at @a run fill ~-10 ~-1 ~-4 ~10 ~-1 ~44 minecraft:grass_block")
+                        // a ford, its water as deep as a slab stands
+                        .command("execute at @a run fill ~-6 ~ ~12 ~6 ~ ~19 minecraft:smooth_stone_slab[type=bottom,waterlogged=true]")
+                        // a deep pond after it
+                        .command("execute at @a run fill ~-6 ~-4 ~24 ~6 ~-1 ~38 minecraft:water")
+                        .anchor()
+                        .command("execute at @a run summon scarlet:parked_car ~ ~ ~3 {Rotation:[0f,0f],paint:2}").then(minecraft -> {
+                        }, 10)
+                        .face(0, 10).getInCar().then(minecraft -> {
+                        }, 10).logCar("got in")
+                        .camera(CameraType.THIRD_PERSON_BACK)
+                        .walk(true).then(minecraft -> {
+                        }, 20).logCar("on the grass")
+                        .then(minecraft -> {
+                        }, 10).logCar("into the ford").shot("carwater_ford", 0)
+                        .then(minecraft -> {
+                        }, 10).logCar("wading").shot("carwater_wading", 0)
+                        .then(minecraft -> {
+                        }, 20).logCar("out of the ford")
+                        .then(minecraft -> {
+                        }, 20).logCar("into the pond").shot("carwater_splash", 0)
+                        .then(minecraft -> {
+                        }, 10).logCar("flooding").walk(false)
+                        .view(-6, 3, 22, 0, 0, 28).shot("carwater_floating", 10).logCar("floating")
+                        .walk(true).then(minecraft -> {
+                        }, 20).walk(false).logCar("pressing on the pedal")
+                        .then(minecraft -> {
+                        }, 60).logCar("going down").shot("carwater_sinking", 0)
+                        .then(minecraft -> {
+                        }, 80).logCar("on the bottom").shot("carwater_bottom", 0)
+                        .playerCamera().camera(CameraType.FIRST_PERSON)
+                        .then(minecraft -> minecraft.options.keyShift.setDown(true), 4).then(minecraft -> minecraft.options.keyShift.setDown(false), 10)
+                        .logCar("got out")
+                        .command("kill @e[type=scarlet:parked_car]")
+                        .command("gamemode creative @a");
+            }
             // townspeople going about their days in a home: sitting down to the television, chatting, waving to the caster
             case "routines" -> {
                 s.land()
@@ -3876,6 +4290,24 @@ public final class Showcase {
     private record Step(Consumer<Minecraft> action, int waitAfter) {
     }
 
+    /**
+     * How a throw has the creature nearest the player posed, or nothing if no creature is near or it isn't thrown.
+     */
+    private static com.yashjit.scarlet.client.hex.Ejections.@org.jspecify.annotations.Nullable Pose thrownPose(Minecraft minecraft) {
+        if (minecraft.level == null || minecraft.player == null) {
+            return null;
+        }
+        Entity nearest = null;
+        double best = Double.MAX_VALUE;
+        for (Entity entity : minecraft.level.entitiesForRendering()) {
+            if (entity instanceof net.minecraft.world.entity.Mob && entity.distanceToSqr(minecraft.player) < best) {
+                best = entity.distanceToSqr(minecraft.player);
+                nearest = entity;
+            }
+        }
+        return nearest == null ? null : com.yashjit.scarlet.client.hex.Ejections.pose(nearest, 0.0F);
+    }
+
     private static final class Scene {
         final List<Step> steps = new ArrayList<>();
         /** When the Hex's size was last written down, in {@link System#nanoTime} nanoseconds, and the server's tick then. */
@@ -4684,6 +5116,93 @@ public final class Showcase {
         }
 
         /**
+         * Moves a free camera to a spot measured from the nearest creature but the player, wherever it is now, looking at
+         * its middle.
+         */
+        Scene viewMob(double x, double y, double z) {
+            return then(minecraft -> {
+                move = null;
+                if (minecraft.level == null || minecraft.player == null) {
+                    return;
+                }
+                Entity nearest = null;
+                double best = Double.MAX_VALUE;
+                for (Entity entity : minecraft.level.entitiesForRendering()) {
+                    if (entity instanceof net.minecraft.world.entity.Mob && entity.distanceToSqr(minecraft.player) < best) {
+                        best = entity.distanceToSqr(minecraft.player);
+                        nearest = entity;
+                    }
+                }
+                if (nearest == null) {
+                    return;
+                }
+                if (camera == null || camera.level() != minecraft.level) {
+                    camera = new ArmorStand(minecraft.level, 0, 0, 0);
+                    camera.setInvisible(true);
+                }
+                Vec3 target = nearest.position().add(0.0, nearest.getBbHeight() * 0.5, 0.0);
+                Vec3 eye = target.add(x, y, z);
+                Vec3 toTarget = target.subtract(eye);
+                float lookYaw = (float) Math.toDegrees(Math.atan2(-toTarget.x, toTarget.z));
+                float lookPitch = (float) Math.toDegrees(-Math.atan2(toTarget.y, Math.hypot(toTarget.x, toTarget.z)));
+                camera.snapTo(eye.x, eye.y - camera.getEyeHeight(), eye.z, lookYaw, lookPitch);
+                camera.setYHeadRot(lookYaw);
+                camera.yHeadRotO = lookYaw;
+                camera.setOldPosAndRot();
+                minecraft.options.setCameraType(CameraType.FIRST_PERSON);
+                minecraft.setCameraEntity(camera);
+            }, 1);
+        }
+
+        /**
+         * Sets a telephone measured from the anchor ringing, as if someone called.
+         */
+        Scene ring(int x, int y, int z) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                BlockPos pos = BlockPos.containing(anchor.add(x, y, z));
+                server.execute(() -> {
+                    net.minecraft.server.level.ServerLevel level = server.overworld();
+                    net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
+                    if (state.getBlock() instanceof com.yashjit.scarlet.decor.TelephoneBlock phone) {
+                        level.setBlock(pos, state.setValue(com.yashjit.scarlet.decor.TelephoneBlock.RINGING, true), net.minecraft.world.level.block.Block.UPDATE_ALL);
+                        level.scheduleTick(pos, phone, 1);
+                    }
+                });
+            }, 2);
+        }
+
+        /**
+         * Sits the creature nearest a seat measured from the anchor straight down on it.
+         */
+        Scene seat(int x, int y, int z) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                BlockPos pos = BlockPos.containing(anchor.add(x, y, z));
+                server.execute(() -> {
+                    net.minecraft.server.level.ServerLevel level = server.overworld();
+                    net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
+                    if (!(state.getBlock() instanceof com.yashjit.scarlet.decor.SeatBlock block)) {
+                        return;
+                    }
+                    var mobs = level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new net.minecraft.world.phys.AABB(pos).inflate(6.0),
+                            mob -> !mob.isPassenger());
+                    mobs.sort(java.util.Comparator.comparingDouble(mob -> mob.distanceToSqr(Vec3.atCenterOf(pos))));
+                    if (!mobs.isEmpty()) {
+                        com.yashjit.scarlet.entity.Seat.sit(level, pos, block.seatHeight(state),
+                                state.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING), mobs.getFirst());
+                    }
+                });
+            }, 2);
+        }
+
+        /**
          * Puts the player at a spot measured from the anchor, still facing the way they were.
          */
         Scene place(double x, double y, double z) {
@@ -5093,11 +5612,39 @@ public final class Showcase {
                     Scarlet.LOG.info("Showcase: {}: no car", when);
                     return;
                 }
+                cars.sort(java.util.Comparator.comparingDouble(car -> car.distanceToSqr(minecraft.player)));
                 var car = cars.getFirst();
                 Vec3 at = car.position().subtract(anchor);
-                Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: the car at %.1f %.2f %.1f facing %.0f going %.2f, %d riding, the player %s",
+                Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: the car at %.1f %.2f %.1f facing %.0f going %.2f, %d riding, the player %s,"
+                                + " %.0f%% left%s%s%s, water %.2f deep",
                         when, at.x, at.y, at.z, Mth.wrapDegrees(car.getYRot()), car.speed(), car.getPassengers().size(),
-                        minecraft.player.getVehicle() == car ? "driving" : "on foot"));
+                        minecraft.player.getVehicle() == car ? "driving" : "on foot", car.condition() * 100.0F, car.wrecked() ? ", wrecked" : "",
+                        car.flooded() ? ", flooded" : "", car.isOnFire() ? ", burning" : "",
+                        car.getFluidHeight(net.minecraft.tags.FluidTags.WATER)));
+            }, 1);
+        }
+
+        /**
+         * Writes down in the log every creature near the anchor but the player: what it is, where, measured from the
+         * anchor, how much health it has and how it is moving.
+         */
+        Scene logLiving(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                server.execute(() -> {
+                    StringBuilder found = new StringBuilder();
+                    for (var living : server.overworld().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                            new net.minecraft.world.phys.AABB(anchor, anchor).inflate(64.0), living -> !(living instanceof net.minecraft.world.entity.player.Player))) {
+                        Vec3 at = living.position().subtract(anchor);
+                        Vec3 going = living.getDeltaMovement();
+                        found.append(String.format(java.util.Locale.ROOT, " %s at %.1f %.1f %.1f, %.1f health, moving %.2f %.2f %.2f;",
+                                BuiltInRegistries.ENTITY_TYPE.getKey(living.getType()).getPath(), at.x, at.y, at.z, living.getHealth(), going.x, going.y, going.z));
+                    }
+                    Scarlet.LOG.info("Showcase: {}:{}", when, found.isEmpty() ? " no one" : found);
+                });
             }, 1);
         }
 
@@ -5132,6 +5679,53 @@ public final class Showcase {
         /**
          * Writes down in the log the items lying around the anchor.
          */
+        /**
+         * Logs every creature the client draws, where it draws it and how it is posed, and where the server has each.
+         */
+        Scene logThrown(String when) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null || minecraft.level == null) {
+                    return;
+                }
+                StringBuilder drawn = new StringBuilder();
+                for (Entity entity : minecraft.level.entitiesForRendering()) {
+                    if (entity instanceof net.minecraft.world.entity.Mob) {
+                        Vec3 at = entity.position().subtract(anchor);
+                        com.yashjit.scarlet.client.hex.Ejections.Pose pose = com.yashjit.scarlet.client.hex.Ejections.pose(entity, 1.0F);
+                        drawn.append(String.format(java.util.Locale.ROOT, " #%d drawn at %.1f %.1f %.1f%s;", entity.getId(), at.x, at.y, at.z,
+                                pose == null ? "" : String.format(java.util.Locale.ROOT, " tilted %.0f rolled %.0f lying %.2f", pose.tilt(), pose.roll(), pose.lie())));
+                    }
+                }
+                String client = drawn.isEmpty() ? " none" : drawn.toString();
+                server.execute(() -> {
+                    StringBuilder held = new StringBuilder();
+                    for (Entity entity : server.overworld().getAllEntities()) {
+                        if (entity instanceof net.minecraft.world.entity.Mob) {
+                            Vec3 at = entity.position().subtract(anchor);
+                            held.append(String.format(java.util.Locale.ROOT, " #%d at %.1f %.1f %.1f;", entity.getId(), at.x, at.y, at.z));
+                        }
+                    }
+                    Scarlet.LOG.info("Showcase: {}: client{} server{}", when, client, held.isEmpty() ? " none" : held);
+                });
+            }, 1);
+        }
+
+        /**
+         * Logs the block measured from the anchor, and the one over it, as the server has them.
+         */
+        Scene logBlock(String when, int x, int y, int z) {
+            return then(minecraft -> {
+                IntegratedServer server = minecraft.getSingleplayerServer();
+                if (server == null) {
+                    return;
+                }
+                BlockPos pos = BlockPos.containing(anchor.add(x, y, z));
+                server.execute(() -> Scarlet.LOG.info("Showcase: {}: {} under {}", when, server.overworld().getBlockState(pos),
+                        server.overworld().getBlockState(pos.above())));
+            }, 2);
+        }
+
         Scene logDropped(String when) {
             return then(minecraft -> {
                 IntegratedServer server = minecraft.getSingleplayerServer();
