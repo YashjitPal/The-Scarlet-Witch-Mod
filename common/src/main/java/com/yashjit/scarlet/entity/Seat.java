@@ -6,12 +6,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -26,8 +26,12 @@ import net.minecraft.world.phys.Vec3;
  */
 public class Seat extends Entity {
 
-    /** How far below the cushion the feet of someone drawn as a person go, so their hips rest on it. */
-    private static final double RESIDENT_SITTING_DEPTH = 0.7;
+    /** How high a person's hips are over their soles: how far below the cushion their feet go, for the hips to rest on it. */
+    private static final double HIP_HEIGHT = 0.75;
+    /** How far back from the middle of the seat they sit, against its back. */
+    private static final double SIT_BACK = 0.1;
+    /** How far round from the way the seat faces whoever sits on it can turn to look, in degrees. */
+    private static final float MOST_TURN = 100.0F;
 
     private boolean loaded;
 
@@ -74,13 +78,49 @@ public class Seat extends Entity {
         }
     }
 
+    /** Sat down facing the way the seat does, on whichever side is told of it, a player's own game too. */
+    @Override
+    protected void addPassenger(Entity passenger) {
+        super.addPassenger(passenger);
+        float yaw = getYRot();
+        passenger.setYRot(yaw);
+        passenger.yRotO = yaw;
+        passenger.setYHeadRot(yaw);
+        if (passenger instanceof LivingEntity living) {
+            living.setYBodyRot(yaw);
+            living.yBodyRotO = yaw;
+        }
+    }
+
+    /** Their body faces the way the seat does, and their head turns only so far from it. */
+    @Override
+    public void onPassengerTurned(Entity passenger) {
+        face(passenger);
+    }
+
+    @Override
+    protected void positionRider(Entity passenger, Entity.MoveFunction move) {
+        super.positionRider(passenger, move);
+        face(passenger);
+    }
+
+    private void face(Entity passenger) {
+        float yaw = getYRot();
+        passenger.setYBodyRot(yaw);
+        float turned = Mth.wrapDegrees(passenger.getYRot() - yaw);
+        float allowed = Mth.clamp(turned, -MOST_TURN, MOST_TURN);
+        if (allowed != turned) {
+            passenger.yRotO += allowed - turned;
+            passenger.setYRot(passenger.getYRot() + allowed - turned);
+            passenger.setYHeadRot(passenger.getYRot());
+        }
+    }
+
     @Override
     protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale) {
-        if (passenger instanceof Player) {
-            return super.getPassengerAttachmentPoint(passenger, dimensions, scale);
-        }
-        // townspeople are drawn as people, whatever mob they really are, so they sit the way a person does
-        return passenger.getVehicleAttachmentPoint(this).subtract(0.0, RESIDENT_SITTING_DEPTH, 0.0);
+        // townspeople are drawn as people, whatever mob they really are, so they sit the way a player does
+        Direction facing = Direction.fromYRot(getYRot());
+        return passenger.getVehicleAttachmentPoint(this).add(-facing.getStepX() * SIT_BACK, -HIP_HEIGHT, -facing.getStepZ() * SIT_BACK);
     }
 
     @Override

@@ -88,6 +88,7 @@ public final class CastPoses {
         ((CastPoseState) state).scarlet$setRead(read);
         double now = avatar.level().getGameTime() + partialTick;
         ((CastPoseState) state).scarlet$setMeditation(Meditation.sit(avatar, now), Meditation.lift(avatar, now), Meditation.offset(avatar, now));
+        ((CastPoseState) state).scarlet$setSeatHip(SeatPose.hip(avatar));
     }
 
     /**
@@ -95,6 +96,7 @@ public final class CastPoses {
      */
     public static void apply(PlayerModel model, AvatarRenderState state) {
         CastPoseState pose = (CastPoseState) state;
+        SeatPose.apply(model, pose.scarlet$seatHip());
         float weight = state.isFallFlying ? 0.0F : 1.0F - state.swimAmount;
         if (weight <= 0.0F) {
             return;

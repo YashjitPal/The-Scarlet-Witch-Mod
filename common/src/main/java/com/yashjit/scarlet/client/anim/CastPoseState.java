@@ -63,6 +63,11 @@ public interface CastPoseState {
 
     void scarlet$setRead(float read);
 
+    /** How high over the floor the hips of someone sat on a couch or a chair are, in blocks: 0 if they aren't. */
+    float scarlet$seatHip();
+
+    void scarlet$setSeatHip(float hip);
+
     /** Sitting cross-legged to dreamwalk: 0 to 1. */
     float scarlet$sit();
 

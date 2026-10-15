@@ -1,5 +1,7 @@
 package com.yashjit.scarlet.client.hex;
 
+import com.yashjit.scarlet.client.anim.CastPoseState;
+import com.yashjit.scarlet.client.anim.SeatPose;
 import com.yashjit.scarlet.network.GesturePayload;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
@@ -72,6 +74,9 @@ public final class ResidentRenderer extends LivingEntityRenderer<LivingEntity, A
         state.leftArmPose = HumanoidModel.ArmPose.EMPTY;
         state.rightArmPose = HumanoidModel.ArmPose.EMPTY;
         state.isCrouching = false;
+        // drawn by the player model, which sits a rider down only when told it rides
+        state.isPassenger = entity.isPassenger();
+        ((CastPoseState) state).scarlet$setSeatHip(SeatPose.hip(entity));
         state.speedValue = 1.0F;
         state.swimAmount = entity.getSwimAmount(partialTicks);
         state.isVisuallySwimming = entity.isVisuallySwimming();

@@ -68,6 +68,19 @@ abstract class AvatarRenderStateMixin implements CastPoseState {
     @Unique
     private float scarlet$meditationOffset;
 
+    @Unique
+    private float scarlet$seatHip;
+
+    @Override
+    public float scarlet$seatHip() {
+        return scarlet$seatHip;
+    }
+
+    @Override
+    public void scarlet$setSeatHip(float hip) {
+        scarlet$seatHip = hip;
+    }
+
     @Override
     public float scarlet$sit() {
         return scarlet$sit;
