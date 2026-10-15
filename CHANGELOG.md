@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.12
+
+- **You sit down on a couch or an armchair** instead of standing in it: hips on the cushion, knees forward and feet on the floor, facing out of the seat, free to look about. Townspeople sit the same way.
+- **The car keeps out of deep water.** It slows as it wades through the shallows, throwing up spray. Driven into water deeper than its wheels, its engine floods and dies, and it floats a few seconds before it goes down; hauled out, it dries off and starts again. A town's car that sinks turns up back where it was parked, and one the Hex made for you is gone.
+- **The car takes a beating instead of vanishing.** Blows, chaos bolts and other magic, explosions, fire and lava, crashing into a wall at speed and landing hard all dent it, its steel taking blows and spells better than flesh. It shows every one: the paint scuffs, the windows craze, smoke pours from under the hood and then sparks, and the lamps die. Past the end it's a wreck. It bursts into flames, burns out and smolders, a blackened shell no one can get into, and beaten apart it leaves scrap iron. An iron ingot hammers a quarter of it back into shape, sneaking with an empty hand picks your own car up just as it is, and the Hex mends its own cars, wrecks and all.
+- **The car hits what it runs into.** Anyone or anything in its way is hurt by how fast it was going and knocked flying, and the car loses speed for it. It never hits whoever rides in it, but a crash at speed hurts them.
+- **Thrown out of the Hex like Monica,** and slower: three or four seconds across a town instead of the blink of an eye. They fly backward, laid back on the air with their arms and legs thrown out, fast off the mark and slowing as they go: low through the town, crashing through whatever is in the way, over the hills between, and out through the wall. Outside they come down hard, skid and roll over, lie winded a moment, and get up. Thrown yourself, your view shakes as you're blasted away and as you land, and drops to the ground while you lie there.
+- **Every piece of furniture works the way the real thing would:**
+  - **The television** warms up with a hum and goes off with a fade, a modern set with a chime. Near it you hear its show: voices back and forth, a laugh track up to the 1980s, and music now and then. It's quiet while no one is about.
+  - **The telephone** rings now and then in a Hex while someone is near: a bell, a chirp or a ringtone, by its era. Pick it up to hear who's calling, or to dial out.
+  - **The toaster** takes bread, toasts it with a glow in its slots, and pops up two slices of toast with a ding. Click it to pop it up early and get the bread back.
+  - **The stove** cooks what a campfire would, set down on its burners where you can see it and in a third of the time: four things at once, each popping off the range when it's done. Switched off, it stops cooking. Sneak with an empty hand to take it all back.
+  - **The fridge door** swings open on its hinge while anyone has the fridge open, the light on inside over stocked shelves and bottles in the door, and shuts behind the last of them.
+  - **The wall clock's hands turn** with the time: the Hex's own hour where its caster has set one, racing round with the sky when the hour changes, and spinning wildly in the Nether and the End, where there's no day to tell.
+  - **Furniture stands on something,** a floor, a rug, a table or a counter, and wall pieces hang on a wall. Take away what holds one up and it falls.
+
 ## 0.1.11
 
 - **The town comes down with its Hex wherever it stands**, as it used to. Out where no one was, a Hex drawn in or falling left its town standing there until someone went near it. Now the land just ahead of the wall is loaded as the wall comes, and the wall waits for it if it must, so every part of the town is gone as the wall goes by, whoever is there.
