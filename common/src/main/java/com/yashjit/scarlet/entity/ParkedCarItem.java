@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.entity;
 
 import com.yashjit.scarlet.decor.HexMade;
+import com.yashjit.scarlet.registry.ScarletDataComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -38,7 +39,9 @@ public class ParkedCarItem extends Item {
         if (level instanceof ServerLevel server) {
             Player player = context.getPlayer();
             float yaw = player != null ? player.getYRot() : 0.0F;
-            ParkedCar.park(server, at, yaw, server.getRandom().nextInt(5), false).madeBy(HexMade.maker(context.getItemInHand()));
+            ParkedCar car = ParkedCar.park(server, at, yaw, server.getRandom().nextInt(5), false);
+            car.madeBy(HexMade.maker(context.getItemInHand()));
+            car.damaged(context.getItemInHand().getOrDefault(ScarletDataComponents.CAR_DAMAGE.get(), 0.0F));
             server.playSound(null, at.x, at.y, at.z, SoundEvents.IRON_DOOR_CLOSE, SoundSource.NEUTRAL, 0.7F, 1.1F);
             if (player == null || !player.isCreative()) {
                 context.getItemInHand().shrink(1);

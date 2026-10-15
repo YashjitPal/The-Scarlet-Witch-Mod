@@ -30,6 +30,12 @@ public final class ScarletDataComponents {
     public static final Supplier<DataComponentType<Long>> HEX_FADING = Services.REGISTRY.register(BuiltInRegistries.DATA_COMPONENT_TYPE, "hex_fading",
             () -> DataComponentType.<Long>builder().persistent(Codec.LONG).networkSynchronized(ByteBufCodecs.VAR_LONG).build());
 
+    /**
+     * How battered a car packed up into its item was, to be just as battered when it is parked again.
+     */
+    public static final Supplier<DataComponentType<Float>> CAR_DAMAGE = Services.REGISTRY.register(BuiltInRegistries.DATA_COMPONENT_TYPE, "car_damage",
+            () -> DataComponentType.<Float>builder().persistent(Codec.floatRange(0.0F, Float.MAX_VALUE)).networkSynchronized(ByteBufCodecs.FLOAT).build());
+
     private ScarletDataComponents() {
     }
 

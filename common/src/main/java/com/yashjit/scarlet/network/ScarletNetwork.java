@@ -14,7 +14,7 @@ public final class ScarletNetwork {
     /**
      * Bump whenever a payload's format changes, so mismatched clients and servers refuse to connect.
      */
-    public static final String VERSION = "27";
+    public static final String VERSION = "28";
 
     private ScarletNetwork() {
     }
@@ -31,6 +31,7 @@ public final class ScarletNetwork {
         registry.serverbound(DreamPayload.TYPE, DreamPayload.STREAM_CODEC, Dreamwalk::handle);
         registry.serverbound(PropPayload.TYPE, PropPayload.STREAM_CODEC, (payload, player) -> Props.conjure(player, payload.index()));
         registry.serverbound(CarHornPayload.TYPE, CarHornPayload.STREAM_CODEC, (payload, player) -> ParkedCar.honk(player));
+        registry.serverbound(CarDrivePayload.TYPE, CarDrivePayload.STREAM_CODEC, (payload, player) -> ParkedCar.reported(player, payload.speed(), payload.crash()));
         registry.clientbound(DreamOptionsPayload.TYPE, DreamOptionsPayload.STREAM_CODEC);
         registry.clientbound(DreamStatePayload.TYPE, DreamStatePayload.STREAM_CODEC);
         registry.clientbound(PossessPayload.TYPE, PossessPayload.STREAM_CODEC);

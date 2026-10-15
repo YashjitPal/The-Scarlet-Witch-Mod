@@ -97,6 +97,12 @@
   "settings.scarlet.era_audio.tip": "Inside a Hex in an older era, everything sounds as if through an old television's speaker.",
   "container.scarlet.refrigerator": "Refrigerator",
   "decor.scarlet.clock": "The clock says %s",
+  "car.scarlet.flooded": "Water floods the engine, and it dies",
+  "car.scarlet.dried": "The engine coughs back to life",
+  "car.scarlet.wrecked": "The car is wrecked",
+  "car.scarlet.wreck": "It's a wreck: it won't go anywhere again",
+  "car.scarlet.town": "It's the town's car, not yours to take away",
+  "car.scarlet.repaired": "Hammered back into shape: %s%%",
   "props.scarlet.title": "SET DRESSING",
   "props.scarlet.cost": "%s chaos energy",
   "item.scarlet.hex_made": "Made by a Hex: gone outside it",
@@ -280,5 +286,8 @@
   "death.attack.scarlet.shockwave.item": "%1$s was blasted away by %2$s",
   "death.attack.scarlet.telekinesis": "%1$s was thrown around by %2$s",
   "death.attack.scarlet.telekinesis.player": "%1$s was flung to their doom while fighting %2$s",
-  "death.attack.scarlet.telekinesis.item": "%1$s was thrown around by %2$s"
+  "death.attack.scarlet.telekinesis.item": "%1$s was thrown around by %2$s",
+  "death.attack.scarlet.car": "%1$s was run over by %2$s",
+  "death.attack.scarlet.car.player": "%1$s was run over while fighting %2$s",
+  "death.attack.scarlet.car.item": "%1$s was run over by %2$s"
 }
