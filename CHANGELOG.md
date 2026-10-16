@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.13
+
+- **The wall never stops for the town.** Drawn in or falling, it moves at its own pace the whole way, where before it stopped and started while the town caught up. Whatever of the town it passes where you can see goes as it goes by: a house it reaches dissolves right there, the wall still moving. What stands out past where anyone can see goes a moment later, nearest anyone first.
+- **The town goes up close behind the wall.** Grow the Hex to its full size and the houses around you rise as the wall spreads past them, instead of a few at a time over minutes; what anyone can see goes up first, and the rest after. Towns build several times as fast as before, and come down several times as fast.
+
 ## 0.1.12
 
 - **You sit down on a couch or an armchair** instead of standing in it: hips on the cushion, knees forward and feet on the floor, facing out of the seat, free to look about. Townspeople sit the same way.
