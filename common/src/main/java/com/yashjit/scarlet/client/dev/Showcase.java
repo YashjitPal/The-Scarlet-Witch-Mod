@@ -1648,6 +1648,57 @@ public final class Showcase {
                         }, 700).logHexSize("its home gone too")
                         .command("execute as @a run scarlet hex forget");
             }
+            // a caster working their Hex as players do: cast, grown to its full size by holding the cast, drawn in by holding
+            // it crouched, and let fall; how fast its town goes up and comes down meanwhile, and how its wall moves
+            case "realtime" -> {
+                s.land().dispelHexes()
+                        .command("kill @e[type=!minecraft:player]")
+                        .elsewhere()
+                        .command("execute as @a run scarlet hex forget")
+                        .command("execute as @a run scarlet hex build town")
+                        .command("item replace entity @a armor.head with scarlet:witch_tiara[scarlet:mastery=6400]")
+                        .command("item replace entity @a weapon.mainhand with minecraft:air")
+                        .command("time set noon")
+                        .command("execute as @a at @s align xz run tp @s ~0.5 ~ ~0.5 0 0")
+                        .anchor().ensureUnsuited().face(0, 0).select(Spell.HEX).playerCamera().hideHud(false)
+                        .tap().then(minecraft -> {
+                        }, 40)
+                        // its home up and the Hex burst out of it, for holding the cast again to grow it
+                        .until(minecraft -> {
+                            IntegratedServer server = minecraft.getSingleplayerServer();
+                            if (server == null || minecraft.player == null) {
+                                return true;
+                            }
+                            Hex hex = HexData.of(server.overworld()).byCaster(minecraft.player.getUUID());
+                            return hex == null || hex.phase() != Hex.Phase.FOUNDING;
+                        }, 1200).then(minecraft -> {
+                        }, 40).logHexSize("cast, its home up").startProfile().hold(true);
+                for (int k = 1; k <= 12; k++) {
+                    s.then(minecraft -> {
+                    }, 20).logHexSize("growing, " + k + " s on");
+                }
+                s.hold(false);
+                for (int k = 1; k <= 30; k++) {
+                    s.then(minecraft -> {
+                    }, 20).logHexSize("grown, " + k + " s on");
+                }
+                s.shot(name + "_grown", 2).sneak(true).hold(true);
+                for (int k = 1; k <= 12; k++) {
+                    s.then(minecraft -> {
+                    }, 20).logHexSize("drawn in for " + k + " s");
+                }
+                s.hold(false).sneak(false);
+                for (int k = 1; k <= 10; k++) {
+                    s.then(minecraft -> {
+                    }, 20).logHexSize("let go, " + k + " s on");
+                }
+                s.command("execute as @a run scarlet hex dispel");
+                for (int k = 1; k <= 30; k++) {
+                    s.then(minecraft -> {
+                    }, 20).logHexSize("falling, " + k + " s on");
+                }
+                s.saveProfile("sw_town").command("execute as @a run scarlet hex forget");
+            }
             // the Hex drawn in through its caster's home, in a town and in an orchard: the home let go to step back through
             // the eras on its own and come apart, none of it raised again while the wall stands across its lot, and the
             // home back up once the Hex is grown back over it, whether it had all gone or still stood
@@ -4313,6 +4364,11 @@ public final class Showcase {
         /** When the Hex's size was last written down, in {@link System#nanoTime} nanoseconds, and the server's tick then. */
         private long loggedAt;
         private int loggedTick;
+        private long loggedPlaced;
+        private long loggedPutBack;
+        private long loggedTownNanos;
+        private long[] loggedStages = new long[6];
+        private jdk.jfr.@org.jspecify.annotations.Nullable Recording profile;
 
         Scene then(Consumer<Minecraft> action, int waitAfter) {
             steps.add(new Step(action, waitAfter));
@@ -5337,16 +5393,40 @@ public final class Showcase {
                         longest = Math.max(longest, nanos);
                     }
                     float wall = hex == null ? 0.0F : Hexes.wallRadius(hex, server.overworld().getGameTime());
-                    String size = hex == null ? "no Hex" : String.format(java.util.Locale.ROOT, "the Hex %s at %.0f blocks, its wall at %.0f, its town %d blocks, %d out past its wall",
-                            hex.phase(), hex.radius(), wall, hex.town() == null ? 0 : hex.town().size(), hex.town() == null ? 0 : hex.town().standingOutside(hex.center(), wall));
+                    net.minecraft.server.level.ServerPlayer watcher = server.getPlayerList().getPlayer(id);
+                    double seenTo = (server.getPlayerList().getViewDistance() + 1) * 16.0;
+                    String size = hex == null ? "no Hex" : String.format(java.util.Locale.ROOT,
+                            "the Hex %s at %.0f blocks, its wall at %.0f, its town %d blocks, %d out past its wall (%d where the player could see)",
+                            hex.phase(), hex.radius(), wall, hex.town() == null ? 0 : hex.town().size(),
+                            hex.town() == null ? 0 : hex.town().standingOutside(hex.center(), wall),
+                            hex.town() == null || watcher == null ? 0 : hex.town().standingOutside(hex.center(), wall, watcher.position(), seenTo));
                     HexData data = HexData.of(server.overworld());
                     // how many ticks the server has got through a second since last written down, out of 20
                     long nanos = System.nanoTime();
                     double pace = loggedAt == 0L ? 20.0 : (server.getTickCount() - loggedTick) * 1.0E9 / (nanos - loggedAt);
+                    int ticks = Math.max(1, server.getTickCount() - loggedTick);
+                    // what the towns did since last written down, a tick at a time
+                    long placed = com.yashjit.scarlet.hex.town.HexTown.placedEver() - loggedPlaced;
+                    long putBack = com.yashjit.scarlet.hex.town.HexTown.putBackEver() - loggedPutBack;
+                    long townNanos = Hexes.townNanosEver() - loggedTownNanos;
+                    boolean first = loggedAt == 0L;
                     loggedAt = nanos;
                     loggedTick = server.getTickCount();
-                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, %d left over in %d chunks, ticks taking %.1f ms on average and %.1f at most, %.1f ticks a second",
-                            when, size, data.leftoverCount(), data.leftoverChunks(), server.getAverageTickTimeNanos() / 1.0E6, longest / 1.0E6, pace));
+                    loggedPlaced += placed;
+                    loggedPutBack += putBack;
+                    loggedTownNanos += townNanos;
+                    long[] stages = com.yashjit.scarlet.hex.town.HexTown.stageNanos();
+                    long[] spent = new long[stages.length];
+                    for (int k = 0; k < stages.length; k++) {
+                        spent[k] = stages[k] - loggedStages[k];
+                    }
+                    loggedStages = stages;
+                    String work = first ? "" : String.format(java.util.Locale.ROOT,
+                            ", the town putting down %d and back %d blocks a tick in %.1f ms (back %.1f, starting %.1f with %.1f lots surveyed in %.1f, down %.1f, restyling %.1f)",
+                            placed / ticks, putBack / ticks, townNanos / 1.0E6 / ticks, spent[0] / 1.0E6 / ticks, spent[1] / 1.0E6 / ticks,
+                            spent[4] / (double) ticks, spent[5] / 1.0E6 / ticks, spent[2] / 1.0E6 / ticks, spent[3] / 1.0E6 / ticks);
+                    Scarlet.LOG.info(String.format(java.util.Locale.ROOT, "Showcase: %s: %s, %d left over in %d chunks, ticks taking %.1f ms on average and %.1f at most, %.1f ticks a second%s",
+                            when, size, data.leftoverCount(), data.leftoverChunks(), server.getAverageTickTimeNanos() / 1.0E6, longest / 1.0E6, pace, work));
                 });
             }, 2);
         }
@@ -5679,6 +5759,38 @@ public final class Showcase {
         /**
          * Writes down in the log the items lying around the anchor.
          */
+        /**
+         * Starts recording where the game spends its time, until {@link #saveProfile}: for seeing what is slow.
+         */
+        Scene startProfile() {
+            return then(minecraft -> {
+                try {
+                    profile = new jdk.jfr.Recording(jdk.jfr.Configuration.getConfiguration("profile"));
+                    profile.start();
+                } catch (Exception e) {
+                    Scarlet.LOG.warn("Showcase: couldn't start a profile", e);
+                }
+            }, 0);
+        }
+
+        /** Writes the recording begun by {@link #startProfile} to the game's folder, and ends it. */
+        Scene saveProfile(String file) {
+            return then(minecraft -> {
+                if (profile == null) {
+                    return;
+                }
+                try {
+                    java.nio.file.Path path = minecraft.gameDirectory.toPath().resolve(file + ".jfr").toAbsolutePath();
+                    profile.dump(path);
+                    Scarlet.LOG.info("Showcase: profile written to {}", path);
+                } catch (Exception e) {
+                    Scarlet.LOG.warn("Showcase: couldn't write the profile", e);
+                }
+                profile.close();
+                profile = null;
+            }, 0);
+        }
+
         /**
          * Logs every creature the client draws, where it draws it and how it is posed, and where the server has each.
          */
