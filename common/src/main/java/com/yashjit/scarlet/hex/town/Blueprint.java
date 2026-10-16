@@ -1,7 +1,8 @@
 package com.yashjit.scarlet.hex.town;
 
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Arrays;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -17,6 +18,10 @@ import net.minecraft.world.phys.Vec3;
  * street, b runs back from the street, and y is the world height.
  */
 public final class Blueprint {
+
+    /** What stages and heights are shifted up by to be packed into a sort key, below and above 0 as they come. */
+    private static final int STAGE_OFFSET = 16;
+    private static final int HEIGHT_OFFSET = 1 << 11;
 
     private final Frame frame;
     private final List<Piece> pieces;
@@ -99,18 +104,31 @@ public final class Blueprint {
      * steps put something at the same spot, the later one wins.
      */
     public List<Piece> schedule() {
-        List<Piece> latest = new ArrayList<>();
-        java.util.Map<BlockPos, Integer> at = new java.util.HashMap<>();
+        List<Piece> unique = new ArrayList<>(pieces.size());
+        Long2IntOpenHashMap at = new Long2IntOpenHashMap(pieces.size());
+        at.defaultReturnValue(-1);
         for (Piece piece : pieces) {
-            Integer index = at.get(piece.pos());
-            if (index != null) {
-                latest.set(index, piece);
+            long key = piece.pos().asLong();
+            int index = at.get(key);
+            if (index >= 0) {
+                unique.set(index, piece);
             } else {
-                at.put(piece.pos(), latest.size());
-                latest.add(piece);
+                at.put(key, unique.size());
+                unique.add(piece);
             }
         }
-        latest.sort(Comparator.comparingInt(Piece::stage).thenComparingInt(piece -> piece.pos().getY()));
+        // by stage, then from the bottom up, and otherwise as they came: packed into numbers to sort, as a part can have
+        // tens of thousands of pieces
+        long[] order = new long[unique.size()];
+        for (int i = 0; i < order.length; i++) {
+            Piece piece = unique.get(i);
+            order[i] = (long) (piece.stage() + STAGE_OFFSET) << 52 | (long) (piece.pos().getY() + HEIGHT_OFFSET) << 32 | i;
+        }
+        Arrays.sort(order);
+        List<Piece> latest = new ArrayList<>(order.length);
+        for (long packed : order) {
+            latest.add(unique.get((int) packed));
+        }
         int[] counts = new int[stageTicks.length];
         for (Piece piece : latest) {
             counts[Math.min(piece.stage(), counts.length - 1)]++;

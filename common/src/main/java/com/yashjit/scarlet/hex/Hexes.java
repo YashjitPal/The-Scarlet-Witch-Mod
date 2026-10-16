@@ -113,13 +113,13 @@ public final class Hexes {
     private static final long BEHIND_TWENTIETHS = 21;
     /**
      * The least and most of each tick the towns take for putting back what their walls have passed, which goes first;
-     * what they can't keep up with, their walls wait for.
+     * their walls never wait for it, and what they can't keep up with goes the next tick.
      */
     private static final long WALL_LEAST = 10_000_000L;
-    private static final long WALL_MOST = 30_000_000L;
+    private static final long WALL_MOST = 34_000_000L;
     /** The same for building and making over. */
     private static final long TOWN_LEAST = 3_000_000L;
-    private static final long TOWN_MOST = 20_000_000L;
+    private static final long TOWN_MOST = 28_000_000L;
     /** The same for putting back what towns gone left in chunks that weren't loaded, nearest anyone first. */
     private static final long LEFTOVER_LEAST = 1_000_000L;
     private static final long LEFTOVER_MOST = 10_000_000L;
@@ -132,10 +132,6 @@ public final class Hexes {
     private static final int LEFTOVER_FETCH_RENEW = 10;
     private static final int LEFTOVER_FETCH_PATIENCE = 400;
     private static final int LEFTOVER_FETCH_TRICKLE = 20;
-    /** How many of a town's blocks may stand out past its wall still to go back before the wall waits for them. */
-    private static final int MOST_BEHIND = 2048;
-    /** Longest a falling wall waits for its town, all told, before it carries on anyway. */
-    private static final int LONGEST_WAIT = 2400;
     /** Longest a fallen Hex's town goes on coming down after its wall has gone in, before the rest goes at once. */
     private static final int FALL_GRACE_TICKS = 1200;
     /** When this tick began, in {@link System#nanoTime} nanoseconds, and each of the {@link #PACE_TICKS} before it. */
@@ -144,6 +140,8 @@ public final class Hexes {
     private static int ticksStarted;
     /** Whether the server has been falling behind its pace. */
     private static boolean behind;
+    /** How long all towns have taken over their ticks since the game started, in nanoseconds: for seeing how they keep up. */
+    private static long townNanosEver;
     /** Ticks between updates sent while a Hex keeps changing, such as while it is being resized. */
     public static final int SYNC_INTERVAL = 2;
     /**
@@ -571,10 +569,6 @@ public final class Hexes {
             }
             return false;
         }
-        if (!grow && hex.town != null && hex.town.behind() > MOST_BEHIND) {
-            // drawn in faster than its town can come down: the wall waits for it
-            return true;
-        }
         hex.radius = Math.clamp(hex.radius + (grow ? step : -step), MIN_RADIUS, MAX_RADIUS);
         data.changed();
         return grow ? hex.radius < MAX_RADIUS : hex.radius > MIN_RADIUS;
@@ -770,6 +764,10 @@ public final class Hexes {
         return behind;
     }
 
+    public static long townNanosEver() {
+        return townNanosEver;
+    }
+
     /**
      * How much of this tick is left for the Hexes and their towns, in nanoseconds; nothing while the server is behind.
      * It goes by how long the tick has taken so far rather than by the server's own tick times, which on Fabric leave
@@ -872,12 +870,6 @@ public final class Hexes {
                     }
                 }
                 case COLLAPSING -> {
-                    if (hex.town != null && hex.town.behind() > MOST_BEHIND && hex.fallWaited < LONGEST_WAIT) {
-                        // the wall waits for the town to come down behind it, rather than leaving it standing outside
-                        hex.phaseSince++;
-                        hex.fallWaited++;
-                        data.changed();
-                    }
                     // a town too big to keep up with its wall goes on coming down a moment longer
                     long falling = now - hex.phaseSince;
                     if (falling >= collapseTicks(hex.phaseRadius)
@@ -922,6 +914,7 @@ public final class Hexes {
                 hex.town.tick(level, hex.center, wallRadius(hex, now), hex.radius, hex.era, eraFront(hex.radius, now - hex.eraSince),
                         hex.phase == Hex.Phase.COLLAPSING, hex.caster, hex.phase == Hex.Phase.FOUNDING ? hex.caster : null, now,
                         from + share, from + wallShare, data);
+                townNanosEver += System.nanoTime() - from;
                 // drawn in over the caster's home, the wall lets it go to stand alone, as it does when the Hex falls
                 HomeRemnant released = hex.town.takeReleased();
                 if (released != null) {

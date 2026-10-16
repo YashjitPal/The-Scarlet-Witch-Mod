@@ -46,6 +46,7 @@ import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.VegetationBlock;
 import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
@@ -85,6 +86,11 @@ public final class Restyle {
     /**
      * Whether a block is part of something built, rather than the land, water, or what grows on it.
      */
+    /** The highest block standing in a column, at most so high: above it there is only air. */
+    private static int highestIn(ServerLevel level, int x, int z, int top) {
+        return Math.min(top, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1);
+    }
+
     public static boolean isBuilt(ServerLevel level, BlockPos pos, BlockState state) {
         if (state.isAir() || Terrain.isGround(state) && !state.is(Blocks.DIRT_PATH)) {
             return false;
@@ -198,7 +204,8 @@ public final class Restyle {
                 if (!inFootprint.test(BlockPos.asLong(x, ground, z))) {
                     continue;
                 }
-                for (int y = bottom; y <= top; y++) {
+                // nothing over the highest block in the column is anything built: open land is looked over in a few
+                for (int y = bottom, highest = highestIn(level, x, z, top); y <= highest; y++) {
                     long key = BlockPos.asLong(x, y, z);
                     if (seen.contains(key) || ours.test(key) || !isBuilt(level, pos.set(x, y, z), level.getBlockState(pos))) {
                         continue;
@@ -239,7 +246,7 @@ public final class Restyle {
                 if (!inFootprint.test(BlockPos.asLong(x, ground, z))) {
                     continue;
                 }
-                for (int y = bottom; y <= top; y++) {
+                for (int y = bottom, highest = highestIn(level, x, z, top); y <= highest; y++) {
                     long key = BlockPos.asLong(x, y, z);
                     if (seen.contains(key) || ours.test(key) || !isBuilt(level, pos.set(x, y, z), level.getBlockState(pos))) {
                         continue;
@@ -675,7 +682,7 @@ public final class Restyle {
                 if (!inFootprint.test(BlockPos.asLong(x, ground, z))) {
                     continue;
                 }
-                for (int y = ground - 1; y <= ground + 32; y++) {
+                for (int y = ground - 1, highest = highestIn(level, x, z, ground + 32); y <= highest; y++) {
                     long key = BlockPos.asLong(x, y, z);
                     if (ours.test(key)) {
                         continue;
