@@ -36,6 +36,9 @@ public record MagicEventPayload(int entityId, int kind, Vec3 position) implement
     public static final int DREAM_DEPART = 11;
     /** A dreamwalker's spirit coming back into their body, at its feet. */
     public static final int DREAM_WAKE = 12;
+    public static final int STAR = 13, BEAM = 14, WEAVE = 15, WARD = 16, SENSE = 17, MIRROR = 18, GATE = 19,
+            PENTACLE = 20, DOMAIN = 21, HALO = 22, STAR_MISS = 23, BEAM_MISS = 24,
+            TRANSMUTED = 25, UNWOVEN = 26, REWRITTEN = 27, FATE = 28, DEFLECT = 29;
 
     public static final Type<MagicEventPayload> TYPE = new Type<>(Scarlet.id("magic_event"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MagicEventPayload> STREAM_CODEC = StreamCodec.composite(

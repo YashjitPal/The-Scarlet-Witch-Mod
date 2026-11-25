@@ -84,6 +84,10 @@ public final class BoltFx {
      * @param darkness   how far the caster's corruption darkens it
      */
     public static void release(Vec3 palm, Vec3 forward, boolean nearCamera, float darkness) {
+        release(palm, forward, nearCamera, darkness, Pixels.Ramp.CHAOS);
+    }
+
+    static void release(Vec3 palm, Vec3 forward, boolean nearCamera, float darkness, Pixels.Ramp ramp) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
             return;
@@ -91,18 +95,17 @@ public final class BoltFx {
         RandomSource random = ScarletFx.random();
         Vec3 from = nearCamera ? palm.add(forward.scale(0.8)) : palm.add(forward.scale(0.15));
         if (!nearCamera) {
-            RELEASES.add(new Release(from, forward, minecraft.level.getGameTime() + partialTick(), darkness));
+            RELEASES.add(new Release(from, forward, minecraft.level.getGameTime() + partialTick(), darkness, ramp));
         }
         float density = ScarletFx.density();
         try (Glow.Darkening ignored = Glow.darkening(darkness)) {
             for (int i = 0, n = Math.round(10 * density); i < n; i++) {
                 Vec3 direction = forward.add(randomUnit(random).scale(0.38)).normalize();
-                int core = random.nextFloat() < 0.4F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
-                ScarletFx.spark(from, direction.scale(0.16 + random.nextDouble() * 0.18), 4 + random.nextInt(5), 0.024F, core, ScarletPalette.SCARLET, 0.0F,
-                        0.8F);
+                int core = random.nextFloat() < 0.4F ? Pixels.HOT : Pixels.BRIGHT;
+                ScarletFx.spark(from, direction.scale(0.16 + random.nextDouble() * 0.18), 4 + random.nextInt(5), 0.024F, ramp, core, 0.0F, 0.8F);
             }
             for (int i = 0, n = Math.round(6 * density); i < n; i++) {
-                ChaosDust.spawn(from.add(randomUnit(random).scale(0.06)), forward.scale(0.05).add(randomUnit(random).scale(0.04)));
+                ChaosDust.spawn(from.add(randomUnit(random).scale(0.06)), forward.scale(0.05).add(randomUnit(random).scale(0.04)), ramp);
             }
         }
     }
@@ -275,20 +278,24 @@ public final class BoltFx {
      * A star of light: a white-hot heart with four arms {@code arm} pixels long and four shorter diagonal ones.
      */
     private static void star(PixelSprite sprite, float length, int priority) {
+        star(sprite, length, priority, Pixels.Ramp.CHAOS);
+    }
+
+    private static void star(PixelSprite sprite, float length, int priority, Pixels.Ramp ramp) {
         int arm = Math.round(length);
         if (arm < 1) {
             return;
         }
         for (int d = -arm; d < arm; d++) {
             float out = Math.abs(d + 0.5F);
-            int color = Pixels.opaque(out < 2.5F ? Pixels.HOT : out < arm * 0.6F ? Pixels.PINK : Pixels.BRIGHT);
+            int color = ramp.opaque(out < 2.5F ? Pixels.HOT : out < arm * 0.6F ? Pixels.PINK : Pixels.BRIGHT);
             sprite.cell(d, -1, color, priority);
             sprite.cell(d, 0, color, priority);
             sprite.cell(-1, d, color, priority);
             sprite.cell(0, d, color, priority);
         }
         for (int d = 1; d <= arm / 2; d++) {
-            int color = Pixels.opaque(d < 2 ? Pixels.HOT : Pixels.PINK);
+            int color = ramp.opaque(d < 2 ? Pixels.HOT : Pixels.PINK);
             sprite.cell(d, d, color, priority);
             sprite.cell(-1 - d, d, color, priority);
             sprite.cell(d, -1 - d, color, priority);
@@ -339,13 +346,18 @@ public final class BoltFx {
      */
     private static void shockRing(VertexConsumer buffer, PoseStack.Pose pose, Vector3f at, Vector3f u, Vector3f v, float progress, float from,
                                   float to, int step, int seed) {
+        shockRing(buffer, pose, at, u, v, progress, from, to, step, seed, Pixels.Ramp.CHAOS);
+    }
+
+    private static void shockRing(VertexConsumer buffer, PoseStack.Pose pose, Vector3f at, Vector3f u, Vector3f v, float progress, float from,
+                                  float to, int step, int seed, Pixels.Ramp ramp) {
         if (progress < 0.0F || progress >= 1.0F) {
             return;
         }
         float p = Pixels.SIZE;
         float radius = from + (to - from) * Ease.outCubic(progress);
         float half = (progress < 0.35F ? 1.0F : 0.55F) * p;
-        int color = Pixels.opaque(Math.min(step + (int) (progress * 3.0F), Pixels.CRIMSON));
+        int color = ramp.opaque(Math.min(step + (int) (progress * 3.0F), Pixels.CRIMSON));
         int reach = (int) Math.ceil((radius + half) / p) + 1;
         for (int i = -reach; i < reach; i++) {
             for (int j = -reach; j < reach; j++) {
@@ -394,10 +406,10 @@ public final class BoltFx {
         Vector3f at = release.position().subtract(camera).toVector3f();
         float fade = 1.0F - t / RELEASE_TICKS;
         PixelSprite sprite = new PixelSprite(pose, at.x, at.y, at.z);
-        star(sprite, 5.0F * fade, 1);
+        star(sprite, 5.0F * fade, 1, release.ramp());
         sprite.draw(buffer);
         Vector3f[] plane = Glow.planeAxes(release.forward().toVector3f());
-        shockRing(buffer, pose, at, plane[0], plane[1], t / RELEASE_TICKS, 0.12F, 0.6F, Pixels.BRIGHT, 0);
+        shockRing(buffer, pose, at, plane[0], plane[1], t / RELEASE_TICKS, 0.12F, 0.6F, Pixels.BRIGHT, 0, release.ramp());
     }
 
     private static Vec3 randomUnit(RandomSource random) {
@@ -411,6 +423,6 @@ public final class BoltFx {
     private record Impact(Vec3 position, Vec3 normal, Vec3 direction, boolean hitEntity, double start, float darkness, int seed) {
     }
 
-    private record Release(Vec3 position, Vec3 forward, double start, float darkness) {
+    private record Release(Vec3 position, Vec3 forward, double start, float darkness, Pixels.Ramp ramp) {
     }
 }

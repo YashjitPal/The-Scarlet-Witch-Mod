@@ -2,6 +2,7 @@ package com.yashjit.scarlet.client.anim;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.client.fx.ShieldFx;
+import com.yashjit.scarlet.client.costume.SpeedLook;
 import com.yashjit.scarlet.client.fx.ShockwaveFx;
 import com.yashjit.scarlet.crown.CrownItem;
 import net.minecraft.client.Minecraft;
@@ -89,6 +90,11 @@ public final class FirstPersonGestures {
      */
     public static void poseArm(PlayerModel model, ModelPart arm) {
         boolean right = arm == model.rightArm;
+        if (right) {
+            float reach = SpeedLook.firstPersonReach();
+            arm.xRot -= 1.0F * reach;
+            arm.zRot -= 0.28F * reach;
+        }
         float side = right ? 1.0F : -1.0F;
         float[] debug = debugSwing;
         if (debug != null) {
@@ -181,7 +187,7 @@ public final class FirstPersonGestures {
         }
         boolean wanted = debugSwing != null || shield() > 0.02F || hold() > 0.02F || tear() > 0.02F || gather() > 0.02F || fling() > 0.02F
                 || raise() > 0.02F || read() > 0.02F
-                || offHandEmpty && CrownItem.isWearingCrown(player) && CastGestures.sinceLastStrike(player, now()) < OFF_HAND_LINGER;
+                || offHandEmpty && CrownItem.hasScarletMagic(player) && CastGestures.sinceLastStrike(player, now()) < OFF_HAND_LINGER;
         offHandPresence = Ease.damp(offHandPresence, wanted ? 1.0F : 0.0F, wanted ? 10.0F : 4.0F, seconds);
         if (!offHandEmpty || offHandPresence < 0.01F) {
             return;

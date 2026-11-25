@@ -440,6 +440,287 @@ public final class Showcase {
                     .look(1.1, 0, 0, 1.72).shot("warlock_front", 10)
                     .look(1.2, 35, 8, 1.75).shot("warlock_three_quarter", 6)
                     .look(1.2, 80, 5, 1.75).shot("warlock_side", 6);
+            case "wandering_coven" -> s
+                    .command("gamemode creative @p").command("difficulty normal").land().levelGround(9,9,9,16).anchor()
+                    .command("kill @e[type=scarlet:wandering_witch]").command("execute at @p run fill ~-9 ~ ~-9 ~9 ~1 ~16 air replace short_grass")
+                    .serverCheck(p -> {
+                        var group=com.yashjit.scarlet.entity.WanderingCoven.visit(p.level(),p);
+                        Scarlet.LOG.info("Coven Overworld visit size={} range={}",group.size(),group.isEmpty()?0:group.getFirst().distanceTo(p));
+                        group.forEach(net.minecraft.world.entity.Entity::discard);
+                        var display=com.yashjit.scarlet.entity.WanderingCoven.spawn(p.level(),p.blockPosition().offset(0,0,5),5);
+                        for(int i=0;i<display.size();i++) {
+                            var w=display.get(i);
+                            w.join(p.getUUID(),1+i%3,i%2==1,0);
+                            w.snapTo(p.position().add((i-2)*1.5,0,5+Math.abs(i-2)*0.45),180,0);
+                            w.setYBodyRot(180); w.setYHeadRot(180);
+                            w.setNoAi(true);
+                        }
+                        Scarlet.LOG.info("Coven showcase count={}",display.size());
+                    })
+                    .hideHud(true).view(0.4,1.5,0.8,0,1.02,5.3).shot("wandering_coven",15)
+                    .view(-1.25,1.58,2.65,-0.7,1.39,5.0).shot("coven_faces",8)
+                    .serverCheck(p -> p.level().getEntitiesOfClass(com.yashjit.scarlet.entity.WanderingWitch.class,p.getBoundingBox().inflate(18))
+                            .forEach(net.minecraft.world.entity.Entity::discard)).command("item replace entity @p armor.head with air")
+                    .command("item replace entity @p weapon.mainhand with air")
+                    .command("item replace entity @p weapon.offhand with scarlet:agatha_brooch[scarlet:siphon_charge=86]")
+                    .serverCheck(p -> {
+                        p.setHealth(20);
+                        Services.PLAYER_DATA.setMagic(p,com.yashjit.scarlet.magic.MagicState.DEFAULT);
+                        Services.PLAYER_DATA.setCorruption(p,com.yashjit.scarlet.darkhold.Corruption.NONE);
+                    })
+                    .command("gamemode survival @p").command("effect clear @p").command("gamerule natural_health_regeneration false")
+                    .command("execute at @p run summon scarlet:wandering_witch ~ ~ ~6 {Tier:2,Gold:1b,Health:16f}")
+                    .serverCheck(p -> p.level().getEntitiesOfClass(com.yashjit.scarlet.entity.WanderingWitch.class,p.getBoundingBox().inflate(12),
+                            w->w.isAlive()).forEach(w->w.setTarget(p)))
+                    .view(6,2.5,3.5,0,1,3.5).shot("coven_beam",20)
+                    .serverCheck(p -> Scarlet.LOG.info("Coven attack HP={} charge={}",p.getHealth(),com.yashjit.scarlet.magic.AgathaMagic.charge(p)))
+                    .then(mc -> {},12).command("item replace entity @p weapon.mainhand with air")
+                    .aimAtNearest("scarlet:wandering_witch").select(Spell.SIPHON).hold(true).shot("coven_siphon",27)
+                    .then(mc -> {},28).logCovenDrain().then(mc -> {},30).logCovenDrain().then(mc -> {},45).hold(false)
+                    .serverCheck(p -> Scarlet.LOG.info("Coven drain mastery={} beam={} HP={} charge={}",Mastery.xp(p.getOffhandItem()),
+                            com.yashjit.scarlet.magic.AgathaMagic.stolen(p,Spell.ARC_BEAM),p.getHealth(),com.yashjit.scarlet.magic.AgathaMagic.charge(p)))
+                    .command("execute at @e[type=scarlet:wandering_witch,limit=1] run tp @p ~ ~ ~-2")
+                    .aimAtNearest("scarlet:wandering_witch").hold(true).then(mc -> {},40).hold(false)
+                    .serverCheck(p -> Scarlet.LOG.info("Coven finishing siphon beam={} survivors={}",
+                            com.yashjit.scarlet.magic.AgathaMagic.stolen(p,Spell.ARC_BEAM),
+                            p.level().getEntitiesOfClass(com.yashjit.scarlet.entity.WanderingWitch.class,p.getBoundingBox().inflate(20),w->w.isAlive()).size()))
+                    .command("gamemode creative @p").command("execute at @p run setblock ~2 ~ ~ chest")
+                    .serverCheck(p -> {
+                        var chest=(net.minecraft.world.level.block.entity.ChestBlockEntity)p.level().getBlockEntity(p.blockPosition().offset(2,0,0));
+                        var key=net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.LOOT_TABLE,
+                                net.minecraft.resources.Identifier.withDefaultNamespace("chests/stronghold_library"));
+                        int books=0;
+                        for(int seed=1;seed<=40;seed++) {
+                            chest.clearContent(); chest.setLootTable(key,seed*0x6A09E667F3BCC909L); chest.unpackLootTable(p);
+                            books+=chest.countItem(com.yashjit.scarlet.registry.ScarletItems.RUNE_GRIMOIRE.get());
+                        }
+                        Scarlet.LOG.info("Coven library books in 40 rolls={}",books);
+                    }).command("execute at @p run setblock ~2 ~ ~ air").command("kill @e[type=scarlet:wandering_witch]");
+            case "agatha_ward" -> s
+                    .command("gamemode creative @p").command("difficulty normal").land().levelGround(9,9,9,14).anchor()
+                    .command("execute at @p run fill ~-9 ~ ~-9 ~9 ~1 ~14 air replace short_grass")
+                    .command("execute at @p run fill ~-9 ~ ~-9 ~9 ~1 ~14 air replace tall_grass")
+                    .command("execute at @p run kill @e[type=item,distance=..18]").command("execute at @p run kill @e[type=experience_orb,distance=..18]")
+                    .command("item replace entity @p armor.head with air").command("item replace entity @p weapon.mainhand with air")
+                    .command("item replace entity @p weapon.offhand with scarlet:agatha_brooch[scarlet:agatha_form=finale]")
+                    .serverCheck(p -> Services.PLAYER_DATA.setMagic(p, com.yashjit.scarlet.magic.MagicState.DEFAULT))
+                    .face(0,0).look(2.9,14,5,1.0).hideHud(true).shot("agatha_own_hair",9)
+                    .then(mc -> mc.gui.setScreen(new com.yashjit.scarlet.client.costume.AgathaWardrobe(mc.player)),6)
+                    .shot("agatha_wardrobe",6)
+                    .then(mc -> {
+                        var box = mc.gui.screen().children().stream().filter(net.minecraft.client.gui.components.Checkbox.class::isInstance)
+                                .map(net.minecraft.client.gui.components.Checkbox.class::cast).findFirst().orElseThrow();
+                        box.onPress(new net.minecraft.client.input.KeyEvent(32, 0, 0));
+                    },6)
+                    .serverCheck(p -> Scarlet.LOG.info("Agatha wardrobe hair={} form={}", com.yashjit.scarlet.player.AgathaForm.styledHair(p), com.yashjit.scarlet.player.AgathaForm.of(p)))
+                    .then(mc -> mc.gui.setScreen(null),3).shot("agatha_optional_hair",6)
+                    .aimAt(0,-0.2,1.5).select(Spell.WITCH_RUNE).tap()
+                    .view(2.5,9,7,0,0,1).shot("agatha_circle",27)
+                    .view(5.4,2.2,6.8,0,0.8,1).shot("agatha_ward_ground",8)
+                    .command("execute at @p run summon witch ~ ~ ~10 {NoAI:1b,Tags:[\"agatha_ward_test\"]}")
+                    .command("gamemode survival @p").wardShot(false,false).wardShot(true,false).wardShot(false,true)
+                    .command("gamemode creative @p").command("kill @e[tag=agatha_ward_test]");
+            case "agatha_magic" -> s
+                    .command("gamemode creative @p").command("difficulty normal").command("gamerule send_command_feedback false").land()
+                    .command("item replace entity @p armor.head with air").command("item replace entity @p weapon.mainhand with air")
+                    .command("item replace entity @p weapon.offhand with scarlet:agatha_brooch[scarlet:agatha_form=finale]")
+                    .serverCheck(p -> {
+                        Services.PLAYER_DATA.setMagic(p, com.yashjit.scarlet.magic.MagicState.DEFAULT);
+                        Services.PLAYER_DATA.setCorruption(p, com.yashjit.scarlet.darkhold.Corruption.NONE);
+                        p.setHealth(p.getMaxHealth());
+                    })
+                    .levelGround(8,8,8,16).command("execute at @p run fill ~-7 ~ ~-7 ~7 ~ ~14 air replace short_grass")
+                    .anchor().playerCamera().camera(CameraType.FIRST_PERSON).face(0,8).then(mc -> mc.gui.hud.getChat().clearMessages(false), 2)
+                    .hideHud(false).wheel(true).wheelCursor(30,-35).shot("agatha_wheel",15).wheel(false)
+                    .then(mc -> mc.options.keyShift.setDown(true),2).wheel(true).wheelCursor(0,-42).shot("agatha_grimoire",12).wheel(false)
+                    .then(mc -> mc.options.keyShift.setDown(false),2).hideHud(true)
+                    .command("kill @e[tag=agatha_test]").command("execute at @p run summon witch ~ ~ ~6 {NoAI:1b,Tags:[\"agatha_test\"]}")
+                    .logAgathaTarget("summoned").aimAtNearest("minecraft:witch").view(6,2.6,3,0,1.15,3)
+                    .select(Spell.VIOLET_BLAST).hold(true).shot("agatha_blast",3).hold(false)
+                    .view(2.2,1.7,7.7,0,1.15,6).select(Spell.BINDING).tap().shot("agatha_chains",9)
+                    .view(5.8,2.2,3,0,1.15,3).select(Spell.SIPHON).hold(true).shot("agatha_partial",5).logAgathaTarget("partial")
+                    .then(mc -> {},20).hold(false)
+                    .serverCheck(p -> Scarlet.LOG.info("Agatha partial finished={} charge={}", !Magic.state(p).channeling(), com.yashjit.scarlet.magic.AgathaMagic.charge(p)))
+                    .view(2.8,1.7,7.5,0,1.1,6).select(Spell.MALEDICTION).tap().shot("agatha_curse",4)
+                    .select(Spell.NIGHTMARE).tap().shot("agatha_nightmare",6)
+                    .view(3.7,1.8,2.2,0,0.9,0.3).select(Spell.FAMILIAR).tap().shot("agatha_familiar",8)
+                    .select(Spell.DOUBLE).tap().shot("agatha_double",7)
+                    .command("kill @e[tag=agatha_test]").command("kill @e[tag=scarlet_conjured]")
+                    .command("effect clear @p").command("execute at @p run summon witch ~ ~ ~6 {NoAI:1b,Tags:[\"agatha_test\"]}")
+                    .logAgathaTarget("second summon").command("gamemode survival @p")
+                    .command("gamerule natural_health_regeneration false").command("effect give @p minecraft:resistance 100 0 true")
+                    .command("item replace entity @p weapon.offhand with scarlet:agatha_brooch[scarlet:agatha_form=finale,scarlet:siphon_charge=98]")
+                    .command("damage @p 2 minecraft:mob_attack by @e[tag=agatha_test,limit=1]")
+                    .serverCheck(p -> Scarlet.LOG.info("Agatha incoming charge={} HP={}", com.yashjit.scarlet.magic.AgathaMagic.charge(p),p.getHealth()))
+                    .then(mc -> {},20).command("item replace entity @p weapon.mainhand with air").aimAtNearest("minecraft:witch")
+                    .view(6.2,2.4,2.5,0,1.15,2.5).select(Spell.SIPHON).logAgathaTarget("ready")
+                    .hold(true).shot("agatha_siphon",14)
+                    .logAgathaTarget("full siphon").view(2.7,1.7,7.7,0,1.1,6).shot("agatha_ashen",50)
+                    .logAgathaTarget("exhaustion").view(6.2,2.4,2.5,0,1.15,2.5).shot("agatha_theft",27)
+                    .then(mc -> {},45).hold(false)
+                    .serverCheck(p -> Scarlet.LOG.info("Agatha drain result mastery={} stolen={} charge={} HP={}",
+                            Mastery.xp(p.getOffhandItem()),p.getOffhandItem().get(com.yashjit.scarlet.registry.ScarletDataComponents.STOLEN_SPELLS.get()),
+                            com.yashjit.scarlet.magic.AgathaMagic.charge(p),p.getHealth()))
+                    .logAgathaTarget("after drain").command("gamemode creative @p").aimAt(0,-0.4,4).view(6,5.5,7,0,0.35,4)
+                    .select(Spell.WITCH_RUNE).tap().shot("agatha_circle",14)
+                    .command("execute at @p run summon witch ~ ~ ~5 {NoAI:1b,Tags:[\"agatha_test\"]}")
+                    .aimAtNearest("minecraft:witch").command("gamemode survival @p")
+                    .serverCheck(p -> {
+                        p.setHealth(12);
+                        Services.PLAYER_DATA.setCorruption(p, Services.PLAYER_DATA.corruption(p).withOpened());
+                    }).select(Spell.VIOLET_BLAST).tap()
+                    .logAgathaTarget("Darkhold blast")
+                    .command("kill @e[tag=agatha_test]").command("gamemode creative @p");
+            case "agatha" -> s
+                    .command("gamemode creative @p")
+                    .command("execute as @p at @s positioned over motion_blocking_no_leaves run tp @s ~ ~ ~")
+                    .levelGround(7, 7, 7, 7)
+                    .command("execute at @p run fill ~-7 ~ ~-7 ~7 ~ ~7 minecraft:air replace minecraft:short_grass")
+                    .command("item replace entity @p armor.head with minecraft:air")
+                    .command("item replace entity @p weapon.mainhand with minecraft:air")
+                    .command("item replace entity @p weapon.offhand with scarlet:agatha_brooch")
+                    .face(0, 0).look(2.5, 17, 5, 0.95).shot("agatha_front", 40)
+                    .look(1.5, 12, 3, 1.44).shot("agatha_cameo", 8)
+                    .look(2.5, 154, 6, 0.95).shot("agatha_back", 8)
+                    .playerCamera().camera(CameraType.FIRST_PERSON).hideHud(false).shot("agatha_cuff", 12)
+                    .hideHud(true).suitUp().look(2.5, 17, 5, 0.95).shot("agnes_front", 12)
+                    .look(1.6, 38, 4, 1.49).shot("agnes_hair", 8)
+                    .look(2.5, 154, 6, 0.95).shot("agnes_back", 8)
+                    .suitUp().look(2.5, 17, 5, 0.95).shot("agatha_finale_front", 12)
+                    .look(1.6, 38, 4, 1.49).shot("agatha_finale_hair", 8)
+                    .look(2.5, 154, 6, 0.95).walk(true).shot("agatha_finale_train", 8).walk(false)
+                    .playerCamera().camera(CameraType.FIRST_PERSON).hideHud(false).shot("agatha_finale_sleeve", 12)
+                    .suitUp().hideHud(true).look(2.5, 17, 5, 0.95).shot("agatha_cycle", 12)
+                    .command("item replace entity @p weapon.offhand with minecraft:air")
+                    .hideHud(true).look(2.5, 17, 5, 0.95).shot("agatha_removed", 12);
+            case "speed" -> ("film".equals(WORLD_GIVEN) ? s.filmSet("plains", 7500, 0, 9500) : s)
+                    .levelGround(8, 8, 8, 24)
+                    .command("execute at @a run fill ~-8 ~ ~-8 ~8 ~ ~24 minecraft:air replace minecraft:short_grass")
+                    .command("item replace entity @a armor.head with minecraft:air")
+                    .command("clear @a scarlet:speed_suit").command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .face(0, 0).look(2.6, 18, 4, 1.05).shot("speed_before", 15)
+                    .command("item replace entity @a armor.head with scarlet:speed_goggles").shot("speed_raised", 15)
+                    .suitUp().shot("speed_street", 18).suitUp().shot("speed_reset", 18)
+                    .command("item replace entity @a inventory.9 with scarlet:speed_suit")
+                    .suitUp().shot("speed_change", 6).shot("speed_front", 18)
+                    .look(1.65, 22, 5, 1.48).shot("speed_detail", 8)
+                    .look(2.7, 154, 5, 1.0).shot("speed_back", 8)
+                    .playerCamera().camera(CameraType.FIRST_PERSON).hideHud(false).shot("speed_sleeve", 8)
+                    .hideHud(true).camera(CameraType.THIRD_PERSON_FRONT).walk(true).sprint(true).shot("speed_sprint", 16)
+                    .sprint(false).walk(false).look(2.6, 16, 4, 1.0)
+                    .command("clear @a scarlet:speed_suit").shot("speed_suit_removed", 15)
+                    .command("item replace entity @a armor.head with minecraft:air").shot("speed_done", 15);
+            case "wiccan_constructs" -> s
+                    .command("gamemode creative @a").land().anchor().place(0, 0, 32).anchor()
+                    .serverCheck(p -> Services.PLAYER_DATA.setMagic(p, com.yashjit.scarlet.magic.MagicState.DEFAULT))
+                    .command("item replace entity @a armor.head with scarlet:wiccan_crown")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .ensureUnsuited().suitUp().face(0, 0).hideHud(true)
+                    .view(5, 3.5, 2, 0, 0.65, 1.8)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.WEAVE.ordinal())), 0)
+                    .shot("billy_weave_tiles", 7)
+                    .serverCheck(p -> Scarlet.LOG.info("Showcase Weave platform: {}", p.level().getBlockState(p.blockPosition().offset(0, 0, 2))))
+                    .look(2.7, 24, 4, 0.95)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.AEGIS.ordinal())), 0)
+                    .shot("billy_aegis", 14)
+                    .serverCheck(p -> Scarlet.LOG.info("Showcase Aegis absorption: {}", p.getAbsorptionAmount()))
+                    .command("execute at @p run setblock ~ ~1 ~4 minecraft:stone").aimAt(0.5, 1.5, 4.5)
+                    .view(3.3, 2.3, 5.8, 0.5, 1.5, 4.5)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.TRANSMUTE.ordinal())), 0)
+                    .shot("billy_transmute", 7)
+                    .serverCheck(p -> Scarlet.LOG.info("Showcase Transmute result: {}", p.level().getBlockState(p.blockPosition().offset(0, 1, 4))))
+                    .command("execute at @p run setblock ~ ~1 ~4 minecraft:air");
+            case "wiccan_combat" -> s
+                    .command("gamemode creative @a").land().anchor().place(0, 0, 20)
+                    .serverCheck(p -> Services.PLAYER_DATA.setMagic(p, com.yashjit.scarlet.magic.MagicState.DEFAULT))
+                    .command("item replace entity @a armor.head with scarlet:wiccan_crown")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .ensureUnsuited().suitUp().face(0, 0).hideHud(true)
+                    .command("execute at @p run summon minecraft:iron_golem ~ ~ ~6 {NoAI:1b,Tags:[\"wiccan_focus\"]}")
+                    .anchor().aimAtNearest("minecraft:iron_golem")
+                    .view(7, 2.6, 2.8, 0, 1.15, 3).select(Spell.STARFIRE)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.STARFIRE.ordinal())), 0)
+                    .shot("billy_starfire", 1).shot("billy_star_impact", 0)
+                    .select(Spell.ARC_BEAM).hold(true).shot("billy_arc_beam", 14)
+                    .playerCamera().camera(CameraType.FIRST_PERSON).hideHud(false).shot("billy_arc_first_person", 6).hold(false)
+                    .hideHud(true).look(9.5, 42, 23, 0.85).select(Spell.SHOCKWAVE)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.SHOCKWAVE.ordinal())), 0)
+                    .shot("billy_wave_gather", 3).shot("billy_wave_front", 4)
+                    .shot("billy_wave_echo", 4).command("kill @e[tag=wiccan_focus]");
+            case "wiccan_magic" -> s
+                    .serverCheck(p -> {
+                        if (p.level().dimension().identifier().equals(Scarlet.id("witches_road")))
+                            com.yashjit.scarlet.magic.WiccanMagic.leaveRoad(p);
+                    })
+                    .then(mc -> {
+                        var server = mc.getSingleplayerServer();
+                        var id = mc.player.getUUID();
+                        if (server != null) server.execute(() -> Services.PLAYER_DATA.setMagic(server.getPlayerList().getPlayer(id),
+                                com.yashjit.scarlet.magic.MagicState.DEFAULT));
+                    }, 3)
+                    .command("gamerule send_command_feedback false")
+                    .command("gamemode creative @a")
+                    .command("item replace entity @a armor.head with scarlet:wiccan_crown")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .ensureUnsuited().suitUp().face(0,0).logMastery("Billy creative")
+                    .then(mc -> mc.gui.hud.getChat().clearMessages(false),2)
+                    .look(3.4,12,8,1.0).hideHud(false).wheel(true).wheelCursor(0,-45)
+                    .shot("wiccan_power_wheel",18).wheel(false)
+                    .then(mc -> mc.options.keyShift.setDown(true),2).wheel(true).wheelCursor(30,10)
+                    .shot("wiccan_grimoire",12).wheel(false).then(mc -> mc.options.keyShift.setDown(false),2)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.DEMIURGE.ordinal())),4)
+                    .wheel(true).wheelCursor(0,-45).shot("wiccan_divine_wheel",12).wheel(false).hideHud(true)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.RUNIC_DOMAIN.ordinal())),4)
+                    .look(6.0,25,48,0.65).shot("wiccan_domain",12)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.ARC_BEAM.ordinal())),6)
+                    .shot("wiccan_beam",4).then(mc -> Services.NETWORK.sendToServer(new CastPayload(false, Spell.ARC_BEAM.ordinal())),4)
+                    .playerCamera().serverCheck(p -> {
+                        Scarlet.LOG.info("Wiccan Road cast: {}", Magic.check(p, Spell.WITCHES_ROAD,p.level().getGameTime()));
+                        Magic.handleCast(p,true,Spell.WITCHES_ROAD.ordinal());
+                    })
+                    .serverCheck(p -> Scarlet.LOG.info("Wiccan Road entry: {}", p.level().dimension().identifier()))
+                    .command("item replace entity @a armor.head with minecraft:air")
+                    .command("execute as @p at @s run wiccan return")
+                    .serverCheck(p -> Scarlet.LOG.info("Wiccan crownless return: {} with {}", p.level().dimension().identifier(), p.getItemBySlot(EquipmentSlot.HEAD)))
+                    .command("gamemode survival @a").command("item replace entity @a armor.head with scarlet:wiccan_crown")
+                    .logMastery("Billy beginner")
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.DEMIURGE.ordinal())),3)
+                    .serverCheck(p -> Scarlet.LOG.info("Wiccan beginner ultimate: {}, form expires {}",
+                            Magic.check(p,Spell.DEMIURGE,p.level().getGameTime()), Magic.state(p).demiurgeUntil()))
+                    .command("advancement grant @a only scarlet:study/stone_leaf")
+                    .command("gamemode creative @a")
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara")
+                    .hideHud(false).wheel(true).shot("wanda_wheel_after_billy",16).wheel(false);
+            case "wiccan" -> ("film".equals(WORLD_GIVEN) ? s.filmSet("plains", 7500, 0, 9500) : s)
+                    .land().anchor().place(0, 0, 20)
+                    .serverCheck(p -> Services.PLAYER_DATA.setMagic(p, com.yashjit.scarlet.magic.MagicState.DEFAULT))
+                    .command("item replace entity @a armor.head with scarlet:wiccan_crown")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .ensureUnsuited().face(0, 0).logMastery("Wiccan equipped")
+                    .look(1.5, 18, 4, 1.7).shot("wiccan_crown", 12)
+                    .look(2.6, 14, 4, 1.0).suitUp().shot("wiccan_weave", 14).shot("wiccan_front", 26)
+                    .look(2.7, 155, 6, 1.0).shot("wiccan_cloak", 8)
+                    .walk(true).shot("wiccan_cloak_walking", 12).walk(false)
+                    .playerCamera().camera(CameraType.FIRST_PERSON).hideHud(false).shot("wiccan_sleeves", 8)
+                    .command("gamemode creative @a")
+                    .command("item replace entity @a weapon.mainhand with minecraft:air")
+                    .serverCheck(p -> Scarlet.LOG.info("Showcase Demiurge before cast: {}", Magic.check(p, Spell.DEMIURGE, p.level().getGameTime())))
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.DEMIURGE.ordinal())), 4)
+                    .serverCheck(p -> Scarlet.LOG.info("Showcase Demiurge active: {}", com.yashjit.scarlet.magic.WiccanSpells.ascended(p)))
+                    .hideHud(true).look(2.6, 14, 4, 1.0).shot("wiccan_demiurge_front", 14)
+                    .look(2.7, 155, 6, 1.0).shot("wiccan_demiurge_cloak", 8)
+                    .playerCamera().camera(CameraType.FIRST_PERSON).hideHud(false).shot("wiccan_demiurge_sleeves", 8)
+                    .hideHud(true).look(2.6, 14, 4, 1.0).suitUp().shot("wiccan_toggled_off", 40)
+                    .suitUp().shot("wiccan_returned", 40).command("item replace entity @a armor.head with minecraft:air")
+                    .shot("wiccan_dismiss", 12).shot("wiccan_dismissed", 30)
+                    .command("item replace entity @a armor.head with scarlet:wiccan_crown")
+                    .hideHud(false).select(Spell.ARC_BEAM).shot("wiccan_caption", 9).hideHud(true)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.LEVITATION.ordinal())), 15)
+                    .look(3.0, 20, 15, 0.8).shot("wiccan_hover", 8).land()
+                    .command("item replace entity @a armor.head with scarlet:witch_tiara")
+                    .hideHud(false).select(Spell.TELEKINESIS).shot("wanda_caption", 9).hideHud(true)
+                    .then(mc -> Services.NETWORK.sendToServer(new CastPayload(true, Spell.LEVITATION.ordinal())), 20)
+                    .look(3.0, 20, 15, 0.8).shot("wanda_hover", 8).land();
             case "suit" -> s
                     .command("item replace entity @a armor.head with scarlet:witch_tiara")
                     .command("item replace entity @a weapon.mainhand with minecraft:air")
@@ -6269,6 +6550,55 @@ public final class Showcase {
 
         Scene select(Spell spell) {
             return then(minecraft -> Services.NETWORK.sendToServer(new SelectSpellPayload(spell.ordinal())), 4);
+        }
+
+        Scene logCovenDrain() {
+            return serverCheck(p -> {
+                var survivors=p.level().getEntitiesOfClass(com.yashjit.scarlet.entity.WanderingWitch.class,p.getBoundingBox().inflate(40));
+                Scarlet.LOG.info("Coven drain active={} hand={} victims={}",Magic.state(p).channeling(Spell.SIPHON),p.getMainHandItem(),
+                        survivors.stream().map(w -> w.getHealth()+" HP / "+w.distanceTo(p)+" blocks / reserve "+((com.yashjit.scarlet.magic.AgathaMagic.InnateMagic)(Object)w).scarlet$remainingMagic()).toList());
+            });
+        }
+
+        Scene wardShot(boolean potion, boolean outgoing) {
+            net.minecraft.world.entity.projectile.Projectile[] shot = new net.minecraft.world.entity.projectile.Projectile[1];
+            return serverCheck(p -> {
+                var witch = p.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Witch.class, p.getBoundingBox().inflate(16),
+                        w -> w.entityTags().contains("agatha_ward_test")).getFirst();
+                var source = outgoing ? p : witch;
+                var projectile = potion ? net.minecraft.world.entity.EntityTypes.SPLASH_POTION.create(p.level(), net.minecraft.world.entity.EntitySpawnReason.TRIGGERED)
+                        : new com.yashjit.scarlet.entity.ChaosBolt(com.yashjit.scarlet.registry.ScarletEntities.CHAOS_BOLT.get(), p.level());
+                projectile.setOwner(source);
+                projectile.setPos(source.getEyePosition().add(0,0,outgoing ? 0.7 : -0.7));
+                projectile.setDeltaMovement(0,0,outgoing ? 1.1 : -1.1);
+                shot[0] = projectile;
+                p.level().addFreshEntity(projectile);
+            }).then(mc -> {},3).shot(potion ? "agatha_ward_potion" : outgoing ? "agatha_ward_outgoing" : "agatha_ward_impact",1)
+                    .serverCheck(p -> Scarlet.LOG.info("Agatha ward potion={} outgoing={} removed={} distance={} playerHP={}",
+                            potion,outgoing,shot[0].isRemoved(),shot[0].distanceTo(p),p.getHealth()));
+        }
+
+        Scene logAgathaTarget(String stage) {
+            return serverCheck(p -> {
+                var witches = p.level().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                        p.getBoundingBox().inflate(20), e -> e.entityTags().contains("agatha_test") && e.isAlive());
+                Scarlet.LOG.info("Agatha {}: targets={} targetHP={} channel={} playerHP={}", stage, witches.size(),
+                        witches.isEmpty() ? 0 : witches.getFirst().getHealth(), Magic.state(p).channeling(Spell.SIPHON), p.getHealth());
+                if (stage.equals("ready")) Scarlet.LOG.info("Agatha prepared {} check={} mainHand={} position={} look={}",
+                        Magic.state(p).selectedSpell(), Magic.check(p, Spell.SIPHON, p.level().getGameTime()),
+                        p.getMainHandItem(), p.position(), p.getLookAngle());
+            });
+        }
+
+        Scene serverCheck(java.util.function.Consumer<ServerPlayer> check) {
+            return then(mc -> {
+                var server = mc.getSingleplayerServer();
+                var id = mc.player.getUUID();
+                if (server != null) server.executeBlocking(() -> {
+                    var player = server.getPlayerList().getPlayer(id);
+                    if (player != null) check.accept(player);
+                });
+            }, 3);
         }
 
         Scene wheel(boolean down) {

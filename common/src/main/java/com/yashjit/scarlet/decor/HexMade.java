@@ -4,6 +4,7 @@ import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.hex.Hex;
 import com.yashjit.scarlet.hex.HexData;
 import com.yashjit.scarlet.hex.HexShape;
+import com.yashjit.scarlet.hex.HexSnapshot;
 import com.yashjit.scarlet.hex.Hexes;
 import com.yashjit.scarlet.hex.town.Terrain;
 import com.yashjit.scarlet.registry.ScarletDataComponents;
@@ -11,7 +12,9 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -23,13 +26,20 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.PlayerEnderChestContainer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BundleContents;
 import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -47,6 +57,7 @@ public final class HexMade {
     public static final int FADE_TICKS = 30;
     private static final int CHECK_EVERY = 5;
     private static final int PLACED_EVERY = 10;
+    private static final Map<ServerPlayer, Vec3> OPENED_AT = new WeakHashMap<>();
 
     private HexMade() {
     }
@@ -71,6 +82,29 @@ public final class HexMade {
         return hex != null && HexShape.contains(hex.center(), Hexes.wallRadius(hex, level.getGameTime()), at);
     }
 
+    /** Whether something may be put down at a spot: anything not made by a Hex, or inside the Hex that made it. */
+    public static boolean canPlace(Level level, ItemStack stack, Vec3 at) {
+        UUID maker = maker(stack);
+        if (maker == null) {
+            return true;
+        }
+        if (level instanceof ServerLevel server) {
+            return inside(server, maker, at);
+        }
+        double now = level.getGameTime();
+        for (HexSnapshot hex : Hexes.clientHexes()) {
+            if (hex.caster().equals(maker)) {
+                return HexShape.contains(hex.center(), Hexes.wallRadius(hex, now), at);
+            }
+        }
+        return false;
+    }
+
+    /** Records where a block container was opened from, so double chests and the like are checked where they stand. */
+    public static void openedAt(ServerPlayer player, Vec3 at) {
+        OPENED_AT.put(player, at);
+    }
+
     public static void addTooltip(ItemStack stack, Consumer<Component> lines) {
         if (maker(stack) != null) {
             lines.accept(Component.translatable("item.scarlet.hex_made").withStyle(ChatFormatting.RED));
@@ -80,61 +114,99 @@ public final class HexMade {
     // ---------------------------------------------------------------- carried
 
     /**
-     * Everything a Hex made that someone carries, or has open in front of them, while they are outside its Hex.
+     * Everything a Hex made that someone carries, or has open in front of them, while it is outside its Hex.
      */
     public static void tick(ServerPlayer player) {
-        if (player.tickCount % CHECK_EVERY != 0 || player.isSpectator()) {
+        if (player.isSpectator()) {
             return;
         }
         ServerLevel level = player.level();
         long now = level.getGameTime();
         Vec3 at = player.position();
-        boolean gone = false;
         Inventory inventory = player.getInventory();
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            ItemStack stack = inventory.getItem(slot);
-            ItemStack after = check(level, at, stack, now);
-            if (after != stack) {
-                inventory.setItem(slot, after);
-                gone = true;
-            }
-        }
+        PlayerEnderChestContainer enderChest = player.getEnderChestInventory();
         AbstractContainerMenu menu = player.containerMenu;
-        ItemStack carried = menu.getCarried();
-        ItemStack after = check(level, at, carried, now);
-        if (after != carried) {
-            menu.setCarried(after);
-            gone = true;
-        }
-        if (menu != player.inventoryMenu) {
+        boolean gone = false;
+        Vec3 goneAt = at.add(0.0, 1.0, 0.0);
+        if (menu == player.inventoryMenu) {
+            OPENED_AT.remove(player);
+        } else {
+            Vec3 fallbackAt = OPENED_AT.getOrDefault(player, at);
             for (Slot slot : menu.slots) {
-                if (slot.container == inventory) {
+                if (slot.container == inventory || slot.container == enderChest) {
                     continue;
                 }
+                Vec3 slotAt = containerAt(slot.container, fallbackAt);
                 ItemStack stack = slot.getItem();
-                ItemStack left = check(level, at, stack, now);
-                if (left != stack) {
+                boolean changed = stripNested(level, slotAt, stack);
+                ItemStack left = check(level, slotAt, stack, now, true);
+                if (left != stack || changed) {
                     slot.set(left);
+                    if (left.isEmpty() && !stack.isEmpty() || changed) {
+                        gone = true;
+                        goneAt = slotAt;
+                    }
+                }
+            }
+        }
+        if (player.tickCount % CHECK_EVERY == 0) {
+            for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+                ItemStack stack = inventory.getItem(slot);
+                boolean changed = stripNested(level, at, stack);
+                ItemStack after = check(level, at, stack, now, false);
+                if (after != stack || changed) {
+                    inventory.setItem(slot, after);
+                    if (after.isEmpty() && !stack.isEmpty() || changed) {
+                        gone = true;
+                    }
+                }
+            }
+            for (int slot = 0; slot < enderChest.getContainerSize(); slot++) {
+                ItemStack stack = enderChest.getItem(slot);
+                boolean changed = stripNested(level, at, stack);
+                ItemStack after = check(level, at, stack, now, false);
+                if (after != stack || changed) {
+                    enderChest.setItem(slot, after);
+                    if (after.isEmpty() && !stack.isEmpty() || changed) {
+                        gone = true;
+                    }
+                }
+            }
+            ItemStack carried = menu.getCarried();
+            boolean changed = stripNested(level, at, carried);
+            ItemStack after = check(level, at, carried, now, false);
+            if (after != carried || changed) {
+                menu.setCarried(after);
+                if (after.isEmpty() && !carried.isEmpty() || changed) {
                     gone = true;
                 }
             }
         }
         if (gone) {
-            glitch(level, at.add(0.0, 1.0, 0.0), 0.4);
+            glitch(level, goneAt, 0.4);
         }
     }
 
+    private static Vec3 containerAt(Container container, Vec3 fallback) {
+        if (container instanceof BlockEntity blockEntity) {
+            return Vec3.atCenterOf(blockEntity.getBlockPos());
+        }
+        if (container instanceof Entity entity) {
+            return entity.position();
+        }
+        return fallback;
+    }
+
     /**
-     * What becomes of something carried to a point: as it was, glitching out, or gone; a box carried with things a Hex
-     * made in it loses them.
+     * What becomes of something at a point: as it was, glitching out, or gone.
      */
-    private static ItemStack check(ServerLevel level, Vec3 at, ItemStack stack, long now) {
+    private static ItemStack check(ServerLevel level, Vec3 at, ItemStack stack, long now, boolean immediate) {
         if (stack.isEmpty()) {
             return stack;
         }
         UUID maker = maker(stack);
         if (maker == null) {
-            return emptied(level, at, stack);
+            return stack;
         }
         Long since = stack.get(ScarletDataComponents.HEX_FADING.get());
         if (inside(level, maker, at)) {
@@ -143,6 +215,9 @@ public final class HexMade {
             }
             return stack;
         }
+        if (immediate) {
+            return ItemStack.EMPTY;
+        }
         if (since == null) {
             stack.set(ScarletDataComponents.HEX_FADING.get(), now);
             return stack;
@@ -150,34 +225,92 @@ public final class HexMade {
         return now - since >= FADE_TICKS ? ItemStack.EMPTY : stack;
     }
 
-    private static ItemStack emptied(ServerLevel level, Vec3 at, ItemStack stack) {
-        ItemContainerContents contents = stack.get(DataComponents.CONTAINER);
-        if (contents == null || contents == ItemContainerContents.EMPTY) {
-            return stack;
+    /**
+     * Strips anything a Hex made out of a box or bundle carried or kept outside that Hex, however deep inside it lies.
+     */
+    private static boolean stripNested(ServerLevel level, Vec3 at, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
         }
-        List<ItemStack> items = new ArrayList<>(contents.itemCopies().toList());
         boolean changed = false;
-        for (int k = 0; k < items.size(); k++) {
-            UUID maker = maker(items.get(k));
-            if (maker != null && !inside(level, maker, at)) {
-                items.set(k, ItemStack.EMPTY);
+        ItemContainerContents contents = stack.get(DataComponents.CONTAINER);
+        if (contents != null && contents != ItemContainerContents.EMPTY) {
+            List<ItemStack> items = new ArrayList<>(contents.itemCopies().toList());
+            boolean boxChanged = false;
+            for (int k = 0; k < items.size(); k++) {
+                ItemStack inner = items.get(k);
+                UUID maker = maker(inner);
+                if (maker != null && !inside(level, maker, at)) {
+                    items.set(k, ItemStack.EMPTY);
+                    boxChanged = true;
+                } else if (stripNested(level, at, inner)) {
+                    boxChanged = true;
+                }
+            }
+            if (boxChanged) {
+                stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items));
                 changed = true;
             }
         }
-        if (changed) {
-            stack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items));
+        BundleContents bundle = stack.get(DataComponents.BUNDLE_CONTENTS);
+        if (bundle != null && !bundle.isEmpty()) {
+            List<ItemStack> items = bundle.itemCopies().toList();
+            List<ItemStack> kept = new ArrayList<>(items.size());
+            boolean bundleChanged = false;
+            for (ItemStack inner : items) {
+                UUID maker = maker(inner);
+                if (maker != null && !inside(level, maker, at)) {
+                    bundleChanged = true;
+                } else {
+                    if (stripNested(level, at, inner)) {
+                        bundleChanged = true;
+                    }
+                    kept.add(inner);
+                }
+            }
+            if (bundleChanged) {
+                stack.set(DataComponents.BUNDLE_CONTENTS, kept.isEmpty() ? BundleContents.EMPTY : bundle.copyWithContents(kept.stream()));
+                changed = true;
+            }
         }
-        return stack;
+        return changed;
     }
 
     /**
-     * Something a Hex made, dropped and lying outside it, goes at once.
+     * Something a Hex made, dropped and lying outside it, goes at once; a box or bundle dropped outside loses what a Hex made inside it.
      */
     public static void tickDropped(ServerLevel level, ItemEntity item) {
-        UUID maker = maker(item.getItem());
+        ItemStack stack = item.getItem();
+        UUID maker = maker(stack);
         if (maker != null && !inside(level, maker, item.position())) {
             glitch(level, item.position().add(0.0, 0.25, 0.0), 0.2);
             item.discard();
+            return;
+        }
+        if (stripNested(level, item.position(), stack)) {
+            item.setItem(stack.copy());
+            glitch(level, item.position().add(0.0, 0.25, 0.0), 0.2);
+        }
+    }
+
+    /**
+     * Something a Hex made, hung in a frame outside it, goes at once.
+     */
+    public static void tickFrame(ServerLevel level, ItemFrame frame) {
+        ItemStack held = frame.getItem();
+        if (held.isEmpty()) {
+            return;
+        }
+        UUID maker = maker(held);
+        if (maker != null && !inside(level, maker, frame.position())) {
+            frame.setItem(ItemStack.EMPTY, false);
+            glitch(level, frame.position(), 0.25);
+            return;
+        }
+        ItemStack copy = held.copy();
+        if (stripNested(level, frame.position(), copy)) {
+            frame.setItem(copy, false);
+            glitch(level, frame.position(), 0.25);
         }
     }
 
@@ -244,7 +377,7 @@ public final class HexMade {
     }
 
     /** Something a Hex made going: a scatter of scarlet, and the sound of a set losing its picture. */
-    private static void glitch(ServerLevel level, Vec3 at, double spread) {
+    public static void glitch(ServerLevel level, Vec3 at, double spread) {
         level.sendParticles(new DustParticleOptions(ScarletPalette.SCARLET, 1.0F), at.x, at.y, at.z, 14, spread, spread, spread, 0.0);
         level.playSound(null, at.x, at.y, at.z, SoundEvents.RESPAWN_ANCHOR_DEPLETE.value(), SoundSource.PLAYERS, 0.35F, 1.8F);
     }

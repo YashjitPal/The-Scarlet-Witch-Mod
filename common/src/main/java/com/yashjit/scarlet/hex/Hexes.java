@@ -806,7 +806,7 @@ public final class Hexes {
         for (Hex hex : data.all()) {
             ServerPlayer caster = level.getServer().getPlayerList().getPlayer(hex.caster);
             // an offline caster still has their crown; the Hex waits for them
-            boolean crowned = caster == null || caster.isAlive() && CrownItem.isWearingCrown(caster);
+            boolean crowned = caster == null || caster.isAlive() && CrownItem.hasScarletMagic(caster);
             if (caster != null && !caster.getGameProfile().name().equals(hex.casterName)) {
                 hex.casterName = caster.getGameProfile().name();
             }

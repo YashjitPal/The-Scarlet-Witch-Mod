@@ -54,12 +54,13 @@ public final class TelekinesisFx {
             return;
         }
         ClientLevel level = Minecraft.getInstance().level;
-        try (Glow.Darkening ignored = Glow.darkening(level == null ? 0.0F : CorruptionClient.darkness(level.getEntity(payload.entityId())))) {
-            burst(payload, kind);
+        Entity caster = level == null ? null : level.getEntity(payload.entityId());
+        try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(caster))) {
+            burst(payload, kind, Pixels.Ramp.ofCaster(caster));
         }
     }
 
-    private static void burst(MagicEventPayload payload, int kind) {
+    private static void burst(MagicEventPayload payload, int kind, Pixels.Ramp ramp) {
         RandomSource random = ScarletFx.random();
         Vec3 at = payload.position();
         float density = ScarletFx.density();
@@ -67,10 +68,10 @@ public final class TelekinesisFx {
         for (int i = 0, n = Math.round(sparks * density); i < n; i++) {
             Vec3 out = randomUnit(random);
             ScarletFx.spark(at, out.scale(0.12 + random.nextDouble() * 0.2).add(0.0, 0.05, 0.0), 6 + random.nextInt(8), 0.028F,
-                    random.nextFloat() < 0.35F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.012F, 0.85F);
+                    ramp, random.nextFloat() < 0.35F ? Pixels.HOT : Pixels.BRIGHT, 0.012F, 0.85F);
         }
         for (int i = 0, n = Math.round(10 * density); i < n; i++) {
-            ChaosDust.spawn(at.add(randomUnit(random).scale(0.5)), randomUnit(random).scale(0.06));
+            ChaosDust.spawn(at.add(randomUnit(random).scale(0.5)), randomUnit(random).scale(0.06), ramp);
         }
     }
 
@@ -97,16 +98,18 @@ public final class TelekinesisFx {
             }
             // sparks shed off it as it is carried
             AABB box = target.getBoundingBox();
-            float darkness = CorruptionClient.darkness(level.getEntity(entry.getIntKey()));
+            Entity caster = level.getEntity(entry.getIntKey());
+            Pixels.Ramp ramp = Pixels.Ramp.ofCaster(caster);
+            float darkness = CorruptionClient.darkness(caster);
             try (Glow.Darkening ignored = Glow.darkening(darkness)) {
                 for (int i = 0, n = count(random, 2.2F * ScarletFx.density()); i < n; i++) {
                     Vec3 at = new Vec3(Mth.lerp(random.nextDouble(), box.minX, box.maxX), Mth.lerp(random.nextDouble(), box.minY, box.maxY),
                             Mth.lerp(random.nextDouble(), box.minZ, box.maxZ));
                     ScarletFx.spark(at, randomUnit(random).scale(0.02).add(0.0, 0.015, 0.0), 10 + random.nextInt(8), 0.022F,
-                            random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.001F, 0.9F);
+                            ramp, random.nextFloat() < 0.3F ? Pixels.HOT : Pixels.BRIGHT, -0.001F, 0.9F);
                 }
                 if (random.nextFloat() < 0.4F * ScarletFx.density()) {
-                    ChaosDust.spawn(box.getCenter().add(randomUnit(random).scale(box.getSize() * 0.6)), randomUnit(random).scale(0.01));
+                    ChaosDust.spawn(box.getCenter().add(randomUnit(random).scale(box.getSize() * 0.6)), randomUnit(random).scale(0.01), ramp);
                 }
             }
             if (random.nextFloat() < 0.5F * darkness * ScarletFx.density()) {
@@ -150,7 +153,7 @@ public final class TelekinesisFx {
             Vector3f right = Hands.palm(caster, HumanoidArm.RIGHT).subtract(camera).toVector3f();
             Vector3f left = Hands.palm(caster, HumanoidArm.LEFT).subtract(camera).toVector3f();
             draws.add(new Draw(center.subtract(camera).toVector3f(), size, target.getBbWidth(), target.getBbHeight(), right, left, presence,
-                    ScarletFx.isFirstPersonViewOf(caster), caster.getId() * 0.618F, CorruptionClient.darkness(caster)));
+                    ScarletFx.isFirstPersonViewOf(caster), caster.getId() * 0.618F, CorruptionClient.darkness(caster), Pixels.Ramp.ofCaster(caster)));
         }
         if (draws.isEmpty()) {
             return;
@@ -191,7 +194,7 @@ public final class TelekinesisFx {
         PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y, c.z);
         float rx = (draw.width() * 0.5F + 0.25F) / Pixels.SIZE;
         float ry = (draw.height() * 0.5F + 0.25F) / Pixels.SIZE;
-        int color = GlowPass.tint(ScarletPalette.GLASS, 0.5F * draw.presence());
+        int color = GlowPass.tint(draw.ramp() == Pixels.Ramp.WICCAN ? 0x418DFF : ScarletPalette.GLASS, 0.5F * draw.presence());
         int reachX = (int) Math.ceil(rx);
         int reachY = (int) Math.ceil(ry);
         for (int i = -reachX; i < reachX; i++) {
@@ -215,9 +218,9 @@ public final class TelekinesisFx {
         Vector3f c = draw.center();
         float radius = draw.width() * 0.5F + 0.22F;
         float half = draw.height() * 0.5F + 0.12F;
-        Wisps.helix(sprite, c, radius, radius, -half, half, 2, 1.4F, 0.11F, time, draw.presence(), draw.seed(), 0);
+        Wisps.helix(sprite, c, radius, radius, -half, half, 2, 1.4F, 0.11F, time, draw.presence(), draw.seed(), 0, draw.ramp());
         Wisps.helix(sprite, c, radius * 1.12F, radius * 0.9F, -half * 0.8F, half * 0.9F, 1, 1.1F, -0.08F, time, draw.presence() * 0.8F,
-                draw.seed() + 1.7F, 5);
+                draw.seed() + 1.7F, 5, draw.ramp());
     }
 
     /**
@@ -231,7 +234,7 @@ public final class TelekinesisFx {
         Vector3f grip = new Vector3f(c).add(Mth.sin(seed * 3.1F) * draw.width() * 0.4F, Mth.sin(seed * 1.7F) * draw.height() * 0.35F,
                 Mth.cos(seed * 2.3F) * draw.width() * 0.4F);
         float curl = Math.min(0.6F, grip.distance(palm) * 0.08F);
-        Wisps.tendril(sprite, palm, grip, 1.0F, curl, seed, time, draw.presence() * (draw.own() ? 0.75F : 1.0F), 0.09F, index + 11);
+        Wisps.tendril(sprite, palm, grip, 1.0F, curl, seed, time, draw.presence() * (draw.own() ? 0.75F : 1.0F), 0.09F, index + 11, draw.ramp());
     }
 
     private static int count(RandomSource random, float expected) {
@@ -243,7 +246,7 @@ public final class TelekinesisFx {
     }
 
     private record Draw(Vector3f center, float size, float width, float height, Vector3f rightPalm, Vector3f leftPalm, float presence, boolean own,
-                        float seed, float darkness) {
+                        float seed, float darkness, Pixels.Ramp ramp) {
     }
 
     /**

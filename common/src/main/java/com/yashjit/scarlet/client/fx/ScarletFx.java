@@ -74,7 +74,13 @@ public final class ScarletFx {
      */
     public static void spark(Vec3 position, Vec3 velocity, int life, float size, int coreColor, int haloColor, float gravity, float drag) {
         if (SPARKS.size() < budget()) {
-            SPARKS.add(new Spark(position, velocity, life, size, coreColor, haloColor, gravity, drag, RANDOM.nextFloat() * 100.0F, Glow.darkness()));
+            spark(position, velocity, life, size, Pixels.Ramp.CHAOS, Pixels.stepOf(coreColor), gravity, drag);
+        }
+    }
+
+    static void spark(Vec3 position, Vec3 velocity, int life, float size, Pixels.Ramp ramp, int start, float gravity, float drag) {
+        if (SPARKS.size() < budget()) {
+            SPARKS.add(new Spark(position, velocity, life, size, ramp, start, gravity, drag, RANDOM.nextFloat() * 100.0F, Glow.darkness()));
         }
     }
 
@@ -85,7 +91,7 @@ public final class ScarletFx {
      */
     public static void smoke(Vec3 position, Vec3 velocity, int life, float size, float density) {
         if (SMOKE.size() < budget() / 4) {
-            SMOKE.add(new Spark(position, velocity, life, size, 0, 0, -0.0015F, 0.9F, density, 0.0F));
+            SMOKE.add(new Spark(position, velocity, life, size, Pixels.Ramp.CHAOS, Pixels.SHADOW, -0.0015F, 0.9F, density, 0.0F));
         }
     }
 
@@ -197,8 +203,7 @@ public final class ScarletFx {
         int age;
         final int life;
         final float size;
-        final int coreColor;
-        final int haloColor;
+        final Pixels.Ramp ramp;
         final float gravity;
         final float drag;
         /** For a spark, the phase of its flicker; for smoke, how dark it is. */
@@ -207,7 +212,7 @@ public final class ScarletFx {
         /** The step of the ramp it starts at. */
         final int start;
 
-        Spark(Vec3 position, Vec3 velocity, int life, float size, int coreColor, int haloColor, float gravity, float drag, float seed, float darkness) {
+        Spark(Vec3 position, Vec3 velocity, int life, float size, Pixels.Ramp ramp, int start, float gravity, float drag, float seed, float darkness) {
             this.x = this.xo = position.x;
             this.y = this.yo = position.y;
             this.z = this.zo = position.z;
@@ -216,13 +221,12 @@ public final class ScarletFx {
             this.vz = velocity.z;
             this.life = life;
             this.size = size;
-            this.coreColor = coreColor;
-            this.haloColor = haloColor;
+            this.ramp = ramp;
             this.gravity = gravity;
             this.drag = drag;
             this.seed = seed;
             this.darkness = darkness;
-            this.start = Pixels.stepOf(coreColor);
+            this.start = start;
         }
 
         boolean tick() {
@@ -260,7 +264,7 @@ public final class ScarletFx {
             if (Pixels.hash(age, 0, Float.floatToIntBits(seed), 3) < 0.15F) {
                 step++;
             }
-            return Pixels.ramp(Math.min(step, Pixels.WINE), t > 0.9F ? 0.5F : 1.0F);
+            return Glow.withAlpha(ramp.color(Math.min(step, Pixels.WINE)), t > 0.9F ? 0.5F : 1.0F);
         }
     }
 }

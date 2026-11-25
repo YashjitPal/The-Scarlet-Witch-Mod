@@ -3,6 +3,11 @@ package com.yashjit.scarlet.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.yashjit.scarlet.ScarletPalette;
+import com.yashjit.scarlet.crown.CrownItem;
+import com.yashjit.scarlet.crown.CrownStyle;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import org.jspecify.annotations.Nullable;
 import org.joml.Vector3f;
 
 /**
@@ -27,8 +32,38 @@ public final class Pixels {
     public static final int WINE = 5;
     public static final int SHADOW = 6;
     /** The ramp, white-hot down to shadow: every pixel of magic is one of these. */
-    private static final int[] RAMP = {ScarletPalette.CORE, ScarletPalette.PINK, ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET,
-            ScarletPalette.CRIMSON, ScarletPalette.WINE, ScarletPalette.SHADOW};
+    public enum Ramp {
+        CHAOS(ScarletPalette.CORE, ScarletPalette.PINK, ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET,
+                ScarletPalette.CRIMSON, ScarletPalette.WINE, ScarletPalette.SHADOW),
+        WICCAN(0xE5F8FF, 0xA2E4FF, 0x50B8FF, 0x3378EE, 0x274AB7, 0x232B72, 0x0D1633),
+        AGATHA(0xFFF0E2, 0xEDD0FF, 0xD392FF, 0xA45CE3, 0x7338AF, 0x472352, 0x221329),
+        TEAL(0xEDFFF7,0xB9FFE8,0x6DE9CA,0x32B6AE,0x187B80,0x194854,0x112C35),
+        GOLD(0xFFFBE0,0xFFF5BC,0xF6DE82,0xD6B462,0xA37D42,0x694C39,0x3F302F);
+
+        private final int[] colors;
+
+        Ramp(int... colors) {
+            this.colors = colors;
+        }
+
+        public static Ramp of(CrownStyle style) {
+            return style == CrownStyle.WICCAN ? WICCAN : CHAOS;
+        }
+
+        public static Ramp ofCaster(@Nullable Entity caster) {
+            if (caster instanceof com.yashjit.scarlet.entity.WanderingWitch w) return w.gold() ? GOLD : TEAL;
+            if (caster instanceof net.minecraft.world.entity.player.Player p && com.yashjit.scarlet.player.AgathaForm.worn(p)) return AGATHA;
+            return caster instanceof LivingEntity living && CrownItem.isWiccan(living) ? WICCAN : CHAOS;
+        }
+
+        public int color(int step) {
+            return colors[Math.clamp(step, HOT, SHADOW)];
+        }
+
+        public int opaque(int step) {
+            return 0xFF000000 | color(step);
+        }
+    }
     private static final float[] BAYER = {
             0.0F / 16, 8.0F / 16, 2.0F / 16, 10.0F / 16,
             12.0F / 16, 4.0F / 16, 14.0F / 16, 6.0F / 16,
@@ -42,7 +77,7 @@ public final class Pixels {
      * A step of the ramp as a color, {@link #HOT} to {@link #SHADOW}; steps past either end stop there.
      */
     public static int ramp(int step) {
-        return RAMP[Math.clamp(step, HOT, SHADOW)];
+        return Ramp.CHAOS.color(step);
     }
 
     /**
@@ -67,9 +102,10 @@ public final class Pixels {
         int best = SCARLET;
         int bestDistance = Integer.MAX_VALUE;
         for (int step = HOT; step <= SHADOW; step++) {
-            int dr = ((rgb >> 16) & 0xFF) - ((RAMP[step] >> 16) & 0xFF);
-            int dg = ((rgb >> 8) & 0xFF) - ((RAMP[step] >> 8) & 0xFF);
-            int db = (rgb & 0xFF) - (RAMP[step] & 0xFF);
+            int color = ramp(step);
+            int dr = ((rgb >> 16) & 0xFF) - ((color >> 16) & 0xFF);
+            int dg = ((rgb >> 8) & 0xFF) - ((color >> 8) & 0xFF);
+            int db = (rgb & 0xFF) - (color & 0xFF);
             int distance = dr * dr + dg * dg + db * db;
             if (distance < bestDistance) {
                 best = step;

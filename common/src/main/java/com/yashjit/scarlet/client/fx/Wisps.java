@@ -45,6 +45,11 @@ public final class Wisps {
      */
     public static void tendril(PixelSprite sprite, Vector3f from, Vector3f to, float reach, float curl, float seed, float time, float fade,
                                float speed, int salt) {
+        tendril(sprite, from, to, reach, curl, seed, time, fade, speed, salt, Pixels.Ramp.CHAOS);
+    }
+
+    static void tendril(PixelSprite sprite, Vector3f from, Vector3f to, float reach, float curl, float seed, float time, float fade,
+                               float speed, int salt, Pixels.Ramp ramp) {
         Vector3f path = new Vector3f(to).sub(from);
         float length = path.length();
         if (length < 0.05F || reach <= 0.0F || fade <= 0.0F) {
@@ -67,7 +72,7 @@ public final class Wisps {
                 float near = Math.abs(s - bead);
                 int step = near < 0.035F ? Pixels.HOT : near < 0.08F ? Pixels.PINK : s < 0.35F ? Pixels.BRIGHT : s < 0.75F ? Pixels.SCARLET
                         : Pixels.CRIMSON;
-                sprite.line(previous, at, Pixels.opaque(step), 1, s < 0.3F ? 2 : 1);
+                sprite.line(previous, at, ramp.opaque(step), 1, s < 0.3F ? 2 : 1);
             }
             previous = at;
         }
@@ -82,6 +87,11 @@ public final class Wisps {
      */
     public static void helix(PixelSprite sprite, Vector3f center, float radiusLow, float radiusHigh, float bottom, float top, int strands, float turns,
                              float spin, float time, float fade, float seed, int salt) {
+        helix(sprite, center, radiusLow, radiusHigh, bottom, top, strands, turns, spin, time, fade, seed, salt, Pixels.Ramp.CHAOS);
+    }
+
+    static void helix(PixelSprite sprite, Vector3f center, float radiusLow, float radiusHigh, float bottom, float top, int strands, float turns,
+                      float spin, float time, float fade, float seed, int salt, Pixels.Ramp ramp) {
         if (fade <= 0.0F) {
             return;
         }
@@ -101,7 +111,7 @@ public final class Wisps {
                     float travel = (float) Math.pow(0.5 + 0.5 * Mth.sin(s * 9.0F - time * 0.5F + k * 2.1F), 3);
                     if (Pixels.shows(fade * (0.4F + 0.8F * envelope), i + frame, k + salt)) {
                         int step = travel > 0.75F ? Pixels.PINK : travel > 0.35F ? Pixels.BRIGHT : envelope < 0.35F ? Pixels.CRIMSON : Pixels.SCARLET;
-                        sprite.line(previous, at, Pixels.opaque(step), 1, 1);
+                        sprite.line(previous, at, ramp.opaque(step), 1, 1);
                     }
                 }
                 previous = at;
@@ -134,6 +144,10 @@ public final class Wisps {
      * {@code width} deep: white-hot at its leading edge and cooling behind it, breaking up in a dither as it fades.
      */
     public static void burst(PixelSprite sprite, float radius, float width, float fade, int frame) {
+        burst(sprite, radius, width, fade, frame, Pixels.Ramp.CHAOS);
+    }
+
+    static void burst(PixelSprite sprite, float radius, float width, float fade, int frame, Pixels.Ramp ramp) {
         float outer = radius / Pixels.SIZE;
         float inner = Math.max(0.0F, radius - width) / Pixels.SIZE;
         int reach = (int) Math.ceil(outer) + 1;
@@ -148,7 +162,7 @@ public final class Wisps {
                     continue;
                 }
                 int step = k > 0.82F ? Pixels.HOT : k > 0.6F ? Pixels.PINK : k > 0.35F ? Pixels.BRIGHT : Pixels.SCARLET;
-                sprite.cell(i, j, Pixels.opaque(step), 1);
+                sprite.cell(i, j, ramp.opaque(step), 1);
             }
         }
     }
@@ -160,6 +174,10 @@ public final class Wisps {
      * @param flame how far the flames reach past its body, in pixels
      */
     public static void orb(PixelSprite sprite, float radius, float flame, int frame, int salt) {
+        orb(sprite, radius, flame, frame, salt, Pixels.Ramp.CHAOS);
+    }
+
+    static void orb(PixelSprite sprite, float radius, float flame, int frame, int salt, Pixels.Ramp ramp) {
         int reach = (int) Math.ceil(radius + flame + 1.0F);
         for (int i = -reach; i < reach; i++) {
             for (int j = -reach; j < reach; j++) {
@@ -172,7 +190,7 @@ public final class Wisps {
                     continue;
                 }
                 int step = r < radius * 0.45F ? Pixels.HOT : r < radius ? Pixels.PINK : r < radius + lick * 0.5F ? Pixels.BRIGHT : Pixels.SCARLET;
-                sprite.cell(i, j, Pixels.opaque(step), 2);
+                sprite.cell(i, j, ramp.opaque(step), 2);
             }
         }
     }
@@ -188,6 +206,10 @@ public final class Wisps {
      * @param strength how fiercely they burn, 0 to 1
      */
     public static void eyes(PixelSprite sprite, Vector3f head, float size, float out, float yaw, float strength, float time) {
+        eyes(sprite, head, size, out, yaw, strength, time, Pixels.Ramp.CHAOS);
+    }
+
+    static void eyes(PixelSprite sprite, Vector3f head, float size, float out, float yaw, float strength, float time, Pixels.Ramp ramp) {
         if (strength < 0.01F) {
             return;
         }
@@ -205,12 +227,12 @@ public final class Wisps {
             float y = head.y + 0.06F * size;
             float z = head.z + fz * out - fx * apart * side;
             // drawn a little in front of the face as seen, so the face never hides them
-            sprite.plotInFront(x, y, z, EYE_LIFT, Pixels.opaque(strength > 0.4F ? Pixels.HOT : Pixels.PINK), 4, thickness);
+            sprite.plotInFront(x, y, z, EYE_LIFT, ramp.opaque(strength > 0.4F ? Pixels.HOT : Pixels.PINK), 4, thickness);
             if (strength < 0.25F) {
                 continue;
             }
             // the glint round it, a pixel out each way
-            int glint = Pixels.opaque(strength > 0.7F ? Pixels.BRIGHT : Pixels.SCARLET);
+            int glint = ramp.opaque(strength > 0.7F ? Pixels.BRIGHT : Pixels.SCARLET);
             for (int d = 0; d < 4; d++) {
                 float di = d == 0 ? -step : d == 1 ? step : 0.0F;
                 float dj = d == 2 ? -step : d == 3 ? step : 0.0F;

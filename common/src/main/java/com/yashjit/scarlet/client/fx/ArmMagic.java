@@ -32,28 +32,28 @@ public final class ArmMagic {
      * @param darkness how far the Darkhold's corruption darkens it
      */
     public static void submitArm(PoseStack poseStack, SubmitNodeCollector collector, PlayerModel model, boolean right, boolean slim, float time,
-                                 float intensity, float darkness) {
+                                 float intensity, float darkness, Pixels.Ramp ramp) {
         poseStack.pushPose();
         model.root().translateAndRotate(poseStack);
         (right ? model.rightArm : model.leftArm).translateAndRotate(poseStack);
-        GlowPass.submitPixels(collector, poseStack, arm(right, slim, time, intensity, darkness));
+        GlowPass.submitPixels(collector, poseStack, arm(right, slim, time, intensity, darkness, ramp));
         poseStack.popPose();
     }
 
     /**
      * Pixels for one arm, in the space of its shoulder pivot.
      */
-    public static SubmitNodeCollector.CustomGeometryRenderer arm(boolean right, boolean slim, float time, float intensity, float darkness) {
+    public static SubmitNodeCollector.CustomGeometryRenderer arm(boolean right, boolean slim, float time, float intensity, float darkness, Pixels.Ramp ramp) {
         float axisX = (right ? -1.0F : 1.0F) * (slim ? 0.5F : 1.0F) / 16.0F;
         float t = time + (right ? 0.0F : 37.0F);
         return (pose, buffer) -> {
             try (Glow.Darkening ignored = Glow.darkening(darkness)) {
-                emit(buffer, pose, axisX, t, intensity);
+                emit(buffer, pose, axisX, t, intensity, ramp);
             }
         };
     }
 
-    private static void emit(VertexConsumer buffer, PoseStack.Pose pose, float axisX, float time, float intensity) {
+    private static void emit(VertexConsumer buffer, PoseStack.Pose pose, float axisX, float time, float intensity, Pixels.Ramp ramp) {
         PixelSprite sprite = new PixelSprite(pose, axisX, MagicLayer.PALM_Y, 0.0F);
         int frame = (int) Math.floor(time);
         for (int k = 0; k < STRANDS; k++) {
@@ -71,20 +71,20 @@ public final class ArmMagic {
                     float travel = (float) Math.pow(0.5 + 0.5 * Mth.sin(s * 9.0F - time * 0.55F + k * 2.1F), 3);
                     if (Pixels.shows(intensity * (0.45F + 0.75F * envelope), i + frame, k)) {
                         int step = travel > 0.75F ? Pixels.PINK : travel > 0.35F ? Pixels.BRIGHT : s < 0.3F ? Pixels.CRIMSON : Pixels.SCARLET;
-                        sprite.line(previous, at, Pixels.opaque(step), 1, 1);
+                        sprite.line(previous, at, ramp.opaque(step), 1, 1);
                     }
                 }
                 previous = at;
             }
         }
-        palm(sprite, time, intensity);
+        palm(sprite, time, intensity, ramp);
         sprite.draw(buffer);
     }
 
     /**
      * The ball of magic churning in the palm.
      */
-    private static void palm(PixelSprite sprite, float time, float intensity) {
-        Wisps.orb(sprite, (1.5F + 0.5F * Mth.sin(time * 0.5F)) * intensity + 0.5F, 1.5F * intensity, (int) Math.floor(time), 23);
+    private static void palm(PixelSprite sprite, float time, float intensity, Pixels.Ramp ramp) {
+        Wisps.orb(sprite, (1.5F + 0.5F * Mth.sin(time * 0.5F)) * intensity + 0.5F, 1.5F * intensity, (int) Math.floor(time), 23, ramp);
     }
 }

@@ -16,7 +16,7 @@ import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.entity.DreamBody;
 import com.yashjit.scarlet.network.MagicEventPayload;
-import it.unimi.dsi.fastutil.ints.Int2FloatMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.DeltaTracker;
@@ -85,7 +85,8 @@ public final class DreamFx {
         Vec3 feet = payload.position();
         Entity entity = minecraft.level.getEntity(payload.entityId());
         float darkness = entity == null ? 0.0F : darkness(entity);
-        BURSTS.add(new Burst(feet, minecraft.level.getGameTime(), departing, darkness));
+        Pixels.Ramp ramp = Pixels.Ramp.ofCaster(entity);
+        BURSTS.add(new Burst(feet, minecraft.level.getGameTime(), departing, darkness, ramp));
         Vec3 head = feet.add(0.0, Meditation.HOVER + 1.62 - Meditation.SIT_DROP, 0.0);
         RandomSource random = ScarletFx.random();
         try (Glow.Darkening ignored = Glow.darkening(darkness)) {
@@ -95,14 +96,14 @@ public final class DreamFx {
                     // the spirit streaking up out of the head
                     Vec3 up = new Vec3(random.nextGaussian() * 0.04, 0.22 + random.nextDouble() * 0.28, random.nextGaussian() * 0.04);
                     ScarletFx.spark(head, up, 10 + random.nextInt(14), 0.024F + random.nextFloat() * 0.012F,
-                            random.nextFloat() < 0.4F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.004F, 0.9F);
+                            ramp, random.nextFloat() < 0.4F ? Pixels.HOT : Pixels.BRIGHT, -0.004F, 0.9F);
                 } else {
                     // light drawn in from all around into the head
                     Vec3 out = new Vec3(random.nextGaussian(), random.nextGaussian() * 0.6, random.nextGaussian()).normalize();
                     int life = 9 + random.nextInt(6);
                     Vec3 from = head.add(out.scale(1.4 + random.nextDouble() * 0.6));
                     ScarletFx.spark(from, head.subtract(from).scale(1.0 / life), life, 0.02F,
-                            random.nextFloat() < 0.4F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.0F, 1.0F);
+                            ramp, random.nextFloat() < 0.4F ? Pixels.HOT : Pixels.BRIGHT, 0.0F, 1.0F);
                 }
             }
         }
@@ -111,7 +112,7 @@ public final class DreamFx {
     /**
      * The spirit gone out of a creature: a puff of it off its head.
      */
-    public static void released(int entityId) {
+    public static void released(int entityId, Pixels.Ramp ramp) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || !(minecraft.level.getEntity(entityId) instanceof LivingEntity creature)) {
             return;
@@ -121,7 +122,7 @@ public final class DreamFx {
         for (int i = 0, n = Math.round(22 * ScarletFx.density()); i < n; i++) {
             Vec3 out = new Vec3(random.nextGaussian(), random.nextGaussian() * 0.5 + 0.6, random.nextGaussian()).normalize();
             ScarletFx.spark(head, out.scale(0.06 + random.nextDouble() * 0.12), 10 + random.nextInt(10), 0.022F,
-                    random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.002F, 0.88F);
+                    ramp, random.nextFloat() < 0.3F ? Pixels.HOT : Pixels.BRIGHT, -0.002F, 0.88F);
         }
     }
 
@@ -145,6 +146,7 @@ public final class DreamFx {
             if (sit < 0.05F || entity.isInvisible() || entity == minecraft.getCameraEntity() && minecraft.options.getCameraType().isFirstPerson()) {
                 continue;
             }
+            Pixels.Ramp ramp = Pixels.Ramp.ofCaster(entity);
             float darkness = darkness(entity);
             try (Glow.Darkening ignored = Glow.darkening(darkness)) {
                 // sparks lifting off the swirl, and off the hands
@@ -153,15 +155,14 @@ public final class DreamFx {
                     double radius = 0.45 + random.nextDouble() * 0.2;
                     Vec3 at = entity.position().add(Math.cos(angle) * radius, 0.1 + random.nextDouble() * 1.4, Math.sin(angle) * radius);
                     ScarletFx.spark(at, new Vec3(-Math.sin(angle) * 0.01, 0.012 + random.nextDouble() * 0.02, Math.cos(angle) * 0.01),
-                            16 + random.nextInt(14), 0.016F, random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET,
-                            ScarletPalette.SCARLET, -0.0008F, 0.95F);
+                            16 + random.nextInt(14), 0.016F, ramp, random.nextFloat() < 0.3F ? Pixels.HOT : Pixels.BRIGHT, -0.0008F, 0.95F);
                 }
                 for (HumanoidArm arm : HumanoidArm.values()) {
                     Vec3 palm = entity instanceof Player player ? Hands.palm(player, arm) : Hands.drawnPalm(entity, arm);
                     if (palm != null && random.nextFloat() < 0.3F * sit * density) {
                         ScarletFx.spark(palm.add(random.nextGaussian() * 0.04, 0.0, random.nextGaussian() * 0.04),
                                 new Vec3(random.nextGaussian() * 0.004, 0.015 + random.nextDouble() * 0.015, random.nextGaussian() * 0.004),
-                                12 + random.nextInt(10), 0.014F, ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.0006F, 0.95F);
+                                12 + random.nextInt(10), 0.014F, ramp, Pixels.BRIGHT, -0.0006F, 0.95F);
                     }
                 }
                 if (darkness > 0.2F && random.nextFloat() < 0.25F * darkness * density) {
@@ -170,17 +171,17 @@ public final class DreamFx {
                 }
             }
         }
-        for (Int2FloatMap.Entry entry : DreamwalkClient.possessed().int2FloatEntrySet()) {
+        for (Int2ObjectMap.Entry<DreamwalkClient.Spirit> entry : DreamwalkClient.possessed().int2ObjectEntrySet()) {
             // embers rising off a head with a spirit in it, unless your own view looks out of it
             if (!(level.getEntity(entry.getIntKey()) instanceof LivingEntity creature) || creature == minecraft.getCameraEntity()) {
                 continue;
             }
             if (random.nextFloat() < 0.5F * density) {
                 Vec3 head = creature.getEyePosition().add(random.nextGaussian() * 0.15, 0.1, random.nextGaussian() * 0.15);
-                try (Glow.Darkening ignored = Glow.darkening(entry.getFloatValue())) {
+                Pixels.Ramp ramp = entry.getValue().ramp();
+                try (Glow.Darkening ignored = Glow.darkening(entry.getValue().darkness())) {
                     ScarletFx.spark(head, new Vec3(random.nextGaussian() * 0.01, 0.02 + random.nextDouble() * 0.02, random.nextGaussian() * 0.01),
-                            12 + random.nextInt(10), 0.02F, random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET,
-                            ScarletPalette.SCARLET, -0.0015F, 0.92F);
+                            12 + random.nextInt(10), 0.02F, ramp, random.nextFloat() < 0.3F ? Pixels.HOT : Pixels.BRIGHT, -0.0015F, 0.92F);
                 }
             }
         }
@@ -210,13 +211,13 @@ public final class DreamFx {
             }
             boolean ownEyes = entity == viewer && minecraft.options.getCameraType().isFirstPerson();
             Vec3 feet = entity.getPosition(partialTick);
-            sitters.add(new Sitter(feet.subtract(camera).toVector3f(), sit, Meditation.lift(entity, now), ownEyes, entity.getId() * 0.618F, darkness(entity)));
+            sitters.add(new Sitter(feet.subtract(camera).toVector3f(), sit, Meditation.lift(entity, now), ownEyes, entity.getId() * 0.618F, darkness(entity), Pixels.Ramp.ofCaster(entity)));
         }
         List<Gaze> gazes = new ArrayList<>();
-        for (Int2FloatMap.Entry entry : DreamwalkClient.possessed().int2FloatEntrySet()) {
+        for (Int2ObjectMap.Entry<DreamwalkClient.Spirit> entry : DreamwalkClient.possessed().int2ObjectEntrySet()) {
             if (level.getEntity(entry.getIntKey()) instanceof LivingEntity creature && creature != viewer) {
                 gazes.add(new Gaze(creature.getEyePosition(partialTick).subtract(camera).toVector3f(), MindControlFx.size(creature),
-                        MindControlFx.faceOut(creature), creature.getViewYRot(partialTick), entry.getFloatValue()));
+                        MindControlFx.faceOut(creature), creature.getViewYRot(partialTick), entry.getValue().darkness(), entry.getValue().ramp()));
             }
         }
         List<Burst> bursts = List.copyOf(BURSTS);
@@ -235,7 +236,7 @@ public final class DreamFx {
                     for (int w = 0; w < WISPS; w++) {
                         Wisp wisp = wisp(sitter, w, time);
                         if (wisp != null) {
-                            drawWisp(sprite, wisp, w, frame);
+                            drawWisp(sprite, wisp, w, frame, sitter.ramp());
                         }
                     }
                     sprite.draw(buffer);
@@ -249,17 +250,17 @@ public final class DreamFx {
                                 return 0;
                             }
                             if (r < 0.5F) {
-                                return Pixels.opaque(Pixels.CRIMSON);
+                                return sitter.ramp().opaque(Pixels.CRIMSON);
                             }
                             int mark = Mth.floor((theta - turn) / (Mth.TWO_PI / 24.0F));
-                            return Pixels.opaque(Math.floorMod(mark, 3) == 0 ? Pixels.BRIGHT : Pixels.SCARLET);
+                            return sitter.ramp().opaque(Math.floorMod(mark, 3) == 0 ? Pixels.BRIGHT : Pixels.SCARLET);
                         });
             }
             for (Gaze gaze : gazes) {
                 Glow.darken(gaze.darkness());
                 Vector3f head = gaze.head();
                 PixelSprite sprite = PixelSprite.inWorld(pose, head.x, head.y, head.z);
-                Wisps.eyes(sprite, head, gaze.size(), gaze.out(), gaze.yaw(), 1.0F, time);
+                Wisps.eyes(sprite, head, gaze.size(), gaze.out(), gaze.yaw(), 1.0F, time, gaze.ramp());
                 sprite.draw(buffer);
             }
             for (Burst burst : bursts) {
@@ -270,10 +271,10 @@ public final class DreamFx {
                 float fade = 1.0F - Ease.outCubic(k);
                 float size = burst.departing() ? 0.3F + 1.5F * Ease.outCubic(k) : 1.6F - 1.3F * Ease.outCubic(k);
                 PixelSprite sprite = PixelSprite.inWorld(pose, chest.x, chest.y, chest.z);
-                Wisps.burst(sprite, size, 0.25F, fade, frame);
-                Wisps.ring(sprite, chest, FLAT_U, FLAT_V, size * 0.9F, 0.0F, 1.0F, Pixels.opaque(fade > 0.5F ? Pixels.BRIGHT : Pixels.SCARLET), 0, 1);
+                Wisps.burst(sprite, size, 0.25F, fade, frame, burst.ramp());
+                Wisps.ring(sprite, chest, FLAT_U, FLAT_V, size * 0.9F, 0.0F, 1.0F, burst.ramp().opaque(fade > 0.5F ? Pixels.BRIGHT : Pixels.SCARLET), 0, 1);
                 if (fade > 0.4F) {
-                    Wisps.orb(sprite, 4.0F * fade, 1.5F, frame, 37);
+                    Wisps.orb(sprite, 4.0F * fade, 1.5F, frame, 37, burst.ramp());
                 }
                 sprite.draw(buffer);
             }
@@ -285,11 +286,11 @@ public final class DreamFx {
      * One wisp of the swirl as a line of pixels, whole along its middle and thinning out at its ends and as it fades, a
      * brighter fleck here and there along it.
      */
-    private static void drawWisp(PixelSprite sprite, Wisp wisp, int index, int frame) {
+    private static void drawWisp(PixelSprite sprite, Wisp wisp, int index, int frame, Pixels.Ramp ramp) {
         Vector3f[] points = wisp.points();
         for (int i = 1; i < points.length; i++) {
             if (Pixels.shows(wisp.alphas()[i] / 0.65F * 1.8F, i + frame, index + 50)) {
-                sprite.line(points[i - 1], points[i], Pixels.opaque(i % 5 == 2 ? Pixels.BRIGHT : Pixels.SCARLET), 1, wisp.widths()[i] > 0.08F ? 2 : 1);
+                sprite.line(points[i - 1], points[i], ramp.opaque(i % 5 == 2 ? Pixels.BRIGHT : Pixels.SCARLET), 1, wisp.widths()[i] > 0.08F ? 2 : 1);
             }
         }
     }
@@ -351,30 +352,33 @@ public final class DreamFx {
         float strength = ScarletClientConfig.get().reduceFlashing ? 0.55F : 1.0F;
         int width = graphics.guiWidth();
         int height = graphics.guiHeight();
+        Pixels.Ramp ramp = Pixels.Ramp.ofCaster(player);
+        int shadow = ramp == Pixels.Ramp.WICCAN ? ramp.color(Pixels.SHADOW) : ScarletPalette.VOID;
+        int highlight = ramp == Pixels.Ramp.WICCAN ? ramp.color(Pixels.PINK) : ScarletPalette.SICKLY;
         float rise = DreamwalkClient.rise(player, partialTick);
         if (rise > 0.001F) {
             // the dark closing in as the body rises, until the view is gone
             MindControlFx.vignette(graphics, width, height, Math.max(width, height) * (0.1F + 0.42F * Ease.inOutCubic(rise)), 0.85F * rise,
-                    ScarletPalette.VOID);
-            MindControlFx.vignette(graphics, width, height, Math.max(width, height) * 0.12F * rise, 0.45F * rise * strength, ScarletPalette.SICKLY);
+                    shadow);
+            MindControlFx.vignette(graphics, width, height, Math.max(width, height) * 0.12F * rise, 0.45F * rise * strength, highlight);
             float black = Ease.clamp01((rise - 0.78F) / 0.22F);
             if (black > 0.0F) {
-                graphics.fill(0, 0, width, height, ARGB.color(0.95F * Ease.inOutCubic(black), ScarletPalette.VOID));
+                graphics.fill(0, 0, width, height, ARGB.color(0.95F * Ease.inOutCubic(black), shadow));
             }
         }
         if (DreamwalkClient.away() && !MindControlClient.dreaming()) {
             // on the way: nothing to see until the creature is here
-            graphics.fill(0, 0, width, height, ARGB.color(0.95F, ScarletPalette.VOID));
+            graphics.fill(0, 0, width, height, ARGB.color(0.95F, shadow));
         }
         if (MindControlClient.dreaming() && MindControlClient.movedIn()) {
             double since = MindControlClient.sinceMoved(now);
             if (since < OPEN_TICKS) {
                 // the view opening out of the dark from the middle, into the creature's
                 float k = Ease.clamp01((float) (since / OPEN_TICKS));
-                graphics.fill(0, 0, width, height, ARGB.color(0.9F * (1.0F - Ease.outCubic(k)), ScarletPalette.VOID));
-                MindControlFx.vignette(graphics, width, height, Math.max(width, height) * (0.5F - 0.4F * k), 1.0F - k, ScarletPalette.VOID);
+                graphics.fill(0, 0, width, height, ARGB.color(0.9F * (1.0F - Ease.outCubic(k)), shadow));
+                MindControlFx.vignette(graphics, width, height, Math.max(width, height) * (0.5F - 0.4F * k), 1.0F - k, shadow);
                 MindControlFx.sprite(graphics, width / 2.0F, height / 2.0F, Math.max(width, height) * (0.2F + 1.8F * k),
-                        ARGB.color(0.55F * (1.0F - k) * strength, ScarletPalette.SICKLY));
+                        ARGB.color(0.55F * (1.0F - k) * strength, highlight));
             }
         }
         double woke = now - DreamwalkClient.wokeAt();
@@ -382,10 +386,10 @@ public final class DreamFx {
             // waking with a start
             float k = (float) (woke / WAKE_TICKS);
             float alpha = (1.0F - Ease.outCubic(k)) * strength;
-            graphics.fill(0, 0, width, height, ARGB.color(alpha * 0.5F, ScarletPalette.CRIMSON));
-            MindControlFx.vignette(graphics, width, height, Math.max(width, height) * (0.45F - 0.3F * k), alpha, ScarletPalette.VOID);
+            graphics.fill(0, 0, width, height, ARGB.color(alpha * 0.5F, ramp.color(Pixels.CRIMSON)));
+            MindControlFx.vignette(graphics, width, height, Math.max(width, height) * (0.45F - 0.3F * k), alpha, shadow);
             MindControlFx.sprite(graphics, width / 2.0F, height / 2.0F, Math.max(width, height) * (0.3F + 1.4F * k),
-                    ARGB.color(alpha * 0.5F, ScarletPalette.BRIGHT_SCARLET));
+                    ARGB.color(alpha * 0.5F, ramp.color(Pixels.BRIGHT)));
         }
     }
 
@@ -394,15 +398,15 @@ public final class DreamFx {
      *
      * @param ownEyes the view is their own, in the first person
      */
-    private record Sitter(Vector3f feet, float sit, float lift, boolean ownEyes, float seed, float darkness) {
+    private record Sitter(Vector3f feet, float sit, float lift, boolean ownEyes, float seed, float darkness, Pixels.Ramp ramp) {
     }
 
     private record Wisp(Vector3f[] points, float[] widths, float[] alphas) {
     }
 
-    private record Gaze(Vector3f head, float size, float out, float yaw, float darkness) {
+    private record Gaze(Vector3f head, float size, float out, float yaw, float darkness, Pixels.Ramp ramp) {
     }
 
-    private record Burst(Vec3 feet, double at, boolean departing, float darkness) {
+    private record Burst(Vec3 feet, double at, boolean departing, float darkness, Pixels.Ramp ramp) {
     }
 }

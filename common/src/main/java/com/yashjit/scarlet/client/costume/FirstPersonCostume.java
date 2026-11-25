@@ -6,6 +6,10 @@ import com.yashjit.scarlet.client.fx.ArmMagic;
 import com.yashjit.scarlet.client.hex.Outfits;
 import com.yashjit.scarlet.client.magic.MagicVisuals;
 import com.yashjit.scarlet.client.render.ScarletRenderTypes;
+import com.yashjit.scarlet.magic.WiccanSpells;
+import com.yashjit.scarlet.player.AgathaForm;
+import java.util.EnumMap;
+import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelPart;
@@ -29,6 +33,8 @@ public final class FirstPersonCostume {
 
     private static @Nullable CostumeModel wide;
     private static @Nullable CostumeModel slim;
+    private static EnumMap<AgathaForm, AgathaLook> agathaWide;
+    private static EnumMap<AgathaForm, AgathaLook> agathaSlim;
 
     private FirstPersonCostume() {
     }
@@ -36,6 +42,8 @@ public final class FirstPersonCostume {
     static void bake(EntityModelSet models) {
         wide = new CostumeModel(models.bakeLayer(CostumeModels.WIDE), false);
         slim = new CostumeModel(models.bakeLayer(CostumeModels.SLIM), true);
+        agathaWide = AgathaLook.bake(models, false);
+        agathaSlim = AgathaLook.bake(models, true);
     }
 
     /**
@@ -52,14 +60,20 @@ public final class FirstPersonCostume {
         boolean right = arm == renderer.getModel().rightArm;
         CostumeView view = CostumeView.of(player, partialTick);
         Identifier outfit = view == null ? Outfits.outfit(player, isSlim, partialTick) : null;
+        if (SpeedLook.dressed(player)) outfit = SpeedLook.texture(isSlim);
+        PlayerModel model = isSlim ? slim : wide;
+        if (view == null && AgathaForm.worn(player)) {
+            AgathaLook agatha = (isSlim ? agathaSlim : agathaWide).get(AgathaForm.of(player));
+            model = agatha;
+            outfit = agatha.texture;
+        }
         if (view != null || outfit != null) {
-            CostumeModel model = isSlim ? slim : wide;
             ModelPart costumeArm = right ? model.rightArm : model.leftArm;
             costumeArm.loadPose(arm.storePose());
             costumeArm.visible = true;
             (right ? model.rightSleeve : model.leftSleeve).visible = true;
             if (view != null) {
-                collector.submitModelPart(costumeArm, poseStack, ScarletRenderTypes.costume(view.style(), isSlim), light,
+                collector.submitModelPart(costumeArm, poseStack, ScarletRenderTypes.costume(view.style(), isSlim, WiccanSpells.ascended(player)), light,
                         OverlayTexture.NO_OVERLAY, null, ARGB.white(view.progress()), 0);
             } else {
                 collector.submitModelPart(costumeArm, poseStack, RenderTypes.armorCutoutNoCull(outfit), light,
@@ -73,7 +87,7 @@ public final class FirstPersonCostume {
             poseStack.pushPose();
             arm.translateAndRotate(poseStack);
             collector.submitCustomGeometry(poseStack, ScarletRenderTypes.pixel(), ArmMagic.arm(right, isSlim, time, intensity,
-                    CorruptionClient.darkness(player)));
+                    CorruptionClient.darkness(player), view == null ? com.yashjit.scarlet.client.render.Pixels.Ramp.ofCaster(player) : CostumeView.ramp(view)));
             poseStack.popPose();
         }
     }

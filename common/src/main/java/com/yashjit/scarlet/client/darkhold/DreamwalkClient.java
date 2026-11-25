@@ -9,9 +9,10 @@ import com.yashjit.scarlet.magic.Spell;
 import com.yashjit.scarlet.network.DreamOptionsPayload;
 import com.yashjit.scarlet.network.DreamPayload;
 import com.yashjit.scarlet.network.DreamStatePayload;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.platform.Services;
-import it.unimi.dsi.fastutil.ints.Int2FloatMap;
-import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -36,7 +37,7 @@ public final class DreamwalkClient {
     private static double wokeAt = -1.0E9;
     private static boolean useWasDown;
     /** Creatures with a spirit in them, and how dark that dreamwalker's magic runs. */
-    private static final Int2FloatMap POSSESSED = new Int2FloatOpenHashMap();
+    private static final Int2ObjectMap<Spirit> POSSESSED = new Int2ObjectOpenHashMap<>();
     private static @Nullable ClientLevel seenLevel;
 
     private DreamwalkClient() {
@@ -69,10 +70,11 @@ public final class DreamwalkClient {
                 away = true;
                 into = payload.entityId();
             }
-            case DreamStatePayload.POSSESSED -> POSSESSED.put(payload.entityId(), CorruptionClient.darkness(payload.darkness()));
+            case DreamStatePayload.POSSESSED -> POSSESSED.put(payload.entityId(), new Spirit(CorruptionClient.darkness(payload.darkness()),
+                    payload.wiccan() ? Pixels.Ramp.WICCAN : Pixels.Ramp.CHAOS));
             case DreamStatePayload.RELEASED -> {
                 POSSESSED.remove(payload.entityId());
-                DreamFx.released(payload.entityId());
+                DreamFx.released(payload.entityId(), payload.wiccan() ? Pixels.Ramp.WICCAN : Pixels.Ramp.CHAOS);
             }
             case DreamStatePayload.WOKE -> {
                 away = false;
@@ -98,11 +100,11 @@ public final class DreamwalkClient {
             into = NOTHING;
             return;
         }
-        POSSESSED.int2FloatEntrySet().removeIf(entry -> level.getEntity(entry.getIntKey()) == null);
+        POSSESSED.int2ObjectEntrySet().removeIf(entry -> level.getEntity(entry.getIntKey()) == null);
         boolean useDown = minecraft.options.keyUse.isDown() && minecraft.gui.screen() == null;
         if (away) {
             Entity creature = level.getEntity(into);
-            if (creature != null && creature.isAlive() && MindControlClient.insideOf() != creature) {
+            if (!Magic.state(player).channeling(Spell.ASTRAL) && creature != null && creature.isAlive() && MindControlClient.insideOf() != creature) {
                 MindControlClient.dreamInto(minecraft, creature);
             }
             if (useDown && !useWasDown) {
@@ -131,7 +133,7 @@ public final class DreamwalkClient {
      * Whether your body is sitting down and rising, about to let your spirit go: you sit still for it.
      */
     public static boolean rising(LocalPlayer player) {
-        return !away && Magic.state(player).channeling(Spell.DREAMWALK);
+        return !away && (Magic.state(player).channeling(Spell.DREAMWALK) || Magic.state(player).channeling(Spell.ASTRAL));
     }
 
     /**
@@ -139,7 +141,7 @@ public final class DreamwalkClient {
      */
     public static float rise(LocalPlayer player, float partialTick) {
         MagicState state = Magic.state(player);
-        if (away || !state.channeling(Spell.DREAMWALK)) {
+        if (away || !(state.channeling(Spell.DREAMWALK) || state.channeling(Spell.ASTRAL))) {
             return 0.0F;
         }
         double since = player.level().getGameTime() + partialTick - state.channelStart();
@@ -150,10 +152,12 @@ public final class DreamwalkClient {
      * How dark the magic of the spirit in this creature runs, or below 0 if there is no spirit in it.
      */
     public static float possessedBy(Entity entity) {
-        return POSSESSED.containsKey(entity.getId()) ? POSSESSED.get(entity.getId()) : -1.0F;
+        return POSSESSED.containsKey(entity.getId()) ? POSSESSED.get(entity.getId()).darkness() : -1.0F;
     }
 
-    public static Int2FloatMap possessed() {
+    public record Spirit(float darkness, Pixels.Ramp ramp) {}
+
+    public static Int2ObjectMap<Spirit> possessed() {
         return POSSESSED;
     }
 }

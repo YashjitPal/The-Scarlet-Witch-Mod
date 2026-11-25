@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -17,13 +18,14 @@ import net.minecraft.world.phys.Vec3;
  * for the spirit to go back to, and while they are away, where their body was left and how they were playing, so that
  * whatever happens, even the server going down, they come back to it.
  */
-public record DreamwalkState(Map<ResourceKey<Level>, BlockPos> lastStood, Optional<Away> away) {
+public record DreamwalkState(Map<ResourceKey<Level>, BlockPos> lastStood, Optional<Away> away, Optional<GlobalPos> roadOrigin) {
 
-    public static final DreamwalkState NONE = new DreamwalkState(Map.of(), Optional.empty());
+    public static final DreamwalkState NONE = new DreamwalkState(Map.of(), Optional.empty(), Optional.empty());
 
     public static final MapCodec<DreamwalkState> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.unboundedMap(Level.RESOURCE_KEY_CODEC, BlockPos.CODEC).optionalFieldOf("last_stood", Map.of()).forGetter(DreamwalkState::lastStood),
-            Away.CODEC.optionalFieldOf("away").forGetter(DreamwalkState::away)
+            Away.CODEC.optionalFieldOf("away").forGetter(DreamwalkState::away),
+            GlobalPos.CODEC.optionalFieldOf("road_origin").forGetter(DreamwalkState::roadOrigin)
     ).apply(instance, DreamwalkState::new));
 
     public static final Codec<DreamwalkState> CODEC = MAP_CODEC.codec();
@@ -34,11 +36,15 @@ public record DreamwalkState(Map<ResourceKey<Level>, BlockPos> lastStood, Option
         }
         Map<ResourceKey<Level>, BlockPos> stood = new HashMap<>(lastStood);
         stood.put(dimension, pos.immutable());
-        return new DreamwalkState(Map.copyOf(stood), away);
+        return new DreamwalkState(Map.copyOf(stood), away, roadOrigin);
     }
 
     public DreamwalkState withAway(Optional<Away> away) {
-        return new DreamwalkState(lastStood, away);
+        return new DreamwalkState(lastStood, away, roadOrigin);
+    }
+
+    public DreamwalkState withRoadOrigin(Optional<GlobalPos> origin) {
+        return new DreamwalkState(lastStood, away, origin);
     }
 
     /**

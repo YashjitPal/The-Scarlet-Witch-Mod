@@ -27,9 +27,22 @@ public final class CostumeModels {
     }
 
     public static void register(ClientPlatform platform) {
-        platform.registerLayerDefinition(WIDE, () -> LayerDefinition.create(PlayerModel.createMesh(OVER_SKIN, false), 64, 64));
-        platform.registerLayerDefinition(SLIM, () -> LayerDefinition.create(PlayerModel.createMesh(OVER_SKIN, true), 64, 64));
+        platform.registerLayerDefinition(WIDE, () -> costume(false));
+        platform.registerLayerDefinition(SLIM, () -> costume(true));
         platform.registerLayerDefinition(CAPE, CostumeModels::cape);
+        AgathaLook.register(platform);
+    }
+
+    private static LayerDefinition costume(boolean slim) {
+        MeshDefinition mesh = PlayerModel.createMesh(OVER_SKIN, slim);
+        PartDefinition head = mesh.getRoot().getChild("head");
+        // Three staggered, swept-back locks break up the silhouette above Tommy's goggles.
+        for (int i = 0; i < 3; i++) {
+            head.addOrReplaceChild("quiff_" + i, CubeListBuilder.create().texOffs(24, 0).addBox(-1.5F, -1.0F, -2, 3, 2, 5),
+                    PartPose.offsetAndRotation(-2.3F + i * 2.15F, -8.5F - i * 0.28F, -0.65F + i * 0.6F,
+                            0.14F + i * 0.12F, -0.3F, -0.12F));
+        }
+        return LayerDefinition.create(mesh, 64, 64);
     }
 
     /**

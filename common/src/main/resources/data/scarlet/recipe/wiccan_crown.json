@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "A": "minecraft:amethyst_shard",
+    "L": "minecraft:lapis_lazuli"
+  },
+  "pattern": ["IAI", "LIL"],
+  "result": { "id": "scarlet:wiccan_crown" }
+}

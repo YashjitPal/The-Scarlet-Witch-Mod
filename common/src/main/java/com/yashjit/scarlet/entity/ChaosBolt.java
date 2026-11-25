@@ -59,12 +59,20 @@ public class ChaosBolt extends ThrowableProjectile {
     }
 
     public static ChaosBolt fire(ServerPlayer owner, Vec3 from, Vec3 direction) {
+        return fire((LivingEntity)owner, from, direction);
+    }
+
+    public static ChaosBolt fire(LivingEntity owner, Vec3 from, Vec3 direction) {
         ChaosBolt bolt = new ChaosBolt(ScarletEntities.CHAOS_BOLT.get(), owner.level());
         bolt.setOwner(owner);
         bolt.setPos(from);
         bolt.shoot(direction.x, direction.y, direction.z, SPEED, 0.0F);
         owner.level().addFreshEntity(bolt);
         return bolt;
+    }
+
+    @Override protected boolean canHitEntity(Entity entity) {
+        return !(getOwner() instanceof WanderingWitch w && w.companion(entity)) && super.canHitEntity(entity);
     }
 
     @Override
@@ -213,13 +221,14 @@ public class ChaosBolt extends ThrowableProjectile {
      * Whether something is with the caster: carried by them, carrying them, or their own pet.
      */
     private static boolean withCaster(Entity caster, Entity entity) {
-        return entity.isPassengerOfSameVehicle(caster) || entity.hasPassenger(caster) || caster.hasPassenger(entity)
+        return caster instanceof WanderingWitch w && w.companion(entity) || entity.isPassengerOfSameVehicle(caster) || entity.hasPassenger(caster) || caster.hasPassenger(entity)
                 || entity instanceof OwnableEntity pet && pet.getOwner() == caster;
     }
 
     private void burst(Vec3 at, Vec3 normal, boolean hitEntity, boolean loud) {
         Entity owner = getOwner();
-        Services.NETWORK.sendToTrackingAndSelf(this, new ChaosImpactPayload(at, normal, getDeltaMovement().normalize(), hitEntity,
+        if (owner instanceof WanderingWitch witch) witch.fx(com.yashjit.scarlet.network.WitchEffect.Kind.COVEN_BURST, at, 10);
+        else Services.NETWORK.sendToTrackingAndSelf(this, new ChaosImpactPayload(at, normal, getDeltaMovement().normalize(), hitEntity,
                 owner != null ? owner.getId() : -1));
         if (loud) {
             float pitch = 1.2F + random.nextFloat() * 0.25F;

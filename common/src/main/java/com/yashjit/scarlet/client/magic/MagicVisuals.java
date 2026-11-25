@@ -24,7 +24,10 @@ public final class MagicVisuals {
     public static float armIntensity(Player player, HumanoidArm arm, float partialTick) {
         CostumeView view = CostumeView.of(player, partialTick);
         float costume = view != null ? view.magicIntensity() : 0.0F;
+        if (com.yashjit.scarlet.magic.WiccanSpells.ascended(player)) costume = 1.0F;
+        else if (com.yashjit.scarlet.magic.Magic.state(player).channeling(com.yashjit.scarlet.magic.Spell.ARC_BEAM)) costume = 0.9F;
         double now = player.level().getGameTime() + partialTick;
+        if (com.yashjit.scarlet.magic.Magic.state(player).channeling(com.yashjit.scarlet.magic.Spell.SIPHON)) costume = 0.92F;
         float reach = Math.clamp(CastGestures.extension(player, arm, now), 0.0F, 1.0F);
         float cast = 0.35F * reach + CastGestures.flare(player, arm, now);
         PoseBlends.Blend blend = PoseBlends.of(player);

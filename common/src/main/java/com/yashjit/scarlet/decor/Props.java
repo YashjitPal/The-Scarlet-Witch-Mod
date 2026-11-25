@@ -57,7 +57,7 @@ public final class Props {
      * Whether someone could take something now, given whether they stand in their own Hex: they wear their crown.
      */
     public static boolean crowned(Player player) {
-        return CrownItem.isWearingCrown(player);
+        return CrownItem.hasScarletMagic(player);
     }
 
     /**

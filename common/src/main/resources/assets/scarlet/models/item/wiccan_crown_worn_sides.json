@@ -1,0 +1,9 @@
+{
+  "textures": {"metal": "scarlet:item/wiccan_crown_worn", "particle": "#metal"},
+  "display": {"head": {"rotation": [0,0,0], "translation": [0,0,0], "scale": [1,1,1]}},
+  "elements": [
+    { "from": [0.72, 9.84, 0.704], "to": [0.784, 12.352, 15.216], "faces": { "north": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "south": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "east": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "west": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "up": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "down": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" } } },
+    { "from": [15.216, 9.84, 0.704], "to": [15.28, 12.352, 15.216], "faces": { "north": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "south": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "east": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "west": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "up": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "down": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" } } },
+    { "from": [0.72, 9.84, 15.216], "to": [15.28, 12.352, 15.28], "faces": { "north": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "south": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "east": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "west": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "up": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" }, "down": { "uv": [2.8, 6.6, 13.2, 8.2], "texture": "#metal" } } }
+  ]
+}

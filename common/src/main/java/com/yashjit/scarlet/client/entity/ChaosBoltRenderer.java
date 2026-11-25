@@ -42,6 +42,8 @@ public final class ChaosBoltRenderer extends EntityRenderer<ChaosBolt, ChaosBolt
         state.direction.set((float) direction.x, (float) direction.y, (float) direction.z);
         state.age = bolt.tickCount + partialTicks;
         state.seed = bolt.getId();
+        state.coven = bolt.getOwner() instanceof com.yashjit.scarlet.entity.WanderingWitch w
+                ? com.yashjit.scarlet.client.render.Pixels.Ramp.ofCaster(w) : null;
         state.darkness = CorruptionClient.darkness(bolt.getOwner());
         state.flown = flown(bolt, direction, partialTicks);
     }
@@ -73,12 +75,34 @@ public final class ChaosBoltRenderer extends EntityRenderer<ChaosBolt, ChaosBolt
         int seed = state.seed;
         float darkness = state.darkness;
         try (Glow.Darkening ignored = Glow.darkening(darkness)) {
-            GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> BoltVisuals.blast(buffer, pose, direction, age, flown, seed));
+            var coven = state.coven;
+            GlowPass.submitPixels(collector, poseStack, (pose, buffer) -> {
+                if (coven==null) BoltVisuals.blast(buffer, pose, direction, age, flown, seed);
+                else {
+                    var sprite = new com.yashjit.scarlet.client.render.PixelSprite(pose,0,0,0);
+                    var axes = Glow.planeAxes(direction);
+                    var tail = new Vector3f(direction).mul(-Math.min(flown,1.45F));
+                    sprite.line(tail,new Vector3f(),coven.opaque(4),1,2);
+                    for(int j=0;j<2;j++) {
+                        Vector3f last=new Vector3f();
+                        for(int i=0;i<=12;i++) {
+                            double a=Math.PI*i/6+age*0.22+j;
+                            var p=new Vector3f(axes[0]).mul(0.23F*(float)Math.cos(a))
+                                    .fma(0.23F*(float)Math.sin(a),j==0?axes[1]:direction);
+                            if(i>0) sprite.line(last,p,coven.opaque(j==0?2:3),2,1);
+                            last=p;
+                        }
+                    }
+                    sprite.plot(0,0,0,coven.opaque(0),3,3);
+                    sprite.draw(buffer);
+                }
+            });
         }
         super.submit(state, poseStack, collector, camera);
     }
 
     public static final class State extends EntityRenderState {
+        com.yashjit.scarlet.client.render.Pixels.Ramp coven;
         final Vector3f direction = new Vector3f(0, 0, 1);
         float age;
         float flown;

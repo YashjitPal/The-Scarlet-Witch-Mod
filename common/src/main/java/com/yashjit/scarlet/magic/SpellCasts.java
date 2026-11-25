@@ -148,6 +148,7 @@ public final class SpellCasts {
         Vec3 feet = player.position();
         Vec3 chest = feet.add(0.0, player.getBbHeight() * 0.5, 0.0);
         float damage = 3.0F + 0.5F * Math.max(0, Mastery.rank(player) - Spell.SHOCKWAVE.rank());
+        if (WiccanSpells.ascended(player)) damage *= 1.6F;
         DamageSource source = ScarletDamageTypes.spell(level, ScarletDamageTypes.SHOCKWAVE, player);
         for (Entity entity : level.getEntities(player, new AABB(chest, chest).inflate(SHOCKWAVE_RADIUS), entity -> entity.isAlive() && !entity.isSpectator())) {
             Vec3 offset = entity.getBoundingBox().getCenter().subtract(chest);
@@ -156,6 +157,7 @@ public final class SpellCasts {
                 continue;
             }
             double strength = 1.0 - distance / SHOCKWAVE_RADIUS;
+            if (AgathaMagic.intercept(level, player, chest, entity.getBoundingBox().getCenter()) != null) continue;
             Vec3 flat = new Vec3(offset.x, 0.0, offset.z);
             Vec3 away = flat.lengthSqr() < 1.0E-4 ? player.getLookAngle().multiply(1.0, 0.0, 1.0).normalize() : flat.normalize();
             if (entity instanceof Projectile projectile) {

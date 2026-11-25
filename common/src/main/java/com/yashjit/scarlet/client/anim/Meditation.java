@@ -62,7 +62,7 @@ public final class Meditation {
             return 0.0F;
         }
         MagicState state = Magic.state(player);
-        if (state.channeling(Spell.DREAMWALK)) {
+        if (state.channeling(Spell.DREAMWALK) || state.channeling(Spell.ASTRAL)) {
             return progress(state, now);
         }
         double ended = state.readyAt(Spell.DREAMWALK) - Spell.DREAMWALK.cooldown();

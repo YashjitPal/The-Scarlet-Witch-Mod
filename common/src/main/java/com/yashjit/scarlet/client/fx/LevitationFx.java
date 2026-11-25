@@ -2,7 +2,6 @@ package com.yashjit.scarlet.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.CastPoses;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.anim.PoseBlends;
@@ -56,14 +55,16 @@ public final class LevitationFx {
         }
         double now = minecraft.level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         Vec3 at = payload.position();
-        float darkness = CorruptionClient.darkness(minecraft.level.getEntity(payload.entityId()));
-        BURSTS.add(new Burst(at, liftOff, now, darkness));
+        var caster = minecraft.level.getEntity(payload.entityId());
+        Pixels.Ramp ramp = Pixels.Ramp.ofCaster(caster);
+        float darkness = CorruptionClient.darkness(caster);
+        BURSTS.add(new Burst(at, liftOff, now, darkness, ramp));
         try (Glow.Darkening ignored = Glow.darkening(darkness)) {
-            burstSparks(at, liftOff);
+            burstSparks(at, liftOff, ramp);
         }
     }
 
-    private static void burstSparks(Vec3 at, boolean liftOff) {
+    private static void burstSparks(Vec3 at, boolean liftOff, Pixels.Ramp ramp) {
         RandomSource random = ScarletFx.random();
         float density = ScarletFx.density();
         int sparks = Math.round((liftOff ? 28 : 14) * density);
@@ -72,12 +73,12 @@ public final class LevitationFx {
             double speed = (liftOff ? 0.12 : 0.08) + random.nextDouble() * 0.12;
             Vec3 velocity = new Vec3(Mth.cos(angle) * speed, (liftOff ? 0.04 : 0.015) + random.nextDouble() * 0.05, Mth.sin(angle) * speed);
             ScarletFx.spark(at.add(Mth.cos(angle) * 0.3, 0.08, Mth.sin(angle) * 0.3), velocity, 7 + random.nextInt(8), 0.026F,
-                    random.nextFloat() < 0.35F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.006F, 0.86F);
+                    ramp, random.nextFloat() < 0.35F ? Pixels.HOT : Pixels.BRIGHT, 0.006F, 0.86F);
         }
         for (int i = 0, n = Math.round((liftOff ? 16 : 9) * density); i < n; i++) {
             float angle = random.nextFloat() * TAU;
             ChaosDust.spawn(at.add(Mth.cos(angle) * 0.4, 0.05, Mth.sin(angle) * 0.4),
-                    new Vec3(Mth.cos(angle) * 0.05, 0.03 + random.nextDouble() * 0.03, Mth.sin(angle) * 0.05));
+                    new Vec3(Mth.cos(angle) * 0.05, 0.03 + random.nextDouble() * 0.03, Mth.sin(angle) * 0.05), ramp);
         }
     }
 
@@ -101,6 +102,7 @@ public final class LevitationFx {
             }
             Vec3 feet = feet(player, 1.0F);
             float time = player.tickCount;
+            Pixels.Ramp ramp = Pixels.Ramp.ofCaster(player);
             float darkness = CorruptionClient.darkness(player);
             try (Glow.Darkening ignored = Glow.darkening(darkness)) {
                 for (int i = 0; i < 2; i++) {
@@ -112,10 +114,10 @@ public final class LevitationFx {
                     Vec3 tangent = new Vec3(-Mth.sin(angle), 0, Mth.cos(angle));
                     ScarletFx.spark(feet.add(out.scale(0.42)).add(0, 0.04 + random.nextDouble() * 0.1, 0),
                             tangent.scale(0.03).add(0, -0.012, 0), 10 + random.nextInt(7), 0.022F,
-                            random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.002F, 0.9F);
+                            ramp, random.nextFloat() < 0.3F ? Pixels.HOT : Pixels.BRIGHT, 0.002F, 0.9F);
                 }
                 if (random.nextFloat() < 0.5F * density) {
-                    ChaosDust.spawn(feet.add(random.nextGaussian() * 0.18, -0.05, random.nextGaussian() * 0.18), new Vec3(0, -0.02, 0));
+                    ChaosDust.spawn(feet.add(random.nextGaussian() * 0.18, -0.05, random.nextGaussian() * 0.18), new Vec3(0, -0.02, 0), ramp);
                 }
             }
             if (random.nextFloat() < 0.6F * darkness * density) {
@@ -143,7 +145,7 @@ public final class LevitationFx {
             float levitate = PoseBlends.of(player).levitate;
             if (levitate > 0.01F) {
                 hovers.add(new Hover(feet(player, partialTick).subtract(camera).toVector3f(), levitate, player.tickCount + partialTick,
-                        (player.getId() * 0.618F) % 1.0F * TAU, CorruptionClient.darkness(player)));
+                        (player.getId() * 0.618F) % 1.0F * TAU, CorruptionClient.darkness(player), Pixels.Ramp.ofCaster(player)));
             }
         }
         List<Burst> bursts = List.copyOf(BURSTS);
@@ -179,7 +181,7 @@ public final class LevitationFx {
             if (r > 0.57F) {
                 // the marks, short arcs of six turning round it
                 float sector = (theta - turn) / (TAU / 6.0F);
-                return r < 0.66F && sector - Mth.floor(sector) < 0.3F && Pixels.shows(fade, i, k) ? Pixels.opaque(Pixels.BRIGHT) : 0;
+                return r < 0.66F && sector - Mth.floor(sector) < 0.3F && Pixels.shows(fade, i, k) ? hover.ramp().opaque(Pixels.BRIGHT) : 0;
             }
             float lick = 0.09F * Pixels.noise(Mth.cos(theta) * 2.0F + frame * 0.4F, Mth.sin(theta) * 2.0F - frame * 0.3F, 62);
             if (r > rim + lick) {
@@ -191,10 +193,10 @@ public final class LevitationFx {
                 return 0;
             }
             int step = heat > 0.95F ? Pixels.HOT : heat > 0.75F ? Pixels.PINK : heat > 0.55F ? Pixels.BRIGHT : heat > 0.3F ? Pixels.SCARLET : Pixels.CRIMSON;
-            return step >= Pixels.SCARLET ? Pixels.ramp(step, 0.75F) : Pixels.opaque(step);
+            return step >= Pixels.SCARLET ? Glow.withAlpha(hover.ramp().color(step), 0.75F) : hover.ramp().opaque(step);
         });
         PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y + 0.35F, c.z);
-        Wisps.helix(sprite, c, 0.36F, 0.24F, 0.05F, 0.65F, 3, 0.4F, 0.2F, time, fade, hover.seed(), 0);
+        Wisps.helix(sprite, c, 0.36F, 0.24F, 0.05F, 0.65F, 3, 0.4F, 0.2F, time, fade, hover.seed(), 0, hover.ramp());
         sprite.draw(buffer);
     }
 
@@ -211,22 +213,22 @@ public final class LevitationFx {
         float k = t / duration;
         Vec3 at = burst.position().add(0.0, 0.03, 0.0);
         float reach = burst.liftOff() ? 2.4F : 1.5F;
-        shock(buffer, pose, camera, at, 0.25F + (reach - 0.25F) * Ease.outCubic(k), 0.32F * (1.0F - k) + 0.08F, (float) Math.pow(1.0F - k, 1.5));
+        shock(buffer, pose, camera, at, 0.25F + (reach - 0.25F) * Ease.outCubic(k), 0.32F * (1.0F - k) + 0.08F, (float) Math.pow(1.0F - k, 1.5), burst.ramp());
         if (burst.liftOff()) {
             float late = Ease.clamp01((t - 2.0F) / (duration - 2.0F));
             if (t > 2.0F && late < 1.0F) {
-                shock(buffer, pose, camera, at, 0.2F + 1.2F * Ease.outCubic(late), 0.18F * (1.0F - late) + 0.06F, 0.7F * (float) Math.pow(1.0F - late, 1.5));
+                shock(buffer, pose, camera, at, 0.2F + 1.2F * Ease.outCubic(late), 0.18F * (1.0F - late) + 0.06F, 0.7F * (float) Math.pow(1.0F - late, 1.5), burst.ramp());
             }
         }
     }
 
-    private static void shock(VertexConsumer buffer, PoseStack.Pose pose, Vec3 camera, Vec3 at, float front, float depth, float fade) {
+    private static void shock(VertexConsumer buffer, PoseStack.Pose pose, Vec3 camera, Vec3 at, float front, float depth, float fade, Pixels.Ramp ramp) {
         FlatPixels.ring(buffer, pose, camera, at.x, at.y, at.z, Math.max(0.0F, front - depth), front, (i, k, r, theta) -> {
             float into = (front - r) / depth;
             if (!Pixels.shows(fade * (1.1F - into), i, k)) {
                 return 0;
             }
-            return Pixels.opaque(into < 0.2F ? Pixels.HOT : into < 0.45F ? Pixels.PINK : into < 0.7F ? Pixels.BRIGHT : Pixels.SCARLET);
+            return ramp.opaque(into < 0.2F ? Pixels.HOT : into < 0.45F ? Pixels.PINK : into < 0.7F ? Pixels.BRIGHT : Pixels.SCARLET);
         });
     }
 
@@ -239,9 +241,9 @@ public final class LevitationFx {
         return player.getPosition(partialTick).add(0, bob, 0);
     }
 
-    private record Hover(Vector3f feet, float levitate, float age, float seed, float darkness) {
+    private record Hover(Vector3f feet, float levitate, float age, float seed, float darkness, Pixels.Ramp ramp) {
     }
 
-    private record Burst(Vec3 position, boolean liftOff, double start, float darkness) {
+    private record Burst(Vec3 position, boolean liftOff, double start, float darkness, Pixels.Ramp ramp) {
     }
 }

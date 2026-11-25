@@ -10,8 +10,7 @@ import com.yashjit.scarlet.network.PossessPayload;
 import com.yashjit.scarlet.network.PuppetPayload;
 import com.yashjit.scarlet.network.StrugglePayload;
 import com.yashjit.scarlet.platform.Services;
-import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
-import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
+import com.yashjit.scarlet.client.render.Pixels;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
@@ -36,7 +35,7 @@ public final class MindControlClient {
     private static final int NOTHING = -1;
 
     private static final Int2ObjectMap<Link> LINKS = new Int2ObjectOpenHashMap<>();
-    private static final Int2DoubleMap LOYAL = new Int2DoubleOpenHashMap();
+    private static final Int2ObjectMap<Loyalty> LOYAL = new Int2ObjectOpenHashMap<>();
 
     private static @Nullable ClientLevel seenLevel;
 
@@ -93,7 +92,7 @@ public final class MindControlClient {
                     MindControlFx.released(caster, link.targetId);
                 }
             }
-            case PossessPayload.LOYAL -> LOYAL.put(payload.targetId(), now);
+            case PossessPayload.LOYAL -> LOYAL.put(payload.targetId(), new Loyalty(now, Pixels.Ramp.ofCaster(level.getEntity(caster))));
             default -> {
             }
         }
@@ -134,7 +133,7 @@ public final class MindControlClient {
         LINKS.int2ObjectEntrySet().removeIf(entry -> !(level.getEntity(entry.getIntKey()) instanceof Player caster)
                 || !Magic.state(caster).channeling(Spell.MIND_CONTROL));
         double now = level.getGameTime();
-        LOYAL.int2DoubleEntrySet().removeIf(entry -> now - entry.getDoubleValue() > MindControl.LOYAL_TICKS || level.getEntity(entry.getIntKey()) == null);
+        LOYAL.int2ObjectEntrySet().removeIf(entry -> now - entry.getValue().since() > MindControl.LOYAL_TICKS || level.getEntity(entry.getIntKey()) == null);
         Link own = LINKS.get(player.getId());
         Entity target = dreaming ? inside : own == null ? null : level.getEntity(own.targetId);
         if (inside != null) {
@@ -302,6 +301,10 @@ public final class MindControlClient {
         return heldBy != NOTHING;
     }
 
+    public static int heldBy() {
+        return heldBy;
+    }
+
     public static double heldSince() {
         return heldSince;
     }
@@ -357,11 +360,13 @@ public final class MindControlClient {
         if (!LOYAL.containsKey(entity.getId())) {
             return 0.0F;
         }
-        float t = (float) ((now - LOYAL.get(entity.getId())) / MindControl.LOYAL_TICKS);
+        float t = (float) ((now - LOYAL.get(entity.getId()).since()) / MindControl.LOYAL_TICKS);
         return Math.clamp(1.0F - t, 0.0F, 1.0F);
     }
 
-    public static Int2DoubleMap loyal() {
+    public record Loyalty(double since, Pixels.Ramp ramp) {}
+
+    public static Int2ObjectMap<Loyalty> loyal() {
         return LOYAL;
     }
 

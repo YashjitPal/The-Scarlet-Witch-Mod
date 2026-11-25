@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.mixin;
 
+import com.yashjit.scarlet.decor.HexMade;
 import com.yashjit.scarlet.hex.HexMending;
 import com.yashjit.scarlet.hex.HexRewrites;
 import com.yashjit.scarlet.hex.HexTape;
@@ -7,6 +8,7 @@ import com.yashjit.scarlet.hex.Hexes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProgressListener;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -24,8 +26,12 @@ abstract class ServerLevelMixin {
 
     @Inject(method = "tickNonPassenger", at = @At("TAIL"))
     private void scarlet$rewriteWhatCameIn(Entity entity, CallbackInfo ci) {
-        HexRewrites.ticked((ServerLevel) (Object) this, entity);
-        HexTape.ticked((ServerLevel) (Object) this, entity);
+        ServerLevel level = (ServerLevel) (Object) this;
+        HexRewrites.ticked(level, entity);
+        HexTape.ticked(level, entity);
+        if (entity instanceof ItemFrame frame && (entity.tickCount == 1 || entity.tickCount % 20 == 0) && !entity.isRemoved()) {
+            HexMade.tickFrame(level, frame);
+        }
     }
 
     @Inject(method = "addFreshEntity", at = @At("RETURN"))

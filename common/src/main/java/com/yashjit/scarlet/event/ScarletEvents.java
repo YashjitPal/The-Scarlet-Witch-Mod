@@ -16,6 +16,7 @@ import com.yashjit.scarlet.magic.RuneTraps;
 import com.yashjit.scarlet.magic.Telekinesis;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.player.SuitUp;
+import com.yashjit.scarlet.player.Speed;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -74,6 +75,7 @@ public final class ScarletEvents {
     }
 
     public static void onServerTick(MinecraftServer server) {
+        com.yashjit.scarlet.entity.WanderingCoven.tick(server.overworld());
         for (ServerLevel level : server.getAllLevels()) {
             // what the Hex does to the world itself is no part of the scene its tape records
             HexTape.offTape(() -> {
@@ -89,6 +91,7 @@ public final class ScarletEvents {
     }
 
     public static void onPlayerTick(ServerPlayer player) {
+        Speed.tick(player);
         // Equipment events miss some inventory paths, so re-check once a second.
         if (player.tickCount % 20 == 0 && Services.PLAYER_DATA.get(player).suited() && !CrownItem.isWearingCrown(player)) {
             SuitUp.setSuited(player, false);

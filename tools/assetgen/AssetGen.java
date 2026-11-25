@@ -33,6 +33,9 @@ public final class AssetGen {
         Path assets = Path.of(args.length > 0 ? args[0] : "common/src/main/resources/assets/scarlet");
         Path preview = Path.of(args.length > 1 ? args[1] : "build/assetgen");
         Files.createDirectories(preview);
+        WiccanArt.generate(assets, preview);
+        SpeedArt.generate(assets);
+        AgathaArt.generate(assets);
 
         List<BufferedImage> sheet = new ArrayList<>();
         for (Crown crown : List.of(Crown.witch(), Crown.warlock())) {
@@ -74,6 +77,7 @@ public final class AssetGen {
             icons.add(icon.getValue());
         }
         writePng(zoomSheet(icons, 128), preview.resolve("spell_icons.png"));
+        AgathaSpellArt.generate(assets);
 
         Path entity = assets.resolve("textures/entity");
         PeopleArt.Outfit[][] residents = PeopleArt.residentWardrobes();
@@ -380,9 +384,13 @@ public final class AssetGen {
          * In the head display context one model unit is 0.625 head pixels at scale 1.
          */
         String wornModelJson() {
+            return wornModelJson(4.0);
+        }
+
+        String wornModelJson(double headRadius) {
             double scale = regionSize / 10.0;
             double thickness = 0.32;
-            double z = -(4.0 + thickness / 2 + 0.03);
+            double z = -(headRadius + thickness / 2 + 0.03);
             String head = String.format(Locale.ROOT,
                     "{ \"rotation\": [0, 180, 0], \"translation\": [0, %s, %s], \"scale\": [%s, %s, %s] }",
                     num(regionCenterY / 0.625), num(z / 0.625), num(scale), num(scale), num(thickness / 0.625));
@@ -441,7 +449,7 @@ public final class AssetGen {
                     """.formatted(name, name, String.join(",\n", elements));
         }
 
-        private static String element(double x0, double y0, double z0, double x1, double y1, double z1, String uv) {
+        static String element(double x0, double y0, double z0, double x1, double y1, double z1, String uv) {
             String face = "{ \"uv\": " + uv + ", \"texture\": \"#metal\" }";
             return "    { \"from\": " + vec(x0, y0, z0) + ", \"to\": " + vec(x1, y1, z1) + ", \"faces\": { "
                     + "\"north\": " + face + ", \"south\": " + face + ", \"east\": " + face + ", \"west\": " + face

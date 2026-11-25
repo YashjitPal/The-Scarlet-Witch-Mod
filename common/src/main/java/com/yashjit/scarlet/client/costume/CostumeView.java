@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.client.costume;
 
 import com.yashjit.scarlet.client.anim.Ease;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.crown.CrownStyle;
@@ -8,6 +9,7 @@ import com.yashjit.scarlet.entity.DreamBody;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.player.ScarletPlayerData;
 import com.yashjit.scarlet.player.SuitUp;
+import com.yashjit.scarlet.player.Speed;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.world.entity.player.Player;
@@ -25,6 +27,7 @@ public record CostumeView(CrownStyle style, float progress, float phase, boolean
     private static final Int2ObjectMap<CrownStyle> LAST_STYLE = new Int2ObjectOpenHashMap<>();
 
     public static @Nullable CostumeView of(Player player, float partialTick) {
+        if (Speed.wearsGoggles(player)) return null;
         ScarletPlayerData data = Services.PLAYER_DATA.get(player);
         CrownStyle worn = CrownItem.wornStyle(player);
         if (worn != null) {
@@ -51,6 +54,10 @@ public record CostumeView(CrownStyle style, float progress, float phase, boolean
 
     public boolean transforming() {
         return phase < 1.0F;
+    }
+
+    public static Pixels.Ramp ramp(@Nullable CostumeView view) {
+        return view == null ? Pixels.Ramp.CHAOS : Pixels.Ramp.of(view.style());
     }
 
     /**

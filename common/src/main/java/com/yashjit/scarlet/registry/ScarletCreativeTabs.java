@@ -20,6 +20,16 @@ public final class ScarletCreativeTabs {
                         List<ItemStack> stacks = new ArrayList<>();
                         stacks.add(new ItemStack(ScarletItems.WITCH_TIARA.get()));
                         stacks.add(new ItemStack(ScarletItems.WARLOCK_CROWN.get()));
+                        stacks.add(new ItemStack(ScarletItems.WICCAN_CROWN.get()));
+                        stacks.add(new ItemStack(ScarletItems.AGATHA_BROOCH.get()));
+                        stacks.add(new ItemStack(ScarletItems.MIRROR_LEAF.get()));
+                        stacks.add(new ItemStack(ScarletItems.STONE_LEAF.get()));
+                        stacks.add(new ItemStack(ScarletItems.DREAM_LEAF.get()));
+                        stacks.add(new ItemStack(ScarletItems.ORB_GRIMOIRE.get()));
+                        stacks.add(new ItemStack(ScarletItems.BEAM_GRIMOIRE.get()));
+                        stacks.add(new ItemStack(ScarletItems.RUNE_GRIMOIRE.get()));
+                        stacks.add(new ItemStack(ScarletItems.SPEED_GOGGLES.get()));
+                        stacks.add(new ItemStack(ScarletItems.SPEED_SUIT.get()));
                         stacks.add(new ItemStack(ScarletItems.DARKHOLD.get()));
                         for (Supplier<Item> decor : ScarletBlocks.DECOR_ITEMS) {
                             stacks.add(new ItemStack(decor.get()));

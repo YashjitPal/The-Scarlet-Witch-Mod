@@ -23,7 +23,30 @@ public enum Spell {
     /** Cast once to raise it; after that, holding the cast resizes it, and the cost is per tick of resizing. */
     HEX("hex", 10, Input.CHANNEL, 0.1F, 10),
     /** The Darkhold's. Cast to choose where the spirit goes and again to wake; the cost is per tick of being away. */
-    DREAMWALK("dreamwalk", 6, Input.TOGGLE, 0.08F, 200);
+    DREAMWALK("dreamwalk", 6, Input.TOGGLE, 0.08F, 200),
+    STARFIRE("starfire", 1, Input.TAP, 7, 7),
+    ARC_BEAM("arc_beam", 2, Input.CHANNEL, 0.65F, 16),
+    WEAVE("weave", 1, Input.TAP, 15, 24),
+    SECOND_SIGHT("second_sight", 2, Input.TAP, 12, 60),
+    ASTRAL("astral", 5, Input.TOGGLE, 0.25F, 160),
+    WAYGATE("waygate", 4, Input.TAP, 22, 45),
+    DEMIURGE("demiurge", 10, Input.TAP, 45, 2400),
+    FATE("fate", 10, Input.TAP, 18, 80),
+    RUNIC_DOMAIN("runic_domain", 10, Input.TAP, 32, 120),
+    WITCHES_ROAD("witches_road", 10, Input.TAP, 25, 40),
+    DREAMBIND("dreambind", 5, Input.TAP, 20, 60),
+    TRANSMUTE("transmute", 3, Input.TAP, 12, 28),
+    GLAMOUR("glamour", 4, Input.TAP, 22, 140),
+    AEGIS("aegis", 1, Input.TAP, 14, 70),
+    VIOLET_BLAST("violet_blast", 1, Input.TAP, 6, 7),
+    SIPHON("siphon", 1, Input.CHANNEL, 0.25F, 36),
+    BINDING("binding", 2, Input.TAP, 16, 80),
+    WITCH_RUNE("witch_rune", 3, Input.TAP, 22, 110),
+    MALEDICTION("malediction", 4, Input.TAP, 19, 100),
+    DOUBLE("double", 3, Input.TAP, 24, 180),
+    NIGHTMARE("nightmare", 5, Input.TAP, 23, 140),
+    FAMILIAR("familiar", 4, Input.TAP, 28, 240),
+    WITCH_SIGHT("witch_sight", 1, Input.TAP, 12, 80);
 
     private static final Spell[] VALUES = values();
 
@@ -31,7 +54,13 @@ public enum Spell {
      * The spells on the wheel, clockwise from the top. Levitation is not among them: it is a gift of the crown itself,
      * there to be used at any time alongside whatever spell is chosen.
      */
-    public static final List<Spell> WHEEL = Arrays.stream(VALUES).filter(spell -> spell != LEVITATION).toList();
+    public static final List<Spell> WHEEL = Arrays.stream(VALUES).filter(spell -> spell != LEVITATION && !spell.billyOnly() && !spell.agathaOnly()).toList();
+
+    public boolean agathaOnly() { return ordinal() >= VIOLET_BLAST.ordinal(); }
+
+    public boolean billyOnly() {
+        return ordinal() >= STARFIRE.ordinal() && !agathaOnly();
+    }
 
     private final String id;
     private final int rank;
@@ -71,8 +100,7 @@ public enum Spell {
      * Whether casting it does anything yet. Spells still being built show in the wheel but cannot be chosen.
      */
     public boolean available() {
-        return this == CHAOS_BOLT || this == CHAOS_SHIELD || this == LEVITATION || this == TELEKINESIS || this == RED_MIST || this == SHOCKWAVE
-                || this == MIND_CONTROL || this == RUNE_TRAP || this == HEX || this == DREAMWALK;
+        return true;
     }
 
     /**
@@ -87,7 +115,7 @@ public enum Spell {
      * Whether casting it throws a hand forward. The others move the whole body, each in its own way.
      */
     public boolean strikes() {
-        return this == CHAOS_BOLT || this == RUNE_TRAP;
+        return this == CHAOS_BOLT || this == RUNE_TRAP || this == STARFIRE || this == VIOLET_BLAST;
     }
 
     /**
@@ -114,7 +142,7 @@ public enum Spell {
      */
     public static Spell choosable(int index) {
         Spell spell = byIndex(index);
-        return WHEEL.contains(spell) ? spell : WHEEL.getFirst();
+        return spell != LEVITATION ? spell : WHEEL.getFirst();
     }
 
     public static int count() {

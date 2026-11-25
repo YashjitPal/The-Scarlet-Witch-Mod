@@ -1,0 +1,28 @@
+{
+  "criteria": {
+    "discovery": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "type": "minecraft:entity_properties",
+          "entity": "this",
+          "predicate": {
+            "minecraft:location": {
+              "structures": "minecraft:ancient_city"
+            },
+            "minecraft:equipment": {
+              "head": {
+                "items": "scarlet:wiccan_crown"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "rewards": {
+    "loot": [
+      "scarlet:study/dream_leaf"
+    ]
+  }
+}

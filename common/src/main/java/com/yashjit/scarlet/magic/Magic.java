@@ -75,12 +75,17 @@ public final class Magic {
     private Magic() {
     }
 
+    public static boolean canCast(Player player) {
+        return CrownItem.isWearingCrown(player) || com.yashjit.scarlet.player.AgathaForm.worn(player);
+    }
+
     public static MagicState state(Player player) {
         return Services.PLAYER_DATA.magic(player);
     }
 
     public static float maxEnergy(Player player) {
         float max = Mastery.maxEnergy(Math.max(1, Mastery.rank(player)));
+        if (WiccanSpells.ascended(player)) return max * 2;
         return Hexes.ownsHex(player) ? max - Hexes.RESERVE : max;
     }
 
@@ -90,6 +95,7 @@ public final class Magic {
     public static float energy(MagicState state, double now, float max) {
         double elapsed = Math.max(0.0, now - state.energyAt());
         float drain = (state.channeling() ? Spell.byIndex(state.channel()).cost() : 0.0F) + (state.levitating() ? Spell.LEVITATION.cost() : 0.0F);
+        if (state.demiurgeUntil() > 0) drain += 0.32F;
         if (drain > 0.0F) {
             return (float) Math.clamp(state.energy() - drain * elapsed, 0.0, max);
         }
@@ -126,13 +132,13 @@ public final class Magic {
     }
 
     public static Refusal check(Player player, Spell spell, long now) {
-        if (!CrownItem.isWearingCrown(player) || player.isSpectator() || !player.isAlive()) {
+        if (!WiccanSpells.permits(player, spell) || player.isSpectator() || !player.isAlive()) {
             return Refusal.NO_CROWN;
         }
         if (!player.getMainHandItem().isEmpty() && spell != Spell.LEVITATION) {
             return Refusal.HANDS_FULL;
         }
-        if (Mastery.rank(player) < spell.rank()) {
+        if (!WiccanSpells.unlocked(player, spell)) {
             return Refusal.LOCKED;
         }
         if (!spell.available()) {
@@ -145,7 +151,7 @@ public final class Magic {
         if (now < state.readyAt(spell)) {
             return Refusal.COOLDOWN;
         }
-        if (spell == Spell.DREAMWALK && (!player.onGround() || player.isPassenger() || player.isSwimming() || player.isFallFlying()
+        if ((spell == Spell.DREAMWALK || spell == Spell.ASTRAL) && (!player.onGround() || player.isPassenger() || player.isSwimming() || player.isFallFlying()
                 || state.levitating())) {
             return Refusal.FOOTING;
         }
@@ -170,6 +176,7 @@ public final class Magic {
     // ---------------------------------------------------------------- server
 
     public static void handleCast(ServerPlayer player, boolean start, int spellIndex) {
+        if (spellIndex < 0 || spellIndex >= Spell.count()) return;
         Spell spell = Spell.byIndex(spellIndex);
         long now = player.level().getGameTime();
         MagicState state = state(player);
@@ -183,11 +190,36 @@ public final class Magic {
             stopLevitation(player, now, true);
             return;
         }
-        if (check(player, spell, now) != Refusal.NONE) {
+        if (AgathaMagic.silenced(player) || check(player, spell, now) != Refusal.NONE) {
             return;
         }
         if (spell == Spell.HEX) {
             castHex(player, state, now);
+            return;
+        }
+        if (spell == Spell.ASTRAL) {
+            Dreamwalk.project(player);
+            return;
+        }
+        if (spell == Spell.SIPHON && (state.channeling() || !AgathaMagic.beginDrain(player, now))) return;
+        if (spell.agathaOnly() && spell.input() == Spell.Input.TAP) {
+            if (AgathaMagic.cast(player, spell, now)) {
+                Services.PLAYER_DATA.setMagic(player, state.withCast(spell, energy(player, now) - spell.cost(), now));
+            }
+            return;
+        }
+        if (spell.billyOnly() && spell.input() == Spell.Input.TAP) {
+            if (!WiccanMagic.cast(player, spell, now)) return;
+            float energy = energy(player, now) - spell.cost();
+            MagicState next = spell.strikes() ? state.withCast(spell, energy, now) : state.withSpent(spell, energy, now);
+            if (spell == Spell.DEMIURGE) next = next.withForm(now + 400, maxEnergy(player) * 2, now);
+            Services.PLAYER_DATA.setMagic(player, next);
+            Mastery.grant(player, 3);
+            return;
+        }
+        if (spell == Spell.SHOCKWAVE && WiccanSpells.ascended(player)) {
+            Services.PLAYER_DATA.setMagic(player, state.withSpent(spell, energy(player, now) - spell.cost(), now));
+            SpellCasts.perform(player, spell, false);
             return;
         }
         switch (spell.input()) {
@@ -221,9 +253,11 @@ public final class Magic {
     }
 
     public static void select(ServerPlayer player, int index) {
+        if (index < 0 || index >= Spell.count()) return;
         MagicState state = state(player);
         Spell spell = Spell.byIndex(index);
-        if (state.selected() != index && Spell.WHEEL.contains(spell) && (!spell.darkhold() || Darkhold.carries(player))) {
+        if (state.selected() != index && spell != Spell.LEVITATION && WiccanSpells.permits(player, spell)
+                && WiccanSpells.unlocked(player, spell) && (!spell.darkhold() || Darkhold.carries(player))) {
             Services.PLAYER_DATA.setMagic(player, state.withSelected(index));
         }
     }
@@ -275,8 +309,9 @@ public final class Magic {
             return;
         }
         Spell spell = Spell.byIndex(state.channel());
+        if (spell == Spell.SIPHON) AgathaMagic.endDrain(player);
         MagicState stopped = state.withChannel(MagicState.NO_CHANNEL, energy(state, now, maxEnergy(player)), now);
-        int cooldown = spell == Spell.MIND_CONTROL ? MindControl.stop(player) : spell == Spell.DREAMWALK ? Dreamwalk.stop(player) : -1;
+        int cooldown = spell == Spell.MIND_CONTROL ? MindControl.stop(player) : spell == Spell.DREAMWALK || spell == Spell.ASTRAL ? Dreamwalk.stop(player) : -1;
         if (cooldown < 0) {
             cooldown = shattered ? SHATTER_COOLDOWN : spell.cooldown();
         }
@@ -353,7 +388,14 @@ public final class Magic {
         runPending(player, now);
         Telekinesis.tick(player, now);
         MagicState state = state(player);
-        if (player.isCreative() && CrownItem.isWearingCrown(player)) {
+        if (state.demiurgeUntil() > 0 && (!WiccanSpells.ascended(player) || !player.isAlive() || energy(player, now) <= 0.001F)) {
+            state = state.withForm(0, Math.min(energy(player, now), Mastery.maxEnergy(Mastery.rank(player))), now);
+            Services.PLAYER_DATA.setMagic(player, state);
+        }
+        WiccanMagic.tick(player, now);
+        AgathaMagic.tick(player, now);
+        state = state(player);
+        if (player.isCreative() && canCast(player) && state.demiurgeUntil() == 0) {
             // magic in creative never runs dry, as its blocks never run out; topped up a little short of full, so a
             // channel's drain doesn't send the state every tick
             float max = maxEnergy(player);
@@ -362,22 +404,27 @@ public final class Magic {
                 Services.PLAYER_DATA.setMagic(player, state);
             }
         }
-        if (player.tickCount % 20 == 0 && state.selectedSpell().darkhold() && !state.channeling() && !Darkhold.carries(player)) {
+        if (canCast(player) && (!WiccanSpells.permits(player, state.selectedSpell())
+                || state.selectedSpell().darkhold() && !state.channeling() && !Darkhold.carries(player))) {
             // the book's spells go with the book
-            state = state.withSelected(Spell.WHEEL.getFirst().ordinal());
+            state = state.withSelected((com.yashjit.scarlet.player.AgathaForm.worn(player) ? Spell.VIOLET_BLAST : CrownItem.isWiccan(player) ? Spell.STARFIRE : Spell.CHAOS_BOLT).ordinal());
             Services.PLAYER_DATA.setMagic(player, state);
         }
         if (state.channeling()) {
             boolean exhausted = energy(state, now, maxEnergy(player)) <= 0.001F && !shrinkingHex(player, Spell.byIndex(state.channel()));
-            if (exhausted || !CrownItem.isWearingCrown(player) || !player.getMainHandItem().isEmpty() || !player.isAlive()) {
+            if (exhausted || !WiccanSpells.permits(player, Spell.byIndex(state.channel())) || !player.getMainHandItem().isEmpty() || !player.isAlive()) {
                 stopChannel(player, now, exhausted);
+            } else if (state.channeling(Spell.SIPHON) && !AgathaMagic.drain(player, now)) {
+                stopChannel(player, now, false);
             } else if (state.channeling(Spell.CHAOS_SHIELD)) {
                 deflectProjectiles(player, now);
             } else if (state.channeling(Spell.TELEKINESIS) && !Telekinesis.hold(player, now)) {
                 stopChannel(player, now, false);
             } else if (state.channeling(Spell.MIND_CONTROL) && !MindControl.hold(player, now)) {
                 stopChannel(player, now, false);
-            } else if (state.channeling(Spell.DREAMWALK) && !Dreamwalk.hold(player, now)) {
+            } else if (state.channeling(Spell.ARC_BEAM)) {
+                if ((now - state.channelStart()) % 4 == 0) WiccanMagic.beam(player);
+            } else if ((state.channeling(Spell.DREAMWALK) || state.channeling(Spell.ASTRAL)) && !Dreamwalk.hold(player, now)) {
                 stopChannel(player, now, false);
             } else if (state.channeling(Spell.HEX) && (EJECTING.contains(player.getUUID()) ? !HexEjection.hold(player)
                     : TEARING.contains(player.getUUID()) ? !Hexes.part(player, !player.isShiftKeyDown())
@@ -390,7 +437,7 @@ public final class Magic {
         if (state.levitating()) {
             Abilities abilities = player.getAbilities();
             boolean exhausted = energy(state, now, maxEnergy(player)) <= 0.001F;
-            if (exhausted || !CrownItem.isWearingCrown(player) || !player.isAlive() || player.isPassenger() || player.isFallFlying()) {
+            if (exhausted || !WiccanSpells.permits(player, Spell.LEVITATION) || !player.isAlive() || player.isPassenger() || player.isFallFlying()) {
                 stopLevitation(player, now, true);
             } else if (now - state.levitatingSince() > TAKEOFF_GRACE && player.onGround() && !abilities.flying) {
                 // touched down: landing ends levitation
@@ -413,7 +460,7 @@ public final class Magic {
             PendingCast cast = iterator.next();
             if (now >= cast.at()) {
                 iterator.remove();
-                if (player.isAlive() && CrownItem.isWearingCrown(player)) {
+                if (player.isAlive() && WiccanSpells.permits(player, cast.spell())) {
                     SpellCasts.perform(player, cast.spell(), cast.offHand());
                 }
             }

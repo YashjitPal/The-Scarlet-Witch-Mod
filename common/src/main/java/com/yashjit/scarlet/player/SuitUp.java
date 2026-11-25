@@ -3,6 +3,7 @@ package com.yashjit.scarlet.player;
 import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.platform.Services;
+import com.yashjit.scarlet.registry.ScarletDataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -22,6 +23,19 @@ public final class SuitUp {
     }
 
     public static void requestToggle(ServerPlayer player) {
+        if (AgathaForm.worn(player)) {
+            if (player.isCreative() || com.yashjit.scarlet.magic.Mastery.rank(player) >= 5) {
+                AgathaForm next = AgathaForm.of(player).next();
+                if (next == AgathaForm.FINALE && com.yashjit.scarlet.magic.Mastery.rank(player) < 9) next = AgathaForm.TRAVELING;
+                player.getOffhandItem().set(ScarletDataComponents.AGATHA_FORM.get(), next);
+                player.sendOverlayMessage(Component.translatable("agatha.scarlet.form." + next.getSerializedName()));
+            }
+            return;
+        }
+        if (Speed.wearsGoggles(player)) {
+            Speed.toggle(player);
+            return;
+        }
         if (!CrownItem.isWearingCrown(player)) {
             player.sendOverlayMessage(Component.translatable("message.scarlet.suit_up.need_crown").withColor(ScarletPalette.BRIGHT_SCARLET));
             return;

@@ -19,7 +19,7 @@ import net.minecraft.core.component.DataComponents;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The source of all power: whoever wears a crown is the Scarlet Witch or Warlock.
+ * A wearable identity: the crown determines the costume and which magic, if any, is available.
  *
  * <p>Worn in the helmet slot with diamond helmet protection. It has no durability, so the mastery stored on it can
  * never be lost to wear, and it survives fire and lava. Its equippable has no equipment asset, which makes vanilla
@@ -53,6 +53,15 @@ public class CrownItem extends Item {
         return wornStyle(entity) != null;
     }
 
+    public static boolean hasScarletMagic(LivingEntity entity) {
+        CrownStyle style = wornStyle(entity);
+        return style != null && style.grantsScarletMagic();
+    }
+
+    public static boolean isWiccan(LivingEntity entity) {
+        return wornStyle(entity) == CrownStyle.WICCAN;
+    }
+
     public static @Nullable CrownStyle wornStyle(LivingEntity entity) {
         return entity.getItemBySlot(EquipmentSlot.HEAD).getItem() instanceof CrownItem crown ? crown.style() : null;
     }
@@ -65,13 +74,16 @@ public class CrownItem extends Item {
     @Override
     @SuppressWarnings("deprecation")
     public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay display, Consumer<Component> builder, TooltipFlag flag) {
+        if (style == CrownStyle.WICCAN) {
+            builder.accept(Component.translatable("item.scarlet.wiccan_crown.lore").withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        }
         int xp = Mastery.xp(stack);
         int rank = Mastery.rankForXp(xp);
-        builder.accept(Component.translatable("item.scarlet.crown.mastery", Mastery.numeral(rank)).withColor(ScarletPalette.BRIGHT_SCARLET));
+        builder.accept(Component.translatable("item.scarlet.crown.mastery", Mastery.numeral(rank)).withColor(style.nameColor()));
         builder.accept((rank >= Mastery.MAX_RANK
                 ? Component.translatable("item.scarlet.crown.mastery.max")
                 : Component.translatable("item.scarlet.crown.mastery.progress", Math.round(Mastery.progress(xp) * 100)))
                 .withStyle(ChatFormatting.GRAY));
-        builder.accept(Component.translatable("item.scarlet.crown.lore").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+        if (style != CrownStyle.WICCAN) builder.accept(Component.translatable("item.scarlet.crown.lore").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
     }
 }

@@ -118,6 +118,7 @@ public final class ScarletClient {
         platform.registerEntityRenderer(ScarletEntities.SEAT, NoopRenderer::new);
         platform.registerEntityRenderer(ScarletEntities.PARKED_CAR, ParkedCarRenderer::new);
         platform.registerEntityRenderer(ScarletEntities.DREAM_BODY, ClientDreamBody::renderer);
+        platform.registerEntityRenderer(ScarletEntities.WANDERING_WITCH, com.yashjit.scarlet.client.entity.WanderingWitchRenderer::new);
         platform.registerBlockEntityRenderer(ScarletBlockEntities.STOVE, StoveRenderer::new);
         platform.registerBlockEntityRenderer(ScarletBlockEntities.WALL_CLOCK, ClockRenderer::new);
         ClientDreamBody.registerOverride();
@@ -125,7 +126,10 @@ public final class ScarletClient {
         ScreenSounds.listen(TelevisionAudio::watched);
         DarkholdItem.viewerCorruption = () -> CorruptionClient.corruption(Minecraft.getInstance().player);
         platform.registerClientbound(ChaosImpactPayload.TYPE, BoltFx::impact);
+        platform.registerClientbound(com.yashjit.scarlet.network.WitchEffect.TYPE, com.yashjit.scarlet.client.fx.AgathaFx::receive);
         platform.registerClientbound(MagicEventPayload.TYPE, payload -> {
+            if (com.yashjit.scarlet.client.fx.AgathaFx.shared(payload)) return;
+            if (com.yashjit.scarlet.client.fx.WiccanFx.receive(payload)) return;
             ShieldFx.onEvent(payload);
             LevitationFx.onEvent(payload);
             ShockwaveFx.onEvent(payload);
@@ -170,6 +174,8 @@ public final class ScarletClient {
             platform.hideVanillaHud(Showcase::overlaysOnly);
         }
         platform.onSubmitWorldGeometry(ScarletFx::submit);
+        platform.onSubmitWorldGeometry(com.yashjit.scarlet.client.fx.WiccanFx::submit);
+        platform.onSubmitWorldGeometry(com.yashjit.scarlet.client.fx.AgathaFx::submit);
         platform.onSubmitWorldGeometry(BoltFx::submit);
         platform.onSubmitWorldGeometry(ShieldFx::submit);
         platform.onSubmitWorldGeometry(LevitationFx::submit);
@@ -200,7 +206,10 @@ public final class ScarletClient {
             }
         }
         while (ScarletKeyMappings.SUIT_UP.consumeClick()) {
-            if (minecraft.player != null) {
+            if (minecraft.player != null && minecraft.gui.screen() == null && minecraft.options.keyShift.isDown()
+                    && com.yashjit.scarlet.player.AgathaForm.worn(minecraft.player)) {
+                minecraft.gui.setScreen(new com.yashjit.scarlet.client.costume.AgathaWardrobe(minecraft.player));
+            } else if (minecraft.player != null && minecraft.gui.screen() == null) {
                 Services.NETWORK.sendToServer(ToggleSuitPayload.INSTANCE);
             }
         }

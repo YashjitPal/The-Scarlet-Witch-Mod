@@ -156,6 +156,7 @@ public class ParkedCar extends Entity {
 
     /** Whether the town parked it, so it goes with the town, and where, for the Hex to bring it back to if it sinks. */
     private boolean town;
+    private @Nullable UUID townCaster;
     private @Nullable Vec3 home;
     private float homeYaw;
     /** Whose Hex made it out of thin air, if one did: it goes the moment it is outside that Hex. */
@@ -203,11 +204,20 @@ public class ParkedCar extends Entity {
      * @param town  whether it belongs to the town of the Hex around it
      */
     public static ParkedCar park(ServerLevel level, Vec3 at, float yaw, int paint, boolean town) {
+        return park(level, at, yaw, paint, town, null);
+    }
+
+    public static ParkedCar park(ServerLevel level, Vec3 at, float yaw, int paint, UUID townCaster) {
+        return park(level, at, yaw, paint, true, townCaster);
+    }
+
+    private static ParkedCar park(ServerLevel level, Vec3 at, float yaw, int paint, boolean town, @Nullable UUID townCaster) {
         ParkedCar car = new ParkedCar(ScarletEntities.PARKED_CAR.get(), level);
         car.setPos(at);
         car.setYRot(yaw);
         car.entityData.set(PAINT, paint);
         car.town = town;
+        car.townCaster = townCaster;
         if (town) {
             car.home = at;
             car.homeYaw = yaw;
@@ -215,6 +225,24 @@ public class ParkedCar extends Entity {
         car.entityData.set(ERA, eraAround(level, at).ordinal());
         level.addFreshEntity(car);
         return car;
+    }
+
+    public boolean belongsToHex(UUID caster) {
+        return caster.equals(townCaster) || caster.equals(madeBy);
+    }
+
+    public boolean isTownCarAtLot(int minX, int minZ, int maxX, int maxZ) {
+        if (!town) {
+            return false;
+        }
+        Vec3 check = !driven && home != null ? home : position().distanceToSqr(home != null ? home : position()) < 4.0 ? position() : null;
+        return check != null && check.x >= minX - 1.0 && check.x <= maxX + 2.0 && check.z >= minZ - 1.0 && check.z <= maxZ + 2.0;
+    }
+
+    public void vanishFromHex(ServerLevel level) {
+        if (!isRemoved()) {
+            vanish(level);
+        }
     }
 
     public void madeBy(@Nullable UUID caster) {
@@ -596,16 +624,27 @@ public class ParkedCar extends Entity {
         if (Math.abs(speed) > SHOVES_FROM && !wrecked()) {
             runOver(level);
         }
+        if (tickCount <= 1 || (tickCount + getId()) % 5 == 0) {
+            if (madeBy != null && !HexMade.inside(level, madeBy, position())) {
+                vanish(level);
+                return;
+            }
+            if (town) {
+                Hex ownHex = townCaster != null ? HexData.of(level).byCaster(townCaster) : hexAround(level, position());
+                boolean insideOwn = ownHex != null && HexShape.contains(ownHex.center(), Hexes.wallRadius(ownHex, now), position());
+                boolean stillParked = !driven || home != null && position().distanceToSqr(home) < 4.0;
+                boolean lotGone = insideOwn && (ownHex.town() == null
+                        || stillParked && !ownHex.town().isBuilt(blockPosition().below().asLong()));
+                if (!insideOwn || lotGone) {
+                    vanish(level);
+                    return;
+                }
+            }
+        }
         if ((tickCount + getId()) % LOOK_EVERY != 0) {
             return;
         }
         Hex hex = hexAround(level, position());
-        // the town's own, never driven off, goes with the lot it was parked on when that is taken back
-        boolean lotGone = town && !driven && hex != null && hex.town() != null && !hex.town().isBuilt(blockPosition().below().asLong());
-        if (town && hex == null || lotGone || madeBy != null && !HexMade.inside(level, madeBy, position())) {
-            vanish(level);
-            return;
-        }
         int era = (hex == null ? Era.PRESENT : hex.era()).ordinal();
         if (entityData.get(ERA) != era) {
             entityData.set(ERA, era);
@@ -1060,6 +1099,7 @@ public class ParkedCar extends Entity {
         entityData.set(WRECKED, input.getBooleanOr("wrecked", false));
         entityData.set(FLOODED_AT, input.getBooleanOr("flooded", false) ? (int) level().getGameTime() - FLOATS_FOR : -1);
         town = input.getBooleanOr("town", false);
+        townCaster = input.read("town_caster", UUIDUtil.CODEC).orElse(null);
         driven = input.getBooleanOr("driven", false);
         madeBy = input.read("made_by", UUIDUtil.CODEC).orElse(null);
         home = input.read("home", Vec3.CODEC).orElse(null);
@@ -1076,6 +1116,7 @@ public class ParkedCar extends Entity {
         output.putBoolean("wrecked", wrecked());
         output.putBoolean("flooded", flooded());
         output.putBoolean("town", town);
+        output.storeNullable("town_caster", UUIDUtil.CODEC, townCaster);
         output.putBoolean("driven", driven);
         output.storeNullable("made_by", UUIDUtil.CODEC, madeBy);
         output.storeNullable("home", Vec3.CODEC, home);

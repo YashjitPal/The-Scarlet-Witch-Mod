@@ -192,6 +192,8 @@ public final class Telekinesis {
         EntityHitResult entityHit = ProjectileUtil.getEntityHitResult(player, eye, limit, new AABB(eye, limit).inflate(1.0),
                 candidate -> canHold(player, candidate), eye.distanceToSqr(limit));
         Entity target = entityHit != null ? entityHit.getEntity() : null;
+        if ((entityHit != null || block.getType() == HitResult.Type.BLOCK)
+                && AgathaMagic.intercept(level, player, eye, entityHit == null ? limit : entityHit.getLocation()) != null) return;
         if (target == null && block.getType() == HitResult.Type.BLOCK) {
             target = tearOut(player, block.getBlockPos());
         }

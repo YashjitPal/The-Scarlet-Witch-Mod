@@ -14,7 +14,6 @@ import com.yashjit.scarlet.client.render.PixelSprite;
 import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.config.ScarletClientConfig;
 import com.yashjit.scarlet.magic.MindControl;
-import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,12 +86,13 @@ public final class MindControlFx {
             return;
         }
         Vec3 head = target.getEyePosition();
-        SNAPS.add(new Snap(head, level.getGameTime(), size(target)));
+        Pixels.Ramp ramp = Pixels.Ramp.ofCaster(level.getEntity(casterId));
+        SNAPS.add(new Snap(head, level.getGameTime(), size(target), ramp));
         RandomSource random = ScarletFx.random();
         for (int i = 0, n = Math.round(26 * ScarletFx.density()); i < n; i++) {
             Vec3 out = new Vec3(random.nextGaussian(), random.nextGaussian(), random.nextGaussian()).normalize();
             ScarletFx.spark(head, out.scale(0.08 + random.nextDouble() * 0.16), 8 + random.nextInt(10), 0.026F,
-                    random.nextFloat() < 0.35F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.004F, 0.86F);
+                    ramp, random.nextFloat() < 0.35F ? Pixels.HOT : Pixels.BRIGHT, 0.004F, 0.86F);
         }
         // your own view comes back to your eyes, where these would be
         if (level.getEntity(casterId) instanceof Player caster && caster != minecraft.player) {
@@ -100,7 +100,7 @@ public final class MindControlFx {
             for (int i = 0, n = Math.round(10 * ScarletFx.density()); i < n; i++) {
                 Vec3 out = new Vec3(random.nextGaussian(), random.nextGaussian() * 0.5 + 0.5, random.nextGaussian()).normalize();
                 ScarletFx.spark(brow, out.scale(0.05 + random.nextDouble() * 0.06), 6 + random.nextInt(6), 0.02F,
-                        ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, -0.002F, 0.85F);
+                        ramp, Pixels.BRIGHT, -0.002F, 0.85F);
             }
         }
     }
@@ -154,8 +154,7 @@ public final class MindControlFx {
                 Vec3 head = target.getEyePosition().add(random.nextGaussian() * 0.15, 0.1, random.nextGaussian() * 0.15);
                 try (Glow.Darkening ignored = Glow.darkening(CorruptionClient.darkness(level.getEntity(entry.getIntKey())))) {
                     ScarletFx.spark(head, new Vec3(random.nextGaussian() * 0.01, 0.02 + random.nextDouble() * 0.02, random.nextGaussian() * 0.01),
-                            12 + random.nextInt(10), 0.02F, random.nextFloat() < 0.3F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET,
-                            ScarletPalette.SCARLET, -0.0015F, 0.92F);
+                            12 + random.nextInt(10), 0.02F, Pixels.Ramp.ofCaster(level.getEntity(entry.getIntKey())), random.nextFloat() < 0.3F ? Pixels.HOT : Pixels.BRIGHT, -0.0015F, 0.92F);
                 }
             }
         }
@@ -188,15 +187,15 @@ public final class MindControlFx {
             draws.add(new Draw(head.subtract(camera).toVector3f(), size(target), faceOut(target), !(target instanceof Player), target.getViewYRot(partialTick),
                     Hands.palm(caster, HumanoidArm.RIGHT).subtract(camera).toVector3f(), Hands.palm(caster, HumanoidArm.LEFT).subtract(camera).toVector3f(),
                     caster.getEyePosition(partialTick).subtract(camera).toVector3f(), reach, inside,
-                    target == viewer, ScarletFx.isFirstPersonViewOf(caster), entry.getIntKey() * 0.618F, time, CorruptionClient.darkness(caster)));
+                    target == viewer, ScarletFx.isFirstPersonViewOf(caster), entry.getIntKey() * 0.618F, time, CorruptionClient.darkness(caster), Pixels.Ramp.ofCaster(caster)));
         }
         List<Ember> embers = new ArrayList<>();
-        for (Int2DoubleMap.Entry entry : MindControlClient.loyal().int2DoubleEntrySet()) {
+        for (Int2ObjectMap.Entry<MindControlClient.Loyalty> entry : MindControlClient.loyal().int2ObjectEntrySet()) {
             if (level.getEntity(entry.getIntKey()) instanceof LivingEntity creature && creature != viewer) {
                 float loyalty = MindControlClient.loyalty(creature, now);
                 if (loyalty > 0.01F) {
                     embers.add(new Ember(creature.getEyePosition(partialTick).subtract(camera).toVector3f(), size(creature), faceOut(creature),
-                            creature.getViewYRot(partialTick), loyalty));
+                            creature.getViewYRot(partialTick), loyalty, entry.getValue().ramp()));
                 }
             }
         }
@@ -214,9 +213,9 @@ public final class MindControlFx {
                 tendrils(sprite, draw);
                 thread(sprite, draw);
                 if (!draw.viewedFromInside()) {
-                    crown(sprite, head, draw.size(), draw.reach(), draw.seed(), draw.time());
+                    crown(sprite, head, draw.size(), draw.reach(), draw.seed(), draw.time(), draw.ramp());
                     if (draw.lightEyes()) {
-                        Wisps.eyes(sprite, head, draw.size(), draw.out(), draw.yaw(), draw.reach(), draw.time() + draw.seed());
+                        Wisps.eyes(sprite, head, draw.size(), draw.out(), draw.yaw(), draw.reach(), draw.time() + draw.seed(), draw.ramp());
                     }
                 }
                 sprite.draw(buffer);
@@ -225,7 +224,7 @@ public final class MindControlFx {
             for (Ember ember : embers) {
                 Vector3f head = ember.head();
                 PixelSprite sprite = PixelSprite.inWorld(pose, head.x, head.y, head.z);
-                Wisps.eyes(sprite, head, ember.size(), ember.out(), ember.yaw(), 0.45F * ember.loyalty(), time);
+                Wisps.eyes(sprite, head, ember.size(), ember.out(), ember.yaw(), 0.45F * ember.loyalty(), time, ember.ramp());
                 sprite.draw(buffer);
             }
             for (Snap snap : snaps) {
@@ -234,9 +233,9 @@ public final class MindControlFx {
                 Vector3f at = snap.head().subtract(camera).toVector3f();
                 PixelSprite sprite = PixelSprite.inWorld(pose, at.x, at.y, at.z);
                 int frame = (int) Math.floor(now);
-                Wisps.burst(sprite, snap.size() * (0.2F + 0.9F * Ease.outCubic(k)), 0.1F + 0.2F * (1.0F - k), 1.0F - Ease.outCubic(k), frame);
+                Wisps.burst(sprite, snap.size() * (0.2F + 0.9F * Ease.outCubic(k)), 0.1F + 0.2F * (1.0F - k), 1.0F - Ease.outCubic(k), frame, snap.ramp());
                 if (k < 0.4F) {
-                    Wisps.orb(sprite, 3.5F * (1.0F - k / 0.4F) * snap.size(), 1.5F, frame, 31);
+                    Wisps.orb(sprite, 3.5F * (1.0F - k / 0.4F) * snap.size(), 1.5F, frame, 31, snap.ramp());
                 }
                 sprite.draw(buffer);
             }
@@ -265,7 +264,7 @@ public final class MindControlFx {
                 float curl = Math.min(0.75F, grip.distance(palm) * 0.1F);
                 // the bead races faster while it is still reaching in
                 Wisps.tendril(sprite, palm, grip, reach, curl, seed, draw.time(), draw.ownFirstPerson() ? alpha * 0.8F : alpha,
-                        reach < 0.999F ? 0.16F : 0.08F, index + 21);
+                        reach < 0.999F ? 0.16F : 0.08F, index + 21, draw.ramp());
             }
         }
     }
@@ -299,7 +298,7 @@ public final class MindControlFx {
             float fade = draw.viewedFromInside() ? 1.0F - Ease.clamp01((s - 0.55F) / 0.45F) : 1.0F;
             if (previous != null && Pixels.shows(draw.inside() * fade, i + frame, 7)) {
                 int step = Math.abs(s - run) < 0.025F ? Pixels.HOT : beat > 0.5F ? Pixels.PINK : Pixels.BRIGHT;
-                sprite.line(previous, at, Pixels.opaque(step), 1, beat > 0.5F && fade > 0.5F ? 2 : 1);
+                sprite.line(previous, at, draw.ramp().opaque(step), 1, beat > 0.5F && fade > 0.5F ? 2 : 1);
             }
             previous = at;
         }
@@ -313,7 +312,7 @@ public final class MindControlFx {
      * A crown of light gathering round a held head: two rings turning on tilted axes, closing round it as the hold
      * takes and flaring with each beat of a heart, a bead of light circling on each, and wisps curling up off it.
      */
-    private static void crown(PixelSprite sprite, Vector3f head, float size, float reach, float seed, float time) {
+    private static void crown(PixelSprite sprite, Vector3f head, float size, float reach, float seed, float time, Pixels.Ramp ramp) {
         float grow = Ease.outCubic(reach);
         if (grow < 0.01F) {
             return;
@@ -328,12 +327,12 @@ public final class MindControlFx {
             float tilt = 0.25F + 0.35F * i;
             Vector3f u = new Vector3f(Mth.cos(spin), 0.0F, Mth.sin(spin));
             Vector3f v = new Vector3f(-Mth.sin(spin) * Mth.cos(tilt), Mth.sin(tilt), Mth.cos(spin) * Mth.cos(tilt));
-            int color = Pixels.opaque(beat ? Pixels.PINK : i == 0 ? Pixels.BRIGHT : Pixels.SCARLET);
+            int color = ramp.opaque(beat ? Pixels.PINK : i == 0 ? Pixels.BRIGHT : Pixels.SCARLET);
             Wisps.ring(sprite, c, u, v, radius, spin, grow, color, 1, 1);
             float bead = time * 0.25F * (i == 0 ? 1.0F : -1.0F) + i * 2.5F;
             float bx = Mth.cos(bead) * radius;
             float by = Mth.sin(bead) * radius;
-            sprite.plot(c.x + u.x * bx + v.x * by, c.y + u.y * bx + v.y * by, c.z + u.z * bx + v.z * by, Pixels.opaque(Pixels.HOT), 2, beadSize);
+            sprite.plot(c.x + u.x * bx + v.x * by, c.y + u.y * bx + v.y * by, c.z + u.z * bx + v.z * by, ramp.opaque(Pixels.HOT), 2, beadSize);
         }
         // wisps curling up off the head
         for (int w = 0; w < 3; w++) {
@@ -348,7 +347,7 @@ public final class MindControlFx {
                 float r = radius * (0.9F - 0.5F * s);
                 Vector3f at = new Vector3f(c.x + Mth.cos(swirl) * r, c.y + rise, c.z + Mth.sin(swirl) * r);
                 if (previous != null && Pixels.shows(life * (1.0F - 0.8F * s), i + frame, w + 40)) {
-                    sprite.line(previous, at, Pixels.opaque(s < 0.4F ? Pixels.SCARLET : Pixels.CRIMSON), 0, 1);
+                    sprite.line(previous, at, ramp.opaque(s < 0.4F ? Pixels.SCARLET : Pixels.CRIMSON), 0, 1);
                 }
                 previous = at;
             }
@@ -389,36 +388,37 @@ public final class MindControlFx {
         if (minecraft.level == null || minecraft.player == null) {
             return;
         }
+        Pixels.Ramp ramp = Pixels.Ramp.ofCaster(minecraft.player);
         double now = minecraft.level.getGameTime() + deltaTracker.getGameTimeDeltaPartialTick(false);
         float strength = ScarletClientConfig.get().reduceFlashing ? 0.55F : 1.0F;
         double moved = MindControlClient.sinceMoved(now);
         if (MindControlClient.inside()) {
             boolean dream = MindControlClient.dreaming();
-            insideView(graphics, minecraft, now, strength, dream);
+            insideView(graphics, minecraft, now, strength, dream, ramp);
             if (!dream && MindControlClient.movedIn() && moved < DIVE_TICKS) {
                 // diving in: a flash of red the new view opens out of, from the middle
                 float k = (float) (moved / DIVE_TICKS);
-                flash(graphics, (1.0F - Ease.outCubic(k)) * 0.75F * strength, k);
+                flash(graphics, (1.0F - Ease.outCubic(k)) * 0.75F * strength, k, ramp);
             }
         } else if (!MindControlClient.movedIn() && !MindControlClient.wasDreaming() && moved < RETURN_TICKS) {
             float k = (float) (moved / RETURN_TICKS);
-            flash(graphics, (1.0F - Ease.outCubic(k)) * 0.55F * strength, k);
+            flash(graphics, (1.0F - Ease.outCubic(k)) * 0.55F * strength, k, ramp);
         }
         if (MindControlClient.held()) {
-            heldView(graphics, minecraft, now, strength);
+            heldView(graphics, minecraft, now, strength, Pixels.Ramp.ofCaster(minecraft.level.getEntity(MindControlClient.heldBy())));
         }
     }
 
     /**
      * @param dream your spirit is in it, dreamwalking: the edges run darker, black-crimson with sickly light
      */
-    private static void insideView(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, float strength, boolean dream) {
+    private static void insideView(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, float strength, boolean dream, Pixels.Ramp ramp) {
         int width = graphics.guiWidth();
         int height = graphics.guiHeight();
         float beat = heartbeat((float) now);
         float edge = (0.42F + 0.18F * beat) * strength;
-        int lit = dream ? ScarletPalette.SICKLY : ScarletPalette.SCARLET;
-        vignette(graphics, width, height, Math.max(width, height) / 4.0F, dream ? edge * 1.4F : edge, dream ? ScarletPalette.VOID : ScarletPalette.WINE);
+        int lit = dream && ramp == Pixels.Ramp.CHAOS ? ScarletPalette.SICKLY : ramp.color(Pixels.SCARLET);
+        vignette(graphics, width, height, Math.max(width, height) / 4.0F, dream ? edge * 1.4F : edge, dream && ramp == Pixels.Ramp.CHAOS ? ScarletPalette.VOID : ramp.color(Pixels.WINE));
         vignette(graphics, width, height, Math.max(width, height) / 9.0F, edge * (dream ? 0.3F : 0.6F), lit);
         // wisps curling at the edges of the view
         for (int i = 0; i < 12; i++) {
@@ -446,14 +446,14 @@ public final class MindControlFx {
             float shown = Ease.clamp01((float) (MindControlClient.sinceMoved(now) - 6.0) / 10.0F);
             Component name = ResidentsClient.isResident(living) ? ResidentsClient.nameOf(living) : living.getDisplayName();
             int y = 14;
-            graphics.centeredText(minecraft.font, name, width / 2, y, ARGB.color(0.95F * shown, dream ? 0xD9425E : ScarletPalette.BRIGHT_SCARLET));
+            graphics.centeredText(minecraft.font, name, width / 2, y, ARGB.color(0.95F * shown, dream && ramp == Pixels.Ramp.CHAOS ? 0xD9425E : ramp.color(Pixels.BRIGHT)));
             float health = Math.clamp(living.getHealth() / Math.max(1.0F, living.getMaxHealth()), 0.0F, 1.0F);
             float barWidth = 100.0F;
             float x0 = (width - barWidth) / 2.0F;
-            rect(graphics, x0 - 1, y + 11, barWidth + 2, 4, ARGB.color(0.7F * shown, ScarletPalette.SHADOW));
-            rect(graphics, x0, y + 12, barWidth, 2, ARGB.color(0.8F * shown, ScarletPalette.WINE));
-            rect(graphics, x0, y + 12, barWidth * health, 1, ARGB.color(shown, ScarletPalette.BRIGHT_SCARLET));
-            rect(graphics, x0, y + 13, barWidth * health, 1, ARGB.color(shown, ScarletPalette.CRIMSON));
+            rect(graphics, x0 - 1, y + 11, barWidth + 2, 4, ARGB.color(0.7F * shown, ramp.color(Pixels.SHADOW)));
+            rect(graphics, x0, y + 12, barWidth, 2, ARGB.color(0.8F * shown, ramp.color(Pixels.WINE)));
+            rect(graphics, x0, y + 12, barWidth * health, 1, ARGB.color(shown, ramp.color(Pixels.BRIGHT)));
+            rect(graphics, x0, y + 13, barWidth * health, 1, ARGB.color(shown, ramp.color(Pixels.CRIMSON)));
             double since = MindControlClient.sinceMoved(now);
             float hint = Math.min(Ease.clamp01((float) (since - 12.0) / 10.0F), Ease.clamp01((float) (110.0 - since) / 20.0F));
             if (hint > 0.02F) {
@@ -468,20 +468,20 @@ public final class MindControlFx {
         }
     }
 
-    private static void heldView(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, float strength) {
+    private static void heldView(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, float strength, Pixels.Ramp ramp) {
         int width = graphics.guiWidth();
         int height = graphics.guiHeight();
         float beat = heartbeat((float) now * 1.6F);
         float shown = Ease.clamp01((float) (now - MindControlClient.heldSince()) / 8.0F);
         float jolt = (float) Math.max(0.0, 1.0 - (now - struggledAt) / 5.0);
-        graphics.fill(0, 0, width, height, ARGB.color((0.16F + 0.08F * beat + 0.12F * jolt) * shown * strength, ScarletPalette.CRIMSON));
-        vignette(graphics, width, height, Math.max(width, height) / 3.0F, (0.6F + 0.2F * beat) * shown * strength, ScarletPalette.SHADOW);
-        vignette(graphics, width, height, Math.max(width, height) / 7.0F, 0.5F * shown * strength, ScarletPalette.SCARLET);
+        graphics.fill(0, 0, width, height, ARGB.color((0.16F + 0.08F * beat + 0.12F * jolt) * shown * strength, ramp.color(Pixels.CRIMSON)));
+        vignette(graphics, width, height, Math.max(width, height) / 3.0F, (0.6F + 0.2F * beat) * shown * strength, ramp.color(Pixels.SHADOW));
+        vignette(graphics, width, height, Math.max(width, height) / 7.0F, 0.5F * shown * strength, ramp.color(Pixels.SCARLET));
         Component text = Component.translatable("hud.scarlet.mind_control.held");
         int y = height / 2 + 28;
         float shake = jolt * 2.0F;
         graphics.centeredText(minecraft.font, text, Math.round(width / 2.0F + Mth.sin((float) now * 3.3F) * shake), y,
-                ARGB.color(shown, ScarletPalette.CORE));
+                ARGB.color(shown, ramp.color(Pixels.HOT)));
         Component hint = Component.translatable("hud.scarlet.mind_control.struggle");
         graphics.pose().pushMatrix();
         graphics.pose().translate(width / 2.0F, y + 12.0F);
@@ -494,22 +494,22 @@ public final class MindControlFx {
             boolean lit = i < fought;
             float size = lit ? 4.0F : 3.0F;
             rect(graphics, x0 + i * 7.0F - size / 2, y + 26.0F - size / 2, size, size,
-                    ARGB.color(shown * (lit ? 1.0F : 0.4F), lit ? ScarletPalette.BRIGHT_SCARLET : ScarletPalette.WINE));
+                    ARGB.color(shown * (lit ? 1.0F : 0.4F), lit ? ramp.color(Pixels.BRIGHT) : ramp.color(Pixels.WINE)));
         }
     }
 
     /**
      * A red flash opening out from the middle of the view as {@code k} runs from 0 to 1.
      */
-    private static void flash(GuiGraphicsExtractor graphics, float alpha, float k) {
+    private static void flash(GuiGraphicsExtractor graphics, float alpha, float k, Pixels.Ramp ramp) {
         if (alpha < 0.01F) {
             return;
         }
         int width = graphics.guiWidth();
         int height = graphics.guiHeight();
-        graphics.fill(0, 0, width, height, ARGB.color(alpha * 0.55F, ScarletPalette.CRIMSON));
-        vignette(graphics, width, height, Math.max(width, height) * (0.5F - 0.35F * k), alpha, ScarletPalette.SHADOW);
-        sprite(graphics, width / 2.0F, height / 2.0F, Math.max(width, height) * (0.3F + 1.6F * k), ARGB.color(alpha * 0.6F, ScarletPalette.BRIGHT_SCARLET));
+        graphics.fill(0, 0, width, height, ARGB.color(alpha * 0.55F, ramp.color(Pixels.CRIMSON)));
+        vignette(graphics, width, height, Math.max(width, height) * (0.5F - 0.35F * k), alpha, ramp.color(Pixels.SHADOW));
+        sprite(graphics, width / 2.0F, height / 2.0F, Math.max(width, height) * (0.3F + 1.6F * k), ARGB.color(alpha * 0.6F, ramp.color(Pixels.BRIGHT)));
     }
 
     /**
@@ -559,13 +559,13 @@ public final class MindControlFx {
      * @param ownFirstPerson   the view is the caster's own eyes
      */
     private record Draw(Vector3f head, float size, float out, boolean lightEyes, float yaw, Vector3f rightPalm, Vector3f leftPalm, Vector3f brow, float reach,
-                        float inside, boolean viewedFromInside, boolean ownFirstPerson, float seed, float time, float darkness) {
+                        float inside, boolean viewedFromInside, boolean ownFirstPerson, float seed, float time, float darkness, Pixels.Ramp ramp) {
     }
 
-    private record Ember(Vector3f head, float size, float out, float yaw, float loyalty) {
+    private record Ember(Vector3f head, float size, float out, float yaw, float loyalty, Pixels.Ramp ramp) {
     }
 
-    private record Snap(Vec3 head, double at, float size) {
+    private record Snap(Vec3 head, double at, float size, Pixels.Ramp ramp) {
     }
 
     /**

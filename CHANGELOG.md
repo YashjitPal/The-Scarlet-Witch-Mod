@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.14-alpha.1
+
+- **Agatha Harkness.** Equip the Cameo Brooch in your offhand to open Agatha's violet spell wheel. Hits charge Energy Absorption. Channel it to drain a witch's magic, heal, and build mastery on the brooch. A lethal siphon can teach you the target's spell. Stand inside your Circle of Runes to extinguish incoming bolts, potions, and aimed beams at its edge.
+- **Agatha's wardrobe.** Start in her traveling coat, unlock Agnes at rank V, and wear the WandaVision finale robes at rank IX. Open the wardrobe with **Shift + G** to choose an outfit and toggle Agatha's hair independently.
+- **Wandering covens.** Groups of two to five human witches roam the Overworld in teal and pale gold. Apprentices cast Starfire, adepts add Arc Beam, and elders lay binding runes. Their grimoires can also turn up in structure chests. Wanda, Wiccan, and Agatha can all learn from them.
+- **Wiccan.** Billy's crown opens a blue spell wheel with Starlight Weave, Waygate, and candle-lit Dreambinding. At rank X, Demiurge form unlocks Runic Domain and passage to the Witches' Road.
+- **Speed.** Equip Tommy's goggles and press **G** to lower the visor. Sprint to build speed, jump higher, and mine faster with an empty hand. Carry his running suit to change into it at the same time.
+
+For **Minecraft 26.3** and **Java 25**. Install the jar for your loader. Fabric also requires Fabric API. Two-player gameplay has yet to be tested in this alpha.
+
 ## 0.1.13
 
 - **The wall never stops for the town.** Drawn in or falling, it moves at its own pace the whole way, where before it stopped and started while the town caught up. Whatever of the town it passes where you can see goes as it goes by: a house it reaches dissolves right there, the wall still moving. What stands out past where anyone can see goes a moment later, nearest anyone first.

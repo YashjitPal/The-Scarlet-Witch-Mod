@@ -1,5 +1,7 @@
 package com.yashjit.scarlet.client.costume;
 
+import com.yashjit.scarlet.player.AgathaForm;
+
 import com.yashjit.scarlet.client.hex.Outfits;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.entity.DreamBody;
@@ -22,7 +24,10 @@ public final class CostumeRendering {
         boolean costume;
         boolean outfit;
         if (entity instanceof Player player) {
-            costume = CostumeView.of(player, partialTick) != null;
+            if (AgathaForm.worn(player)) {
+                AgathaLook.pinBrooch(state);
+            }
+            costume = SpeedLook.dressed(player) || CostumeView.of(player, partialTick) != null;
             outfit = !costume && Outfits.wearing(player, partialTick);
         } else if (entity instanceof DreamBody body) {
             costume = CostumeView.of(body) != null;

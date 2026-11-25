@@ -12,6 +12,7 @@ import com.yashjit.scarlet.mixin.ServerPlayerGameModeInvoker;
 import com.yashjit.scarlet.network.DreamOptionsPayload;
 import com.yashjit.scarlet.network.DreamPayload;
 import com.yashjit.scarlet.network.DreamStatePayload;
+import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.network.MagicEventPayload;
 import com.yashjit.scarlet.platform.Services;
 import com.yashjit.scarlet.registry.ScarletSounds;
@@ -115,7 +116,7 @@ public final class Dreamwalk {
      * Ends the spell, however far it had got.
      */
     private static void end(ServerPlayer player) {
-        if (Magic.state(player).channeling(Spell.DREAMWALK)) {
+        if (Magic.state(player).channeling(Spell.DREAMWALK) || Magic.state(player).channeling(Spell.ASTRAL)) {
             Magic.stopChannel(player, player.level().getGameTime(), false);
         } else {
             stop(player);
@@ -152,20 +153,31 @@ public final class Dreamwalk {
     /**
      * The body sits down and begins to rise, and the ground where the spirit will arrive starts to load.
      */
+    public static void project(ServerPlayer player) {
+        begin(player, player.level().dimension(), true);
+    }
+
     private static void begin(ServerPlayer player, ResourceKey<Level> dimension) {
+        begin(player, dimension, false);
+    }
+
+    private static void begin(ServerPlayer player, ResourceKey<Level> dimension, boolean astral) {
         long now = player.level().getGameTime();
+        Spell spell = astral ? Spell.ASTRAL : Spell.DREAMWALK;
         ServerLevel destination = player.level().getServer().getLevel(dimension);
         if (SESSIONS.containsKey(player.getUUID()) || destination == null || Magic.state(player).channeling()
-                || Magic.check(player, Spell.DREAMWALK, now) != Magic.Refusal.NONE) {
+                || Magic.check(player, spell, now) != Magic.Refusal.NONE) {
             return;
         }
         if (!ScarletServerConfig.get().dreamwalking) {
             player.sendOverlayMessage(Component.translatable("dreamwalk.scarlet.forbidden").withColor(ScarletPalette.SICKLY));
             return;
         }
-        SESSIONS.put(player.getUUID(), new Session(destination, arrival(player, destination).pos(), now));
+        Session session = new Session(destination, astral ? player.blockPosition() : arrival(player, destination).pos(), now);
+        session.astral = astral;
+        SESSIONS.put(player.getUUID(), session);
         remember(player);
-        Magic.channel(player, Spell.DREAMWALK, now);
+        Magic.channel(player, spell, now);
         play(player.level(), player.position(), ScarletSounds.DARKHOLD_WHISPER.get(), 0.8F, 0.8F);
         play(player.level(), player.position(), SoundEvents.ILLUSIONER_PREPARE_MIRROR, 0.6F, 0.7F);
         play(player.level(), player.position(), SoundEvents.AMETHYST_BLOCK_RESONATE, 0.5F, 0.5F);
@@ -178,7 +190,7 @@ public final class Dreamwalk {
      */
     public static boolean hold(ServerPlayer player, long now) {
         Session session = SESSIONS.get(player.getUUID());
-        if (session == null || !Darkhold.carries(player)) {
+        if (session == null || (!session.astral && !Darkhold.carries(player))) {
             return false;
         }
         return session.away ? stayAway(player, session, now) : rise(player, session, now);
@@ -218,7 +230,7 @@ public final class Dreamwalk {
         session.body = DreamBody.leave(player);
         session.away = true;
         session.awaySince = now;
-        Darkhold.corrupt(player, DEPART_CORRUPTION);
+        if (!session.astral) Darkhold.corrupt(player, DEPART_CORRUPTION);
         Services.NETWORK.sendToTrackingAndSelf(player, new MagicEventPayload(player.getId(), MagicEventPayload.DREAM_DEPART, at));
         play(from, at, SoundEvents.SOUL_ESCAPE.value(), 1.0F, 0.6F);
         play(from, at, SoundEvents.ILLUSIONER_MIRROR_MOVE, 0.7F, 0.6F);
@@ -231,8 +243,8 @@ public final class Dreamwalk {
         }
         session.creatureId = mob.getId();
         session.creatureLevel = (ServerLevel) mob.level();
-        MindControl.possess(player, mob);
-        Services.NETWORK.sendToPlayer(player, new DreamStatePayload(DreamStatePayload.AWAY, mob.getId(), corruption(player)));
+        if (!session.astral) MindControl.possess(player, mob);
+        Services.NETWORK.sendToPlayer(player, new DreamStatePayload(DreamStatePayload.AWAY, mob.getId(), corruption(player), CrownItem.isWiccan(player)));
         announce(player, mob, DreamStatePayload.POSSESSED);
         Vec3 head = mob.getEyePosition();
         play(session.creatureLevel, head, SoundEvents.ILLUSIONER_MIRROR_MOVE, 0.8F, 0.75F);
@@ -250,14 +262,15 @@ public final class Dreamwalk {
         keepLoaded((ServerLevel) body.level(), body.blockPosition(), BODY_TICKET_RADIUS);
         keepLoaded(session.creatureLevel, mob.blockPosition(), CREATURE_TICKET_RADIUS);
         long away = now - session.awaySince;
+        if (session.astral && (away >= 300 || body.distanceToSqr(mob) > 64 * 64)) return false;
         if (away > 0 && away % 20 == 0) {
-            Darkhold.corrupt(player, AWAY_CORRUPTION);
+            if (!session.astral) Darkhold.corrupt(player, AWAY_CORRUPTION);
             rouse(body);
         }
         if (away > 0 && away % RESYNC_TICKS == 0) {
             // anyone who has just come into view learns whose spirit is in it, and the dreamwalker's game where to look
             announce(player, mob, DreamStatePayload.POSSESSED);
-            Services.NETWORK.sendToPlayer(player, new DreamStatePayload(DreamStatePayload.AWAY, mob.getId(), corruption(player)));
+            Services.NETWORK.sendToPlayer(player, new DreamStatePayload(DreamStatePayload.AWAY, mob.getId(), corruption(player), CrownItem.isWiccan(player)));
         }
         return true;
     }
@@ -279,7 +292,7 @@ public final class Dreamwalk {
             Vec3 head = mob.getEyePosition();
             play(session.creatureLevel, head, SoundEvents.AMETHYST_CLUSTER_BREAK, 0.7F, 1.1F);
         }
-        Services.NETWORK.sendToPlayer(player, new DreamStatePayload(DreamStatePayload.WOKE, -1, 0.0F));
+        Services.NETWORK.sendToPlayer(player, new DreamStatePayload(DreamStatePayload.WOKE, -1, 0.0F, CrownItem.isWiccan(player)));
         DreamBody body = session.body;
         returnTo(player, body);
         if (body != null && !body.isRemoved()) {
@@ -289,7 +302,7 @@ public final class Dreamwalk {
             play(level, body.position(), SoundEvents.AMETHYST_BLOCK_CHIME, 0.9F, 0.7F);
             body.discard();
         }
-        return Spell.DREAMWALK.cooldown();
+        return session.astral ? Spell.ASTRAL.cooldown() : Spell.DREAMWALK.cooldown();
     }
 
     /**
@@ -458,7 +471,7 @@ public final class Dreamwalk {
     }
 
     private static void announce(ServerPlayer player, Mob mob, int stage) {
-        DreamStatePayload payload = new DreamStatePayload(stage, mob.getId(), corruption(player));
+        DreamStatePayload payload = new DreamStatePayload(stage, mob.getId(), corruption(player), CrownItem.isWiccan(player));
         Services.NETWORK.sendToTrackingAndSelf(mob, payload);
     }
 
@@ -479,6 +492,7 @@ public final class Dreamwalk {
         final BlockPos anchor;
         final long since;
         boolean away;
+        boolean astral;
         long awaySince;
         @Nullable DreamBody body;
         int creatureId = -1;

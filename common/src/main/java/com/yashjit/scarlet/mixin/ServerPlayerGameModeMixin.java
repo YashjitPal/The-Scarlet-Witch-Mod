@@ -2,14 +2,17 @@ package com.yashjit.scarlet.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.yashjit.scarlet.decor.HexMade;
 import com.yashjit.scarlet.hex.HexTape;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerPlayerGameMode;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
@@ -22,11 +25,15 @@ abstract class ServerPlayerGameModeMixin {
     @WrapMethod(method = "useItemOn")
     private InteractionResult scarlet$tapeUseOn(ServerPlayer player, Level level, ItemStack itemStack, InteractionHand hand, BlockHitResult hitResult,
                                                 Operation<InteractionResult> original) {
+        AbstractContainerMenu menuBefore = player.containerMenu;
         HexTape.Use use = HexTape.using(player);
         try {
             return original.call(player, level, itemStack, hand, hitResult);
         } finally {
             HexTape.used(use);
+            if (player.containerMenu != menuBefore && player.containerMenu != player.inventoryMenu) {
+                HexMade.openedAt(player, Vec3.atCenterOf(hitResult.getBlockPos()));
+            }
         }
     }
 

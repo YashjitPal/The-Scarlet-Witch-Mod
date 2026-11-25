@@ -31,6 +31,8 @@ public final class ScarletServerConfig {
     public boolean corruptionSideEffects = true;
     /** Whether the Darkhold's Dreamwalking can be cast at all. */
     public boolean dreamwalking = true;
+    /** Allows an ascended Wiccan to rewrite a small biome patch using pink petals. */
+    public boolean wiccanBiomeRewrite = true;
     /** Whether a caster can rewind the last seconds inside their Hex, and whether other players are wound back with it. */
     public boolean rewind = true;
     public boolean rewindPlayers = true;

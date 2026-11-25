@@ -16,6 +16,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
 
 public final class ScarletEntities {
+    public static final Supplier<EntityType<com.yashjit.scarlet.entity.WanderingWitch>> WANDERING_WITCH = register("wandering_witch",
+            EntityType.Builder.<com.yashjit.scarlet.entity.WanderingWitch>of(com.yashjit.scarlet.entity.WanderingWitch::new, MobCategory.CREATURE).noLootTable().sized(0.6F,1.95F).eyeHeight(1.67F).clientTrackingRange(10));
 
     public static final Supplier<EntityType<ChaosBolt>> CHAOS_BOLT = register("chaos_bolt",
             EntityType.Builder.<ChaosBolt>of(ChaosBolt::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(16)
@@ -35,6 +37,7 @@ public final class ScarletEntities {
 
     public static void bootstrap() {
         Services.REGISTRY.registerAttributes(DREAM_BODY, LivingEntity::createLivingAttributes);
+        Services.REGISTRY.registerAttributes(WANDERING_WITCH, com.yashjit.scarlet.entity.WanderingWitch::attributes);
     }
 
     private static <T extends Entity> Supplier<EntityType<T>> register(String name, EntityType.Builder<T> builder) {

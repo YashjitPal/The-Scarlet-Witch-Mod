@@ -52,6 +52,8 @@ public final class Mastery {
      */
     public static int rank(LivingEntity entity) {
         ItemStack head = entity.getItemBySlot(EquipmentSlot.HEAD);
+        if (entity instanceof Player witch && com.yashjit.scarlet.player.AgathaForm.worn(witch))
+            return witch.isCreative() ? MAX_RANK : rankForXp(xp(witch.getOffhandItem()));
         if (!(head.getItem() instanceof CrownItem)) {
             return 0;
         }

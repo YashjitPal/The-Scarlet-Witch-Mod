@@ -1,6 +1,6 @@
 package com.yashjit.scarlet.client.fx;
 
-import com.yashjit.scarlet.ScarletPalette;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.client.costume.CostumeView;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.render.Glow;
@@ -48,15 +48,15 @@ public final class TransformationFx {
                     if (view.suited()) {
                         rise(player, view);
                         boolean ownFirstPerson = player == minecraft.player && minecraft.options.getCameraType().isFirstPerson();
-                        CastFx.handDust(player, 1.2F, ownFirstPerson);
+                        CastFx.handDust(player, 1.2F, ownFirstPerson, Pixels.Ramp.of(view.style()));
                     } else {
                         burnAway(player, view);
                     }
                 } else if (view.suited()) {
-                    fingertips(player);
+                    fingertips(player, Pixels.Ramp.of(view.style()));
                 }
                 if (view.suited() && last < CROWN_FLARE_PHASE && view.phase() >= CROWN_FLARE_PHASE) {
-                    crownFlare(player);
+                    crownFlare(player, Pixels.Ramp.of(view.style()));
                 }
             }
             LAST_PHASE.put(player.getId(), view.phase());
@@ -79,15 +79,15 @@ public final class TransformationFx {
             double radius = 0.4 + random.nextDouble() * 0.16;
             Vec3 position = new Vec3(player.getX() + Math.cos(angle) * radius, front + random.nextGaussian() * 0.04, player.getZ() + Math.sin(angle) * radius);
             Vec3 velocity = new Vec3(-Math.sin(angle) * 0.07, 0.025 + random.nextDouble() * 0.03, Math.cos(angle) * 0.07);
-            int core = random.nextFloat() < 0.15F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
-            ScarletFx.spark(position, velocity, 9 + random.nextInt(7), 0.028F + random.nextFloat() * 0.022F, core, ScarletPalette.SCARLET, 0.0F, 0.86F);
+            int core = random.nextFloat() < 0.15F ? Pixels.HOT : Pixels.BRIGHT;
+            ScarletFx.spark(position, velocity, 9 + random.nextInt(7), 0.028F + random.nextFloat() * 0.022F, Pixels.Ramp.of(view.style()), core, 0.0F, 0.86F);
         }
         // two threads winding in from further out
         for (int strand = 0; strand < 2; strand++) {
             double angle = view.phase() * Math.PI * 7 + strand * Math.PI;
             Vec3 position = new Vec3(player.getX() + Math.cos(angle) * 0.75, front - 0.1, player.getZ() + Math.sin(angle) * 0.75);
             Vec3 velocity = new Vec3(-Math.cos(angle) * 0.045, 0.05, -Math.sin(angle) * 0.045);
-            ScarletFx.spark(position, velocity, 12, 0.05F, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, 0.0F, 0.9F);
+            ScarletFx.spark(position, velocity, 12, 0.05F, Pixels.Ramp.of(view.style()), Pixels.HOT, 0.0F, 0.9F);
         }
     }
 
@@ -100,12 +100,12 @@ public final class TransformationFx {
             double radius = 0.32 + random.nextDouble() * 0.14;
             Vec3 position = new Vec3(player.getX() + Math.cos(angle) * radius, front + random.nextGaussian() * 0.06, player.getZ() + Math.sin(angle) * radius);
             Vec3 velocity = new Vec3(Math.cos(angle) * 0.012, 0.012 + random.nextDouble() * 0.02, Math.sin(angle) * 0.012);
-            int core = random.nextFloat() < 0.5F ? ScarletPalette.SCARLET : ScarletPalette.CRIMSON;
-            ScarletFx.spark(position, velocity, 18 + random.nextInt(14), 0.03F + random.nextFloat() * 0.025F, core, ScarletPalette.WINE, -0.0015F, 0.93F);
+            int core = random.nextFloat() < 0.5F ? Pixels.SCARLET : Pixels.CRIMSON;
+            ScarletFx.spark(position, velocity, 18 + random.nextInt(14), 0.03F + random.nextFloat() * 0.025F, Pixels.Ramp.of(view.style()), core, -0.0015F, 0.93F);
         }
     }
 
-    private static void fingertips(Player player) {
+    private static void fingertips(Player player, Pixels.Ramp ramp) {
         RandomSource random = ScarletFx.random();
         if (random.nextFloat() > 0.45F * ScarletFx.density()) {
             return;
@@ -115,19 +115,19 @@ public final class TransformationFx {
         double side = right ? 1.0 : -1.0;
         Vec3 hand = new Vec3(player.getX() - Math.cos(yaw) * 0.37 * side, player.getY() + 0.68, player.getZ() - Math.sin(yaw) * 0.37 * side);
         Vec3 velocity = new Vec3(random.nextGaussian() * 0.008, -0.004 - random.nextDouble() * 0.01, random.nextGaussian() * 0.008);
-        ScarletFx.spark(hand, velocity, 14 + random.nextInt(10), 0.025F, ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.0005F, 0.94F);
+        ScarletFx.spark(hand, velocity, 14 + random.nextInt(10), 0.025F, ramp, Pixels.BRIGHT, 0.0005F, 0.94F);
     }
 
-    private static void crownFlare(Player player) {
+    private static void crownFlare(Player player, Pixels.Ramp ramp) {
         RandomSource random = ScarletFx.random();
         Vec3 crown = new Vec3(player.getX(), player.getEyeY() + 0.28, player.getZ());
-        ScarletFx.spark(crown, Vec3.ZERO, 7, 0.32F, ScarletPalette.CORE, ScarletPalette.BRIGHT_SCARLET, 0.0F, 1.0F);
+        ScarletFx.spark(crown, Vec3.ZERO, 7, 0.32F, ramp, Pixels.HOT, 0.0F, 1.0F);
         int count = Math.round(30 * ScarletFx.density());
         for (int i = 0; i < count; i++) {
             Vec3 direction = new Vec3(random.nextGaussian(), random.nextGaussian() * 0.6 + 0.25, random.nextGaussian()).normalize();
             Vec3 velocity = direction.scale(0.08 + random.nextDouble() * 0.08);
-            int core = random.nextFloat() < 0.4F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET;
-            ScarletFx.spark(crown, velocity, 10 + random.nextInt(10), 0.03F + random.nextFloat() * 0.03F, core, ScarletPalette.SCARLET, 0.002F, 0.88F);
+            int core = random.nextFloat() < 0.4F ? Pixels.HOT : Pixels.BRIGHT;
+            ScarletFx.spark(crown, velocity, 10 + random.nextInt(10), 0.03F + random.nextFloat() * 0.03F, ramp, core, 0.002F, 0.88F);
         }
     }
 }

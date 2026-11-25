@@ -9,6 +9,7 @@ import com.yashjit.scarlet.client.hex.Ejections;
 import com.yashjit.scarlet.client.hex.HomePlacement;
 import com.yashjit.scarlet.client.platform.ClientPlatform;
 import com.yashjit.scarlet.client.render.Glow;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.hex.Hex;
 import com.yashjit.scarlet.hex.HexPaint;
@@ -91,7 +92,7 @@ public final class MagicHud {
         lastNanos = nanos;
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        boolean crowned = player != null && CrownItem.isWearingCrown(player) && minecraft.gameMode != null
+        boolean crowned = player != null && Magic.canCast(player) && minecraft.gameMode != null
                 && (!player.isSpectator() || DreamwalkClient.away());
         shown = Ease.damp(shown, crowned ? 1.0F : 0.0F, 10.0F, seconds);
         if (player == null || minecraft.level == null) {
@@ -118,10 +119,12 @@ public final class MagicHud {
             lastHint = hint;
         }
         if (shown > 0.01F) {
-            energyBar(graphics, energy / max, energy < state.selectedSpell().cost(), now, CorruptionClient.darkness(player));
-            caption(graphics, minecraft, now, state.selectedSpell());
+            Pixels.Ramp ramp = Pixels.Ramp.ofCaster(player);
+            energyBar(graphics, energy / max, energy < state.selectedSpell().cost(), now, CorruptionClient.darkness(player), ramp);
+            if (ramp == Pixels.Ramp.AGATHA) siphonGauge(graphics, player, now);
+            caption(graphics, minecraft, now, state.selectedSpell(), ramp);
             if (hintShown > 0.02F && lastHint != null && !SpellWheel.isOpen()) {
-                hintLine(graphics, minecraft, lastHint, hintShown * shown);
+                hintLine(graphics, minecraft, lastHint, hintShown * shown, ramp);
             }
         }
         SpellWheel.render(graphics, minecraft, seconds);
@@ -132,6 +135,7 @@ public final class MagicHud {
      * while its spell is chosen.
      */
     private static @Nullable Component hint(Minecraft minecraft, LocalPlayer player, MagicState state, double now) {
+        if (CrownItem.isWiccan(player) && state.demiurgeUntil() > now) return Component.translatable("wiccan.form", (int)Math.ceil((state.demiurgeUntil() - now) / 20));
         Component placing = HomePlacement.hint(minecraft);
         if (placing != null) {
             return placing;
@@ -185,7 +189,7 @@ public final class MagicHud {
         return null;
     }
 
-    private static void hintLine(GuiGraphicsExtractor graphics, Minecraft minecraft, Component text, float alpha) {
+    private static void hintLine(GuiGraphicsExtractor graphics, Minecraft minecraft, Component text, float alpha, Pixels.Ramp ramp) {
         int y = graphics.guiHeight() - 71 - Math.round(VITALS_LIFT * shown);
         if (minecraft.gameMode != null && !minecraft.gameMode.canHurtPlayer()) {
             y += 14;
@@ -193,14 +197,14 @@ public final class MagicHud {
         graphics.pose().pushMatrix();
         graphics.pose().translate(graphics.guiWidth() / 2.0F, y);
         graphics.pose().scale(0.75F);
-        graphics.centeredText(minecraft.font, text, 0, 0, ARGB.color(0.85F * alpha, 0xE6D6DA));
+        graphics.centeredText(minecraft.font, text, 0, 0, ARGB.color(0.85F * alpha, ramp == Pixels.Ramp.WICCAN ? 0xCCE4F4 : 0xE6D6DA));
         graphics.pose().popMatrix();
     }
 
     /**
      * @param darkness how far the Darkhold's corruption has darkened your magic, and with it the energy
      */
-    private static void energyBar(GuiGraphicsExtractor graphics, float fraction, boolean low, double now, float darkness) {
+    private static void energyBar(GuiGraphicsExtractor graphics, float fraction, boolean low, double now, float darkness, Pixels.Ramp ramp) {
         float shake = refusal == Magic.Refusal.ENERGY ? (float) Math.max(0.0, 1.0 - (now - refusedAt) / 8.0) : 0.0F;
         float x0 = (graphics.guiWidth() - BAR_WIDTH) / 2.0F + shake * (float) Math.sin(now * 3.1) * 1.4F;
         // slides up into place as the crown goes on
@@ -212,8 +216,10 @@ public final class MagicHud {
         int scarlet = Glow.mix(ScarletPalette.SCARLET, 0x5E0A1E, darkness);
         int crimson = Glow.mix(ScarletPalette.CRIMSON, ScarletPalette.ABYSS, darkness);
         int wine = Glow.mix(ScarletPalette.WINE, ScarletPalette.VOID, darkness);
+        if (ramp == Pixels.Ramp.AGATHA) { core = 0xFFF0E2; bright = 0xEDD0FF; scarlet = 0xA45CE3; crimson = 0x7338AF; wine = 0x472352; }
+        if (ramp == Pixels.Ramp.WICCAN) { core = 0xEAFAFF; bright = 0x94E4FF; scarlet = 0x438AF3; crimson = 0x2E54AF; wine = 0x1A2756; }
 
-        rect(graphics, x0 - 1, y0 - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, ARGB.color(alpha * 0.75F, ScarletPalette.SHADOW));
+        rect(graphics, x0 - 1, y0 - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, ARGB.color(alpha * 0.75F, ramp.color(Pixels.SHADOW)));
         rect(graphics, x0, y0, BAR_WIDTH, BAR_HEIGHT, ARGB.color(alpha * 0.85F, wine));
         float fill = BAR_WIDTH * Math.clamp(fraction, 0.0F, 1.0F);
         if (fill > 0.0F) {
@@ -235,12 +241,23 @@ public final class MagicHud {
         }
     }
 
-    private static void caption(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, Spell selected) {
+    private static void siphonGauge(GuiGraphicsExtractor graphics, LocalPlayer player, double now) {
+        int charge = com.yashjit.scarlet.magic.AgathaMagic.charge(player);
+        int x = graphics.guiWidth() / 2 - 90, y = graphics.guiHeight() - BAR_TOP - 4;
+        for (int i = 0; i < 10; i++) {
+            rect(graphics, x + 18 * i, y, 17, 2, 0xff44314f);
+            float fill = Math.clamp(charge - 10 * i, 0, 10) * 1.7F;
+            if (fill > 0) rect(graphics, x + 18 * i, y, fill, 2, charge == 100 && ((int)now / 6) % 2 == 0 ? 0xffefcaff : 0xffa557d5);
+        }
+    }
+
+    private static void caption(GuiGraphicsExtractor graphics, Minecraft minecraft, double now, Spell selected, Pixels.Ramp ramp) {
         Component text;
         double since;
         boolean warning = refusal == Magic.Refusal.LOCKED || refusal == Magic.Refusal.UNAVAILABLE || refusal == Magic.Refusal.DARKHOLD
                 || refusal == Magic.Refusal.FOOTING;
-        if (warning && now - refusedAt < CAPTION_TICKS && now - refusedAt < now - selectedAt) {
+        warning = warning && now - refusedAt < CAPTION_TICKS && refusedAt > selectedAt;
+        if (warning) {
             since = now - refusedAt;
             text = switch (refusal) {
                 case LOCKED -> Component.translatable("spell.scarlet.locked", Mastery.numeral(refusedSpell.rank()));
@@ -263,7 +280,8 @@ public final class MagicHud {
         if (minecraft.gameMode != null && !minecraft.gameMode.canHurtPlayer()) {
             y += 14;
         }
-        graphics.centeredText(minecraft.font, text, graphics.guiWidth() / 2, y, ARGB.color(fade, warning ? 0xF2A0AC : ScarletPalette.BRIGHT_SCARLET));
+        int color = warning ? (ramp == Pixels.Ramp.WICCAN ? 0xBADFFF : 0xF2A0AC) : ramp.color(Pixels.BRIGHT);
+        graphics.centeredText(minecraft.font, text, graphics.guiWidth() / 2, y, ARGB.color(fade, color));
     }
 
     /**

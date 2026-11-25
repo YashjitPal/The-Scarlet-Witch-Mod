@@ -2,6 +2,8 @@ package com.yashjit.scarlet.client.magic;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.client.anim.CastPoseState;
+import com.yashjit.scarlet.client.costume.CostumeView;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.darkhold.DarkholdBook;
 import com.yashjit.scarlet.client.fx.ArmMagic;
@@ -45,12 +47,14 @@ public final class MagicLayer extends RenderLayer<AvatarRenderState, PlayerModel
         float time = (float) (minecraft.level.getGameTime() % 24000L) + partialTick;
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         Vec3[] palms = new Vec3[2];
+        Pixels.Ramp ramp = entity instanceof Player p && (com.yashjit.scarlet.crown.CrownItem.isWiccan(p) || com.yashjit.scarlet.player.AgathaForm.worn(p)) ? Pixels.Ramp.ofCaster(p)
+                : CostumeView.ramp(entity instanceof Player player ? CostumeView.of(player, partialTick) : CostumeView.of((DreamBody) entity));
         float darkness = entity instanceof DreamBody body ? CorruptionClient.darkness(body.corruption()) : CorruptionClient.darkness(entity);
         for (HumanoidArm arm : HumanoidArm.values()) {
             boolean right = arm == HumanoidArm.RIGHT;
             float intensity = entity instanceof Player player ? MagicVisuals.armIntensity(player, arm, partialTick) : MagicVisuals.MEDITATING;
             if (intensity > 0.01F) {
-                ArmMagic.submitArm(poseStack, collector, model, right, slim, time, intensity, darkness);
+                ArmMagic.submitArm(poseStack, collector, model, right, slim, time, intensity, darkness, ramp);
             }
             poseStack.pushPose();
             model.root().translateAndRotate(poseStack);

@@ -15,6 +15,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Entity.class)
 abstract class EntityMixin {
 
+    @Inject(method = "shouldBeSaved", at = @At("HEAD"), cancellable = true)
+    private void scarlet$temporarySummon(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> ci) {
+        if (((Entity)(Object)this).entityTags().contains(com.yashjit.scarlet.magic.AgathaMagic.CONJURED)) ci.setReturnValue(false);
+    }
+
     @Inject(method = "playSound(Lnet/minecraft/sounds/SoundEvent;FF)V", at = @At("HEAD"), cancellable = true)
     private void scarlet$soundLikePeople(SoundEvent sound, float volume, float pitch, CallbackInfo ci) {
         Entity self = (Entity) (Object) this;

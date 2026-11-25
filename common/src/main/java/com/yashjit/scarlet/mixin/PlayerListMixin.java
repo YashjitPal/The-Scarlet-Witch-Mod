@@ -17,5 +17,6 @@ abstract class PlayerListMixin {
     @Inject(method = "remove(Lnet/minecraft/server/level/ServerPlayer;)V", at = @At("HEAD"))
     private void scarlet$wakeBeforeLeaving(ServerPlayer player, CallbackInfo ci) {
         Dreamwalk.onLeave(player);
+        com.yashjit.scarlet.magic.DreamCircle.leave(player);
     }
 }

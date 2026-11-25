@@ -21,7 +21,7 @@ public final class Showrunner {
     }
 
     public static void handle(ServerPlayer player, ShowrunnerPayload payload) {
-        if (!CrownItem.isWearingCrown(player) || Mastery.rank(player) < Spell.HEX.rank()) {
+        if (!CrownItem.hasScarletMagic(player) || Mastery.rank(player) < Spell.HEX.rank()) {
             return;
         }
         if (payload.action() == ShowrunnerPayload.BUILD) {
@@ -61,7 +61,7 @@ public final class Showrunner {
     }
 
     public static void raiseHome(ServerPlayer player, HomePayload payload) {
-        if (CrownItem.isWearingCrown(player) && Mastery.rank(player) >= Spell.HEX.rank()) {
+        if (CrownItem.hasScarletMagic(player) && Mastery.rank(player) >= Spell.HEX.rank()) {
             Hexes.raiseHome(player, payload.lot());
         }
     }

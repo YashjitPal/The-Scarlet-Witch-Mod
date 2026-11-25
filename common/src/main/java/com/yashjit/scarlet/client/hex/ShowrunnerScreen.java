@@ -84,7 +84,7 @@ public final class ShowrunnerScreen extends Screen {
      */
     public static void open(Minecraft minecraft) {
         LocalPlayer player = minecraft.player;
-        if (player != null && CrownItem.isWearingCrown(player) && Mastery.rank(player) >= Spell.HEX.rank() && minecraft.gui.screen() == null) {
+        if (player != null && CrownItem.hasScarletMagic(player) && Mastery.rank(player) >= Spell.HEX.rank() && minecraft.gui.screen() == null) {
             HomePlacement.stop();
             minecraft.gui.setScreen(new ShowrunnerScreen());
             minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.6F, 0.25F));

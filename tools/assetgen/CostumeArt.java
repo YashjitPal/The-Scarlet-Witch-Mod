@@ -80,6 +80,18 @@ final class CostumeArt {
     // ---------------------------------------------------------------- costume
 
     static BufferedImage costume(Look look, boolean slim) {
+        return costume(slim, (part, outer, side, x, y, width) -> switch (part) {
+            case BODY -> outer ? torsoOuter(look, side, x, y, width) : torso(look, side, x, y, width);
+            case RIGHT_ARM, LEFT_ARM -> outer ? armOuter(look, side, x, y, width) : arm(look, side, x, y, width);
+            case RIGHT_LEG, LEFT_LEG -> outer ? legOuter(look, side, x, y, width) : leg(look, side, x, y, width);
+        });
+    }
+
+    interface CostumePainter {
+        int pixel(Part part, boolean outer, Side side, double x, double y, int width);
+    }
+
+    static BufferedImage costume(boolean slim, CostumePainter painter) {
         BufferedImage image = new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_ARGB);
         for (Part part : Part.values()) {
             for (boolean outer : new boolean[] {false, true}) {
@@ -89,11 +101,7 @@ final class CostumeArt {
                         for (int tx = 0; tx < f[2] * DENSITY; tx++) {
                             double x = (tx + 0.5) / DENSITY;
                             double y = (ty + 0.5) / DENSITY;
-                            int argb = switch (part) {
-                                case BODY -> outer ? torsoOuter(look, side, x, y, f[2]) : torso(look, side, x, y, f[2]);
-                                case RIGHT_ARM, LEFT_ARM -> outer ? armOuter(look, side, x, y, f[2]) : arm(look, side, x, y, f[2]);
-                                case RIGHT_LEG, LEFT_LEG -> outer ? legOuter(look, side, x, y, f[2]) : leg(look, side, x, y, f[2]);
-                            };
+                            int argb = painter.pixel(part, outer, side, x, y, f[2]);
                             if (argb != 0) {
                                 image.setRGB(f[0] * DENSITY + tx, f[1] * DENSITY + ty, fabric(argb, f[0] * DENSITY + tx, f[1] * DENSITY + ty));
                             }
@@ -632,7 +640,7 @@ final class CostumeArt {
         int at(double x, double y);
     }
 
-    private static void paintRect(BufferedImage image, int u, int v, int w, int h, Painter painter) {
+    static void paintRect(BufferedImage image, int u, int v, int w, int h, Painter painter) {
         for (int ty = 0; ty < h * DENSITY; ty++) {
             for (int tx = 0; tx < w * DENSITY; tx++) {
                 int argb = painter.at((tx + 0.5) / DENSITY, (ty + 0.5) / DENSITY);

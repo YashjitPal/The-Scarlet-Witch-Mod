@@ -25,12 +25,12 @@ import net.minecraft.network.codec.StreamCodec;
  * @param readyAt         game time each spell comes off cooldown
  */
 public record MagicState(int selected, float energy, long energyAt, long lastCastAt, int castCount, int channel, long channelStart,
-                         long levitatingSince, List<Long> readyAt) {
+                         long levitatingSince, List<Long> readyAt, long demiurgeUntil) {
 
     public static final int NO_CHANNEL = -1;
 
     public static final MagicState DEFAULT = new MagicState(0, Mastery.maxEnergy(1), ScarletPlayerData.NEVER, ScarletPlayerData.NEVER, 0,
-            NO_CHANNEL, ScarletPlayerData.NEVER, ScarletPlayerData.NEVER, Collections.nCopies(Spell.count(), ScarletPlayerData.NEVER));
+            NO_CHANNEL, ScarletPlayerData.NEVER, ScarletPlayerData.NEVER, Collections.nCopies(Spell.count(), ScarletPlayerData.NEVER), 0);
 
     /**
      * Keeps the chosen spell, and whether you were levitating so flight resumes cleanly after a relog. Everything
@@ -38,9 +38,10 @@ public record MagicState(int selected, float energy, long energyAt, long lastCas
      */
     public static final MapCodec<MagicState> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.INT.optionalFieldOf("selected", 0).forGetter(MagicState::selected),
-            Codec.BOOL.optionalFieldOf("levitating", false).forGetter(MagicState::levitating)
-    ).apply(instance, (selected, levitating) -> {
-        MagicState state = DEFAULT.withSelected(selected);
+            Codec.BOOL.optionalFieldOf("levitating", false).forGetter(MagicState::levitating),
+            Codec.LONG.optionalFieldOf("demiurge_ready", 0L).forGetter(state -> state.readyAt(Spell.DEMIURGE))
+    ).apply(instance, (selected, levitating, ready) -> {
+        MagicState state = DEFAULT.withSelected(selected).withCooldown(Spell.DEMIURGE, ready);
         return levitating ? state.withLevitation(true, state.energy(), 0L) : state;
     }));
 
@@ -55,6 +56,7 @@ public record MagicState(int selected, float energy, long energyAt, long lastCas
         buf.writeByte(state.channel);
         buf.writeLong(state.channelStart);
         buf.writeLong(state.levitatingSince);
+        buf.writeLong(state.demiurgeUntil);
         buf.writeByte(state.readyAt.size());
         for (long ready : state.readyAt) {
             buf.writeLong(ready);
@@ -68,12 +70,13 @@ public record MagicState(int selected, float energy, long energyAt, long lastCas
         int channel = buf.readByte();
         long channelStart = buf.readLong();
         long levitatingSince = buf.readLong();
+        long demiurgeUntil = buf.readLong();
         int count = buf.readByte();
         List<Long> readyAt = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             readyAt.add(buf.readLong());
         }
-        return new MagicState(selected, energy, energyAt, lastCastAt, castCount, channel, channelStart, levitatingSince, List.copyOf(readyAt));
+        return new MagicState(selected, energy, energyAt, lastCastAt, castCount, channel, channelStart, levitatingSince, List.copyOf(readyAt), demiurgeUntil);
     });
 
     public Spell selectedSpell() {
@@ -98,18 +101,18 @@ public record MagicState(int selected, float energy, long energyAt, long lastCas
 
     public MagicState withSelected(int selected) {
         return new MagicState(Math.floorMod(selected, Spell.count()), energy, energyAt, lastCastAt, castCount, channel, channelStart,
-                levitatingSince, readyAt);
+                levitatingSince, readyAt, demiurgeUntil);
     }
 
     MagicState withCast(Spell spell, float energyAfter, long now) {
-        return new MagicState(selected, energyAfter, now, now, castCount + 1, channel, channelStart, levitatingSince, withReady(spell, now + spell.cooldown()));
+        return new MagicState(selected, energyAfter, now, now, castCount + 1, channel, channelStart, levitatingSince, withReady(spell, now + spell.cooldown()), demiurgeUntil);
     }
 
     /**
      * Pays for a spell that is not a strike, so no hand is thrown forward for it.
      */
     MagicState withSpent(Spell spell, float energyAfter, long now) {
-        return new MagicState(selected, energyAfter, now, now, castCount, channel, channelStart, levitatingSince, withReady(spell, now + spell.cooldown()));
+        return new MagicState(selected, energyAfter, now, now, castCount, channel, channelStart, levitatingSince, withReady(spell, now + spell.cooldown()), demiurgeUntil);
     }
 
     /**
@@ -117,23 +120,27 @@ public record MagicState(int selected, float energy, long energyAt, long lastCas
      */
     MagicState withChannel(int channel, float energyNow, long now) {
         return new MagicState(selected, energyNow, now, channel == NO_CHANNEL ? now : lastCastAt, castCount, channel,
-                channel == NO_CHANNEL ? channelStart : now, levitatingSince, readyAt);
+                channel == NO_CHANNEL ? channelStart : now, levitatingSince, readyAt, demiurgeUntil);
     }
 
     MagicState withLevitation(boolean on, float energyNow, long now) {
         return new MagicState(selected, energyNow, now, on ? lastCastAt : now, castCount, channel, channelStart,
-                on ? now : ScarletPlayerData.NEVER, readyAt);
+                on ? now : ScarletPlayerData.NEVER, readyAt, demiurgeUntil);
     }
 
     /**
      * Settles energy at {@code now}, for example after a channel pays for something it blocked.
      */
     MagicState withEnergy(float energyNow, long now) {
-        return new MagicState(selected, energyNow, now, lastCastAt, castCount, channel, channelStart, levitatingSince, readyAt);
+        return new MagicState(selected, energyNow, now, lastCastAt, castCount, channel, channelStart, levitatingSince, readyAt, demiurgeUntil);
     }
 
     MagicState withCooldown(Spell spell, long readyTime) {
-        return new MagicState(selected, energy, energyAt, lastCastAt, castCount, channel, channelStart, levitatingSince, withReady(spell, readyTime));
+        return new MagicState(selected, energy, energyAt, lastCastAt, castCount, channel, channelStart, levitatingSince, withReady(spell, readyTime), demiurgeUntil);
+    }
+
+    MagicState withForm(long until, float reserve, long now) {
+        return new MagicState(selected, reserve, now, lastCastAt, castCount, channel, channelStart, levitatingSince, readyAt, until);
     }
 
     private List<Long> withReady(Spell spell, long readyTime) {

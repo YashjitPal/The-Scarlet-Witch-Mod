@@ -43,6 +43,7 @@ public final class ScarletCommands {
     }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        com.yashjit.scarlet.magic.DreamCircle.register(dispatcher);
         dispatcher.register(Commands.literal("scarlet")
                 .then(Commands.literal("hex")
                         .then(Commands.literal("era")

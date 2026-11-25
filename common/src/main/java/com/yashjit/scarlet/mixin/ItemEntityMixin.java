@@ -17,7 +17,7 @@ abstract class ItemEntityMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void scarlet$goneOutsideItsHex(CallbackInfo ci) {
         ItemEntity self = (ItemEntity) (Object) this;
-        if (self.tickCount % 10 == 0 && !self.isRemoved() && self.level() instanceof ServerLevel level) {
+        if ((self.tickCount == 1 || self.tickCount % 10 == 0) && !self.isRemoved() && self.level() instanceof ServerLevel level) {
             HexMade.tickDropped(level, self);
         }
     }

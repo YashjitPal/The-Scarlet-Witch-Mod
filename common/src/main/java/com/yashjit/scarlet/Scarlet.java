@@ -36,6 +36,7 @@ public final class Scarlet {
         ScarletSounds.bootstrap();
         ScarletItems.bootstrap();
         ScarletBlocks.bootstrap();
+        com.yashjit.scarlet.magic.WeaveBlock.bootstrap();
         ScarletBlockEntities.bootstrap();
         ScarletEntities.bootstrap();
         ScarletTickets.bootstrap();

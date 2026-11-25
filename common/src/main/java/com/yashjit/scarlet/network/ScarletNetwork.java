@@ -14,13 +14,14 @@ public final class ScarletNetwork {
     /**
      * Bump whenever a payload's format changes, so mismatched clients and servers refuse to connect.
      */
-    public static final String VERSION = "28";
+    public static final String VERSION = "31";
 
     private ScarletNetwork() {
     }
 
     public static void registerPayloads(PayloadRegistry registry) {
         registry.serverbound(ToggleSuitPayload.TYPE, ToggleSuitPayload.STREAM_CODEC, (payload, player) -> SuitUp.requestToggle(player));
+        registry.serverbound(AgathaOutfitPayload.TYPE, AgathaOutfitPayload.STREAM_CODEC, AgathaOutfitPayload::apply);
         registry.serverbound(CastPayload.TYPE, CastPayload.STREAM_CODEC, (payload, player) -> Magic.handleCast(player, payload.start(), payload.spell()));
         registry.serverbound(SelectSpellPayload.TYPE, SelectSpellPayload.STREAM_CODEC, (payload, player) -> Magic.select(player, payload.spell()));
         registry.serverbound(TelekinesisPayload.TYPE, TelekinesisPayload.STREAM_CODEC, (payload, player) -> Telekinesis.handle(player, payload));
@@ -42,6 +43,7 @@ public final class ScarletNetwork {
         registry.clientbound(PaintPayload.TYPE, PaintPayload.STREAM_CODEC);
         registry.clientbound(ChaosImpactPayload.TYPE, ChaosImpactPayload.STREAM_CODEC);
         registry.clientbound(MagicEventPayload.TYPE, MagicEventPayload.STREAM_CODEC);
+        registry.clientbound(WitchEffect.TYPE, WitchEffect.STREAM_CODEC);
         registry.clientbound(HoldPayload.TYPE, HoldPayload.STREAM_CODEC);
         registry.clientbound(HexRipplePayload.TYPE, HexRipplePayload.STREAM_CODEC);
         registry.clientbound(TownGlitchPayload.TYPE, TownGlitchPayload.STREAM_CODEC);

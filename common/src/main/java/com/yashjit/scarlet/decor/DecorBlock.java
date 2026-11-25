@@ -21,6 +21,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.pathfinder.PathComputationType;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -55,6 +56,9 @@ public class DecorBlock extends HorizontalDirectionalBlock {
 
     @Override
     public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
+        if (!HexMade.canPlace(context.getLevel(), context.getItemInHand(), Vec3.atCenterOf(context.getClickedPos()))) {
+            return null;
+        }
         return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite())
                 .setValue(EraDecor.ERA, EraDecor.eraAt(context.getLevel(), context.getClickedPos()));
     }

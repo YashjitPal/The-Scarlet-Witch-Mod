@@ -6,7 +6,10 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(LivingEntityRenderState.class)
-abstract class LivingEntityRenderStateMixin implements ThrownRenderState {
+abstract class LivingEntityRenderStateMixin implements ThrownRenderState, com.yashjit.scarlet.client.fx.AshState {
+    @Unique private float scarlet$ash;
+    public float scarlet$ash() { return scarlet$ash; }
+    public void scarlet$setAsh(float ash) { scarlet$ash = ash; }
 
     @Unique
     private float scarlet$thrownTilt;

@@ -2,6 +2,9 @@ package com.yashjit.scarlet.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.client.anim.FirstPersonGestures;
+import com.yashjit.scarlet.player.AgathaForm;
+import com.yashjit.scarlet.registry.ScarletItems;
+import net.minecraft.client.Minecraft;
 import com.yashjit.scarlet.client.darkhold.DarkholdBook;
 import com.yashjit.scarlet.client.magic.MindControlClient;
 import net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer;
@@ -51,6 +54,12 @@ abstract class FirstPersonHandsMixin {
     private void scarlet$darkholdInTheHand(PlayerRenderState playerState, FirstPersonHandsAndItemsRenderState state, float partialTicks, float xRot,
                                            InteractionHand hand, float attack, ItemStack itemStack, float inverseArmHeight, PoseStack poseStack,
                                            SubmitNodeCollector submitNodeCollector, int lightCoords, CallbackInfo ci) {
+        var wearer = Minecraft.getInstance().player;
+        if (hand == InteractionHand.OFF_HAND && itemStack.is(ScarletItems.AGATHA_BROOCH.get())
+                && wearer != null && AgathaForm.worn(wearer)) {
+            ci.cancel();
+            return;
+        }
         boolean out = DarkholdBook.outOf(itemStack, hand);
         if (!out && !DarkholdBook.carried(itemStack)) {
             return;

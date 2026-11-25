@@ -1,5 +1,6 @@
 package com.yashjit.scarlet.client.fx;
 
+import com.yashjit.scarlet.client.render.Pixels;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.SingleQuadParticle;
@@ -21,7 +22,7 @@ public final class ChaosDust extends SingleQuadParticle {
 
     private final TextureAtlasSprite[] frames;
 
-    private ChaosDust(ClientLevel level, Vec3 position, Vec3 velocity, TextureAtlasSprite[] frames) {
+    private ChaosDust(ClientLevel level, Vec3 position, Vec3 velocity, TextureAtlasSprite[] frames, Pixels.Ramp ramp) {
         super(level, position.x, position.y, position.z, frames[0]);
         this.frames = frames;
         this.xd = velocity.x;
@@ -32,7 +33,7 @@ public final class ChaosDust extends SingleQuadParticle {
         this.hasPhysics = false;
         this.lifetime = 9 + random.nextInt(13);
         this.quadSize = 0.03F + random.nextFloat() * 0.035F;
-        int rgb = COLORS[random.nextInt(COLORS.length)];
+        int rgb = ramp == Pixels.Ramp.CHAOS ? COLORS[random.nextInt(COLORS.length)] : ramp.color(Pixels.PINK + random.nextInt(3));
         float brightness = 0.82F + random.nextFloat() * 0.18F;
         setColor(((rgb >> 16) & 0xFF) / 255.0F * brightness, ((rgb >> 8) & 0xFF) / 255.0F * brightness, (rgb & 0xFF) / 255.0F * brightness);
     }
@@ -41,6 +42,10 @@ public final class ChaosDust extends SingleQuadParticle {
      * Adds one speck. Respects the effects quality setting through {@link ScarletFx#density()} at the call site.
      */
     public static void spawn(Vec3 position, Vec3 velocity) {
+        spawn(position, velocity, Pixels.Ramp.CHAOS);
+    }
+
+    static void spawn(Vec3 position, Vec3 velocity, Pixels.Ramp ramp) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
             return;
@@ -50,7 +55,7 @@ public final class ChaosDust extends SingleQuadParticle {
         for (int i = 0; i < FRAMES; i++) {
             frames[i] = atlas.getSprite(Identifier.withDefaultNamespace("generic_" + (FRAMES - 1 - i)));
         }
-        minecraft.particleEngine.add(new ChaosDust(minecraft.level, position, velocity, frames));
+        minecraft.particleEngine.add(new ChaosDust(minecraft.level, position, velocity, frames, ramp));
     }
 
     @Override

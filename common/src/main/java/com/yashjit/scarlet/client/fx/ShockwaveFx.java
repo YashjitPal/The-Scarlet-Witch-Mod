@@ -2,7 +2,6 @@ package com.yashjit.scarlet.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.yashjit.scarlet.ScarletPalette;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.render.FlatPixels;
@@ -67,9 +66,10 @@ public final class ShockwaveFx {
         }
         FLINGS.put(payload.entityId(), now);
         float darkness = CorruptionClient.darkness(level.getEntity(payload.entityId()));
-        WAVES.add(new Wave(payload.position(), now, darkness));
+        Pixels.Ramp ramp = Pixels.Ramp.ofCaster(level.getEntity(payload.entityId()));
+        WAVES.add(new Wave(payload.position(), now, darkness, ramp));
         try (Glow.Darkening ignored = Glow.darkening(darkness)) {
-            blastSparks(payload.position());
+            blastSparks(payload.position(), ramp);
         }
         RandomSource random = ScarletFx.random();
         for (int i = 0, n = Math.round(12 * darkness * ScarletFx.density()); i < n; i++) {
@@ -149,13 +149,13 @@ public final class ShockwaveFx {
     private static void gathering(Player player) {
         RandomSource random = ScarletFx.random();
         Vec3 knot = knot(player, 1.0F);
+        Pixels.Ramp ramp = Pixels.Ramp.ofCaster(player);
         for (int i = 0, n = Math.round(5 * ScarletFx.density()); i < n; i++) {
             Vec3 from = knot.add(randomUnit(random).scale(1.1 + random.nextDouble() * 0.6));
-            ScarletFx.spark(from, knot.subtract(from).scale(0.2), 5, 0.022F, random.nextFloat() < 0.4F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET,
-                    ScarletPalette.SCARLET, 0.0F, 0.95F);
+            ScarletFx.spark(from, knot.subtract(from).scale(0.2), 5, 0.022F, ramp, random.nextFloat() < 0.4F ? Pixels.HOT : Pixels.BRIGHT, 0.0F, 0.95F);
         }
         if (random.nextFloat() < 0.5F * ScarletFx.density()) {
-            ChaosDust.spawn(knot.add(randomUnit(random).scale(0.8)), randomUnit(random).scale(0.01));
+            ChaosDust.spawn(knot.add(randomUnit(random).scale(0.8)), randomUnit(random).scale(0.01), ramp);
         }
     }
 
@@ -190,11 +190,11 @@ public final class ShockwaveFx {
             float angle = random.nextFloat() * TAU;
             Vec3 at = center.add(Mth.cos(angle) * radius, 0.15, Mth.sin(angle) * radius);
             ScarletFx.spark(at, new Vec3(Mth.cos(angle) * 0.12, 0.06 + random.nextDouble() * 0.08, Mth.sin(angle) * 0.12), 6 + random.nextInt(5),
-                    0.024F, ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.006F, 0.86F);
+                    0.024F, wave.ramp(), Pixels.BRIGHT, 0.006F, 0.86F);
         }
     }
 
-    private static void blastSparks(Vec3 feet) {
+    private static void blastSparks(Vec3 feet, Pixels.Ramp ramp) {
         RandomSource random = ScarletFx.random();
         float density = ScarletFx.density();
         for (int i = 0, n = Math.round(44 * density); i < n; i++) {
@@ -202,14 +202,14 @@ public final class ShockwaveFx {
             double speed = 0.45 + random.nextDouble() * 0.5;
             Vec3 at = feet.add(0.0, 0.2 + random.nextDouble() * 1.2, 0.0);
             ScarletFx.spark(at, new Vec3(Mth.cos(angle) * speed, 0.02 + random.nextDouble() * 0.12, Mth.sin(angle) * speed), 7 + random.nextInt(8),
-                    0.03F, random.nextFloat() < 0.35F ? ScarletPalette.CORE : ScarletPalette.BRIGHT_SCARLET, ScarletPalette.SCARLET, 0.01F, 0.84F);
+                    0.03F, ramp, random.nextFloat() < 0.35F ? Pixels.HOT : Pixels.BRIGHT, 0.01F, 0.84F);
         }
         for (int i = 0, n = Math.round(14 * density); i < n; i++) {
             ScarletFx.spark(feet.add(randomUnit(random).scale(0.5)).add(0.0, 1.0, 0.0), randomUnit(random).scale(0.08).add(0.0, 0.1, 0.0),
-                    16 + random.nextInt(10), 0.034F, ScarletPalette.CRIMSON, ScarletPalette.WINE, 0.004F, 0.9F);
+                    16 + random.nextInt(10), 0.034F, ramp, Pixels.CRIMSON, 0.004F, 0.9F);
         }
         for (int i = 0, n = Math.round(12 * density); i < n; i++) {
-            ChaosDust.spawn(feet.add(randomUnit(random).scale(1.2)).add(0.0, 0.8, 0.0), randomUnit(random).scale(0.12));
+            ChaosDust.spawn(feet.add(randomUnit(random).scale(1.2)).add(0.0, 0.8, 0.0), randomUnit(random).scale(0.12), ramp);
         }
     }
 
@@ -229,7 +229,7 @@ public final class ShockwaveFx {
                 float gather = gather(player, now);
                 if (gather > 0.01F) {
                     knots.add(new Knot(knot(player, partialTick).subtract(camera).toVector3f(), gather, ScarletFx.isFirstPersonViewOf(player),
-                            CorruptionClient.darkness(player)));
+                            CorruptionClient.darkness(player), Pixels.Ramp.ofCaster(player)));
                 }
             }
         }
@@ -264,10 +264,10 @@ public final class ShockwaveFx {
             float into = (radius - r) / depth;
             if (into < 1.0F) {
                 return Pixels.shows(fade * (1.15F - into), i, kk)
-                        ? Pixels.opaque(into < 0.18F ? Pixels.HOT : into < 0.4F ? Pixels.PINK : into < 0.7F ? Pixels.BRIGHT : Pixels.SCARLET) : 0;
+                        ? wave.ramp().opaque(into < 0.18F ? Pixels.HOT : into < 0.4F ? Pixels.PINK : into < 0.7F ? Pixels.BRIGHT : Pixels.SCARLET) : 0;
             }
             float behind = (r - radius * 0.55F) / wake;
-            return Pixels.shows(fade * 0.35F * behind, i + frame, kk) ? Pixels.ramp(Pixels.CRIMSON, 0.75F) : 0;
+            return Pixels.shows(fade * 0.35F * behind, i + frame, kk) ? Glow.withAlpha(wave.ramp().color(Pixels.CRIMSON), 0.75F) : 0;
         });
         for (int e = 1; e <= 2; e++) {
             float echo = Ease.clamp01((t - e * 2.5F) / WAVE_TICKS);
@@ -277,7 +277,7 @@ public final class ShockwaveFx {
             float at = RADIUS * Ease.outCubic(echo) * (1.0F - 0.12F * e);
             float shown = 0.7F * (float) Math.pow(1.0F - echo, 1.5);
             FlatPixels.ring(buffer, pose, camera, ground.x, ground.y, ground.z, Math.max(0.0F, at - 0.16F), at,
-                    (i, kk, r, theta) -> Pixels.shows(shown, i, kk) ? Pixels.opaque(r > at - 0.07F ? Pixels.BRIGHT : Pixels.SCARLET) : 0);
+                    (i, kk, r, theta) -> Pixels.shows(shown, i, kk) ? wave.ramp().opaque(r > at - 0.07F ? Pixels.BRIGHT : Pixels.SCARLET) : 0);
         }
         Vector3f c = ground.subtract(camera).toVector3f();
         PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y + 1.0F, c.z);
@@ -291,18 +291,23 @@ public final class ShockwaveFx {
                 }
                 float angle = n * TAU / columns;
                 float lick = height * (0.45F + 0.55F * Pixels.noise(angle * 6.0F, frame * 0.35F, 71));
+                if (wave.ramp() == Pixels.Ramp.WICCAN) {
+                    // Five crystalline crests extend the pentacle's points along the wavefront.
+                    float crest = Math.max(0, Mth.cos(5 * angle));
+                    lick = height * (0.15F + 1.25F * crest * crest * crest);
+                }
                 Vector3f base = new Vector3f(c.x + Mth.cos(angle) * radius, c.y, c.z + Mth.sin(angle) * radius);
                 Vector3f mid = new Vector3f(base).add(0.0F, lick * 0.4F, 0.0F);
                 Vector3f top = new Vector3f(base).add(0.0F, lick, 0.0F);
-                sprite.line(base, mid, Pixels.opaque(Pixels.PINK), 1, 1);
-                sprite.line(mid, top, Pixels.opaque(Pixels.SCARLET), 0, 1);
+                sprite.line(base, mid, wave.ramp().opaque(Pixels.PINK), 1, 1);
+                sprite.line(mid, top, wave.ramp().opaque(Pixels.SCARLET), 0, 1);
             }
         }
         // the flash at its heart
         if (t < 5.0F) {
             float flash = 1.0F - t / 5.0F;
-            Wisps.orb(sprite, 10.0F * flash, 3.0F * flash, frame, 73);
-            Wisps.burst(sprite, 0.6F + 2.0F * (1.0F - flash), 0.4F, flash, frame);
+            Wisps.orb(sprite, 10.0F * flash, 3.0F * flash, frame, 73, wave.ramp());
+            Wisps.burst(sprite, 0.6F + 2.0F * (1.0F - flash), 0.4F, flash, frame, wave.ramp());
         }
         sprite.draw(buffer);
     }
@@ -317,13 +322,13 @@ public final class ShockwaveFx {
         Vector3f c = knot.at();
         int frame = (int) Math.floor(time);
         PixelSprite sprite = PixelSprite.inWorld(pose, c.x, c.y, c.z);
-        Wisps.orb(sprite, 1.0F + 3.0F * g, 1.0F + 2.0F * g, frame, 74);
+        Wisps.orb(sprite, 1.0F + 3.0F * g, 1.0F + 2.0F * g, frame, 74, knot.ramp());
         for (int i = 0; i < 2; i++) {
             float spin = time * (0.6F + 0.3F * i) * (i == 0 ? 1.0F : -1.0F);
             float tilt = 0.4F + 0.5F * i;
             Vector3f u = new Vector3f(Mth.cos(spin), 0.0F, Mth.sin(spin));
             Vector3f v = new Vector3f(-Mth.sin(spin) * Mth.cos(tilt), Mth.sin(tilt), Mth.cos(spin) * Mth.cos(tilt));
-            Wisps.ring(sprite, c, u, v, 0.18F + 0.12F * g, spin, g, Pixels.opaque(Pixels.BRIGHT), 1, 1);
+            Wisps.ring(sprite, c, u, v, 0.18F + 0.12F * g, spin, g, knot.ramp().opaque(Pixels.BRIGHT), 1, 1);
         }
         sprite.draw(buffer);
     }
@@ -345,9 +350,9 @@ public final class ShockwaveFx {
         return Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
     }
 
-    private record Wave(Vec3 center, double start, float darkness) {
+    private record Wave(Vec3 center, double start, float darkness, Pixels.Ramp ramp) {
     }
 
-    private record Knot(Vector3f at, float gather, boolean own, float darkness) {
+    private record Knot(Vector3f at, float gather, boolean own, float darkness, Pixels.Ramp ramp) {
     }
 }

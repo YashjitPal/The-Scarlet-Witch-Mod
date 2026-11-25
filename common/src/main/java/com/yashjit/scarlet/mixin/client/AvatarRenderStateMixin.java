@@ -1,12 +1,33 @@
 package com.yashjit.scarlet.mixin.client;
 
 import com.yashjit.scarlet.client.anim.CastPoseState;
+import com.yashjit.scarlet.client.costume.SpeedLook;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(AvatarRenderState.class)
-abstract class AvatarRenderStateMixin implements CastPoseState {
+abstract class AvatarRenderStateMixin implements CastPoseState, SpeedLook.Pose, com.yashjit.scarlet.client.costume.AgathaLook.Pose {
+    @Unique private boolean scarlet$agathaHair;
+    @Override public boolean scarlet$agathaHair() { return scarlet$agathaHair; }
+    @Override public void scarlet$setAgathaHair(boolean visible) { scarlet$agathaHair = visible; }
+    @Unique private float scarlet$goggles;
+    @Unique private float scarlet$goggleReach;
+    @Unique private float scarlet$stride;
+    @Unique private boolean scarlet$speedSuit;
+
+    @Override public float scarlet$goggles() { return scarlet$goggles; }
+    @Override public float scarlet$goggleReach() { return scarlet$goggleReach; }
+    @Override public float scarlet$stride() { return scarlet$stride; }
+    @Override public boolean scarlet$speedSuit() { return scarlet$speedSuit; }
+
+    @Override
+    public void scarlet$setSpeed(float goggles, float reach, float stride, boolean dressed) {
+        scarlet$goggles = goggles;
+        scarlet$goggleReach = reach;
+        scarlet$stride = stride;
+        scarlet$speedSuit = dressed;
+    }
 
     @Unique
     private float scarlet$rightStrike;

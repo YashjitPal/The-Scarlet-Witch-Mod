@@ -2,6 +2,7 @@ package com.yashjit.scarlet.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.yashjit.scarlet.hex.HexTape;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
@@ -17,6 +18,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(LivingEntity.class)
 abstract class LivingEntityMixin {
+
+    @WrapOperation(method = "hurtServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;actuallyHurt(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/damagesource/DamageSource;F)V"))
+    private void scarlet$witchDamage(LivingEntity target, ServerLevel level, DamageSource source, float amount, Operation<Void> original) {
+        float before = target.getHealth() + target.getAbsorptionAmount();
+        original.call(target, level, source, amount);
+        com.yashjit.scarlet.magic.AgathaMagic.struck(target, source, before - target.getHealth() - target.getAbsorptionAmount());
+    }
+
+    @Inject(method = "tick", at = @At("TAIL"))
+    private void scarlet$bound(CallbackInfo ci) {
+        LivingEntity target = (LivingEntity)(Object)this;
+        if (!target.level().isClientSide()) com.yashjit.scarlet.magic.AgathaMagic.holdBound(target);
+    }
 
     @WrapMethod(method = "die")
     private void scarlet$tapeDeath(DamageSource source, Operation<Void> original) {

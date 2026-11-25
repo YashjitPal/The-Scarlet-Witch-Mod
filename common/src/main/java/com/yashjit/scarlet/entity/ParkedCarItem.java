@@ -33,6 +33,12 @@ public class ParkedCarItem extends Item {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos().above();
         Vec3 at = Vec3.atBottomCenterOf(pos);
+        if (!HexMade.canPlace(level, context.getItemInHand(), at)) {
+            if (level instanceof ServerLevel server) {
+                HexMade.glitch(server, at.add(0.0, 0.5, 0.0), 0.3);
+            }
+            return InteractionResult.FAIL;
+        }
         if (!level.noCollision(new AABB(at.x - 1.0, at.y, at.z - 1.0, at.x + 1.0, at.y + 1.6, at.z + 1.0))) {
             return InteractionResult.FAIL;
         }

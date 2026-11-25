@@ -3,6 +3,8 @@ package com.yashjit.scarlet.client.hex;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.yashjit.scarlet.Scarlet;
 import com.yashjit.scarlet.client.costume.CostumeView;
+import com.yashjit.scarlet.player.AgathaForm;
+import com.yashjit.scarlet.client.costume.SpeedLook;
 import com.yashjit.scarlet.client.fx.Glitch;
 import com.yashjit.scarlet.client.fx.SlipFx;
 import com.yashjit.scarlet.client.fx.ScarletFx;
@@ -53,7 +55,7 @@ public final class Outfits {
      * The outfit a player is wearing at this moment, or null for their own clothes.
      */
     public static @Nullable Identifier outfit(Player player, boolean slim, float partialTick) {
-        if (player.isSpectator() || CostumeView.of(player, partialTick) != null || seenLevel == null) {
+        if (player.isSpectator() || AgathaForm.worn(player) || SpeedLook.dressed(player) || CostumeView.of(player, partialTick) != null || seenLevel == null) {
             return null;
         }
         double now = seenLevel.getGameTime() + partialTick;

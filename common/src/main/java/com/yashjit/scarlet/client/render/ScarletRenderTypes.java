@@ -142,13 +142,17 @@ public final class ScarletRenderTypes {
      * The costume over the skin. The tint's alpha is the transformation progress: texels whose reveal mask is above it
      * are discarded, so the costume rises from the feet as progress grows.
      */
-    public static RenderType costume(CrownStyle style, boolean slim) {
-        String name = style.getSerializedName() + (slim ? "_slim" : "");
+    public static RenderType costume(CrownStyle style, boolean slim, boolean ascended) {
+        String name = (ascended ? "wiccan_astral" : style.getSerializedName()) + (slim ? "_slim" : "");
         return RenderTypes.entityCutoutDissolve(Scarlet.id("textures/entity/costume/" + name + ".png"), slim ? REVEAL_SLIM : REVEAL);
     }
 
     public static RenderType cape(CrownStyle style) {
         return RenderTypes.entityCutoutDissolve(Scarlet.id("textures/entity/costume/" + style.getSerializedName() + "_cape.png"), CAPE_REVEAL);
+    }
+
+    public static RenderType demiurgeCape() {
+        return RenderTypes.entityCutoutDissolve(Scarlet.id("textures/entity/costume/wiccan_astral_cape.png"), CAPE_REVEAL);
     }
 
     /**

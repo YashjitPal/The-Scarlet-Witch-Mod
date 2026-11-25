@@ -36,9 +36,55 @@ Chaos magic inspired by the Scarlet Witch, for Minecraft 26.3 on Fabric and NeoF
 </tr>
 </table>
 
-- Worn in the helmet slot, a crown protects like a diamond helmet and never breaks. A crown alone in the crafting grid turns into the other one, keeping everything on it.
+- Worn in the helmet slot, a crown protects like a diamond helmet and never breaks. The two Scarlet crowns can be swapped in the crafting grid, keeping everything on them.
 - **Mastery** grows as you cast and is stored on the crown, so a stolen crown carries everything its owner learned.
-- **In creative**, a crown has every power at once, at full strength, and its magic never runs dry. Mastery only grows in survival.
+- **In creative**, a Scarlet crown has every power at once, at full strength, and its magic never runs dry. Mastery only grows in survival.
+
+### Wiccan
+
+![Billy's blue suit-up, mid-transformation and fully suited in game](docs/media/features/wiccan.webp)
+
+Equip **Wiccan's Crown** and press <kbd>G</kbd> to manifest Billy Maximoff's costume from *Agatha All Along*. Blue threads weave a midnight suit up from the boots; the red cloak unfurls behind the shoulder wrap, and the cobalt circlet flares last. Your own face stays visible. Press <kbd>G</kbd> again or take off the crown to dismiss the suit.
+
+Craft Billy's crown with **iron ingot, amethyst shard, iron ingot** across the top and **lapis lazuli, iron ingot, lapis lazuli** beneath. You can also find it in the Scarlet creative tab or use `/give @s scarlet:wiccan_crown`.
+
+**Billy's spell wheel:** Hold <kbd>R</kbd>, point at a spell, then release. Hold sneak while the wheel is open for the witchcraft page; release the wheel key before letting go of sneak. Cast with an empty main hand. Billy's crown earns its own mastery, and the costume is optional. See the [Wiccan field guide](docs/WICCAN.md) for spells, rituals and Demiurge form.
+
+### Speed
+
+![Tommy's wraparound visor and green running suit in Minecraft](docs/media/features/speed.webp)
+
+Equip **Speed's Goggles** in the head slot and press <kbd>G</kbd> to pull them down. Sprint to accelerate over half a second, jump higher, or mine faster with an empty main hand. With **Speed's Running Suit** in your inventory, the same key changes you into Tommy's green-and-white kit in a scuff of dust. Press it again to raise the visor and return to your own clothes.
+
+Both items appear in the Scarlet creative tab. For the goggles, place leather at each end of the top row, then an orange stained glass pane, an iron ingot and another pane below. For the suit, use green and white wool in the pattern `GWG / WGW / G G`.
+
+### Agatha Harkness
+
+![Agatha's traveling coat, Agnes's Westview outfit, and her violet finale robes in Minecraft](docs/media/features/agatha.webp)
+
+Equip **Agatha's Cameo Brooch** in your offhand and leave your head free of character crowns and Speed goggles. Hold **R** for the violet combat wheel, or **Shift + R** for witchcraft. Point at a spell and release **R** to select it. Right-click with an empty main hand to cast. From rank II, double-tap jump to fly while using another spell.
+
+**Energy Absorption** is available from rank I. Hits from attackers fill the segmented siphon meter above your casting energy. Aim at an enemy spellcaster or player within 16 blocks and hold right-click. Even an empty meter gives you a brief drain. A full one sustains it for up to six seconds. Releasing, losing sight of the target, or moving too far away breaks the link. Each pulse damages the target and heals Agatha. A target that runs out of mastery starts turning grey and takes heavier damage.
+
+The brooch gains mastery by draining another wearer's crown or brooch, or the innate magic of witches and other magical mobs. A lethal siphon also teaches compatible techniques the victim knew. A witch can teach Glamour and an evoker can teach Weave. Reading the **Darkhold** strengthens Agatha's native combat spells, lengthens her siphon and lets her leech health and casting energy on damaging hits.
+
+![Agatha's purple wheel, binding chains, absorption, exhausted witch, nightmare eyes and protective rune circle in game](docs/media/features/agatha-magic.webp)
+
+The combat wheel also holds Violet Blast, Binding Chains, Telekinesis, Circle of Runes, Malediction, Mirror Double, Nightmare and Spirit Familiar. Cast a rune on the ground to protect and empower Agatha inside it and bind and silence intruders. Witch Sight marks nearby magical creatures, undead and dropped enchanted items. Agatha shares Billy's grimoire leaves for learning witchcraft early. For a psychic conversation, cast **Dreambinding** within eight blocks of a sleeping player with four lit candle blocks around their bed. The sleeper uses `/wiccan dream accept`, either player can use `/wiccan dream say <message>`, and `/wiccan dream leave` ends the link.
+
+While Agatha stands within the five-block radius of her Circle of Runes, hostile chaos bolts, witch potions and aimed spell beams extinguish at the boundary. The nearest standing rune flares at impact. Agatha and her teammates can cast outward. Stepping outside suspends this protection until she returns or the inscription expires.
+
+A fresh brooch shows Agatha's traveling coat with your own skin's hair. **G** cycles unlocked outfits. **Shift + G** opens the wardrobe to choose an outfit and toggle **Agatha's hair** independently at any rank. The brooch remembers both choices. Agnes unlocks at rank V and the *WandaVision* finale robes appear when Agatha reaches rank IX. Creative opens all three immediately. Find the brooch in the Scarlet creative tab or use `/give @s scarlet:agatha_brooch`.
+
+### Wandering Covens
+
+![Five human coven witches wearing teal and pale-gold mantles in Minecraft](docs/media/features/wandering-coven.webp)
+
+Groups of two to five human witches can visit the Overworld while you explore. Look for teal or pale-gold mantles. The witches roam together and defend their companions when attacked. A coven needs open surface ground near a player. Visits follow the mob-spawning game rule and occur on Easy, Normal and Hard.
+
+An apprentice casts Starfire orbs. An adept also uses Arc Beam, and an elder can mark the ground with a binding rune. Step clear of the inscription before it closes. When a player defeats a witch, there is a one-in-three chance of finding the book for her tier. The same grimoires can appear in unopened structure chests. Look for Starfire in mineshafts and dungeons, Arc Beam in desert pyramids and jungle temples, and Binding Runes in stronghold libraries and woodland mansions.
+
+Use a grimoire while wearing Wanda's or Billy's crown, or with Agatha's brooch equipped, to learn its spell on that item. Agatha can also take a coven member's signature spell by finishing her with Energy Absorption. The usual charge, range, line of sight and channel duration apply.
 
 ## Chaos magic
 

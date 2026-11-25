@@ -350,6 +350,7 @@ public final class MindControl {
         if (hit == null || !(hit.getEntity() instanceof LivingEntity target)) {
             return;
         }
+        if (AgathaMagic.intercept(level, caster, eye, hit.getLocation()) != null) return;
         link.targetId = target.getId();
         link.since = now;
         HELD.put(target.getId(), link);

@@ -14,7 +14,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * @param entityId the creature the spirit is in
  * @param darkness how far the Darkhold has darkened the dreamwalker's magic, 0 to 1
  */
-public record DreamStatePayload(int stage, int entityId, float darkness) implements CustomPacketPayload {
+public record DreamStatePayload(int stage, int entityId, float darkness, boolean wiccan) implements CustomPacketPayload {
 
     /** To the dreamwalker: look out through this creature, once it is here. */
     public static final int AWAY = 0;
@@ -30,6 +30,7 @@ public record DreamStatePayload(int stage, int entityId, float darkness) impleme
             ByteBufCodecs.VAR_INT, DreamStatePayload::stage,
             ByteBufCodecs.VAR_INT, DreamStatePayload::entityId,
             ByteBufCodecs.FLOAT, DreamStatePayload::darkness,
+            ByteBufCodecs.BOOL, DreamStatePayload::wiccan,
             DreamStatePayload::new);
 
     @Override

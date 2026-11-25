@@ -1,6 +1,7 @@
 package com.yashjit.scarlet.mixin.client;
 
 import com.yashjit.scarlet.client.anim.CastPoses;
+import com.yashjit.scarlet.client.costume.SpeedLook;
 import com.yashjit.scarlet.client.anim.ThrownPose;
 import com.yashjit.scarlet.client.hex.ResidentRenderer;
 import net.minecraft.client.model.player.PlayerModel;
@@ -16,6 +17,7 @@ abstract class PlayerModelMixin {
     @Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)V", at = @At("TAIL"))
     private void scarlet$castPose(AvatarRenderState state, CallbackInfo ci) {
         CastPoses.apply((PlayerModel) (Object) this, state);
+        SpeedLook.pose((PlayerModel) (Object) this, state);
         ResidentRenderer.gesture((PlayerModel) (Object) this, state);
         ThrownPose.limbs((PlayerModel) (Object) this, state);
     }

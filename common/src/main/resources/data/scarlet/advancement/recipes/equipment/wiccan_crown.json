@@ -1,0 +1,15 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_lapis": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [{ "items": "minecraft:lapis_lazuli" }] }
+    },
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": { "recipes": "scarlet:wiccan_crown" }
+    }
+  },
+  "requirements": [["has_lapis", "has_the_recipe"]],
+  "rewards": { "recipes": ["scarlet:wiccan_crown"] }
+}

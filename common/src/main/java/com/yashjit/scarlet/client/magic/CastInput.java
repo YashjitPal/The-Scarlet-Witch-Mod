@@ -63,14 +63,14 @@ public final class CastInput {
      */
     public static boolean claimsClick(Minecraft minecraft) {
         LocalPlayer player = minecraft.player;
-        if (player == null || !CrownItem.isWearingCrown(player) || !player.getMainHandItem().isEmpty()) {
+        if (player == null || !Magic.canCast(player) || !player.getMainHandItem().isEmpty()) {
             return false;
         }
         if (holding != null) {
             return true;
         }
         Spell spell = Magic.state(player).selectedSpell();
-        return (spell == Spell.MIND_CONTROL || spell == Spell.TELEKINESIS) && minecraft.hitResult instanceof EntityHitResult;
+        return (spell == Spell.MIND_CONTROL || spell == Spell.TELEKINESIS || spell.agathaOnly()) && minecraft.hitResult instanceof EntityHitResult;
     }
 
     /**
@@ -78,7 +78,7 @@ public final class CastInput {
      */
     public static boolean tryCast(Minecraft minecraft) {
         LocalPlayer player = minecraft.player;
-        if (player == null || !CrownItem.isWearingCrown(player)) {
+        if (player == null || !Magic.canCast(player)) {
             return false;
         }
         MagicState state = Magic.state(player);
@@ -132,7 +132,7 @@ public final class CastInput {
         if (!useDown) {
             pressHandled = false;
         }
-        if (holding != null && (!useDown || !CrownItem.isWearingCrown(player))) {
+        if (holding != null && (!useDown || !Magic.canCast(player))) {
             Services.NETWORK.sendToServer(new CastPayload(false, holding.ordinal()));
             holding = null;
         }
@@ -164,11 +164,11 @@ public final class CastInput {
      * it can rise or land at any time, whatever spell they have chosen.
      */
     private static boolean canLevitate(LocalPlayer player) {
-        return CrownItem.isWearingCrown(player) && !player.isSpectator() && Mastery.rank(player) >= Spell.LEVITATION.rank();
+        return Magic.canCast(player) && !player.isSpectator() && Mastery.rank(player) >= Spell.LEVITATION.rank();
     }
 
     private static void toggle(LocalPlayer player, Spell spell, MagicState state, long now) {
-        if (spell == Spell.DREAMWALK && state.channeling(Spell.DREAMWALK)) {
+        if ((spell == Spell.DREAMWALK || spell == Spell.ASTRAL) && state.channeling(spell)) {
             // still sitting down to it: cast again and you get up
             Services.NETWORK.sendToServer(DreamPayload.WAKING);
             return;

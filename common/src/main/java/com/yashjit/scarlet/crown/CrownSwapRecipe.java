@@ -35,7 +35,7 @@ public final class CrownSwapRecipe extends CustomRecipe {
         if (crown == null) {
             return ItemStack.EMPTY;
         }
-        CrownStyle target = ((CrownItem) crown.getItem()).style().other();
+        CrownStyle target = ((CrownItem) crown.getItem()).style() == CrownStyle.WITCH ? CrownStyle.WARLOCK : CrownStyle.WITCH;
         return crown.transmuteCopy(ScarletItems.crown(target), 1);
     }
 
@@ -45,7 +45,7 @@ public final class CrownSwapRecipe extends CustomRecipe {
         }
         for (ItemStack stack : input.items()) {
             if (!stack.isEmpty()) {
-                return stack.getItem() instanceof CrownItem ? stack : null;
+                return stack.getItem() instanceof CrownItem item && item.style().grantsScarletMagic() ? stack : null;
             }
         }
         return null;

@@ -4,14 +4,18 @@ import com.yashjit.scarlet.hex.HexEjection;
 import com.yashjit.scarlet.hex.HexRipples;
 import com.yashjit.scarlet.hex.Residents;
 import com.yashjit.scarlet.magic.MindControl;
+import com.yashjit.scarlet.magic.AgathaMagic;
 import com.yashjit.scarlet.magic.RuneTraps;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -23,7 +27,26 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * set free stays loyal for a while. One bound by a Rune Trap only strains against it.
  */
 @Mixin(Mob.class)
-abstract class MobMixin {
+abstract class MobMixin implements AgathaMagic.InnateMagic {
+    @Unique private int scarlet$remainingMagic = -1;
+
+    public int scarlet$remainingMagic() {
+        return scarlet$remainingMagic < 0 ? 180 : scarlet$remainingMagic;
+    }
+
+    public void scarlet$setRemainingMagic(int value) {
+        scarlet$remainingMagic = Math.clamp(value, 0, 180);
+    }
+
+    @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
+    private void scarlet$loadReserve(ValueInput input, CallbackInfo ci) {
+        scarlet$remainingMagic = Math.clamp(input.getIntOr("scarlet:witch_reserve", -1), -1, 180);
+    }
+
+    @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
+    private void scarlet$saveReserve(ValueOutput output, CallbackInfo ci) {
+        if (scarlet$remainingMagic >= 0) output.putInt("scarlet:witch_reserve", scarlet$remainingMagic);
+    }
 
     @Inject(method = "setTarget", at = @At("HEAD"), cancellable = true)
     private void scarlet$keepThePeace(@Nullable LivingEntity target, CallbackInfo ci) {

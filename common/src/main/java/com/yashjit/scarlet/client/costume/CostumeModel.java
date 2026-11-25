@@ -17,7 +17,8 @@ public final class CostumeModel extends PlayerModel {
     @Override
     public void setupAnim(AvatarRenderState state) {
         super.setupAnim(state);
-        this.head.visible = false;
+        this.head.visible = ((SpeedLook.Pose) state).scarlet$speedSuit();
+        this.hat.visible = this.head.visible;
         this.jacket.visible = true;
         this.leftSleeve.visible = true;
         this.rightSleeve.visible = true;

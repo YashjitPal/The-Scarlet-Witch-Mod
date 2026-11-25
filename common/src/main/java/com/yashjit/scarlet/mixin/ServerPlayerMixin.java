@@ -14,6 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ServerPlayer.class)
 abstract class ServerPlayerMixin {
 
+    @Inject(method = "disconnect", at = @At("HEAD"))
+    private void scarlet$disperseFamiliars(CallbackInfo ci) {
+        com.yashjit.scarlet.magic.AgathaMagic.disconnect((ServerPlayer)(Object)this);
+    }
+
     @Inject(method = "triggerDimensionChangeTriggers", at = @At("HEAD"), cancellable = true)
     private void scarlet$spiritsTravelUnseen(ServerLevel oldLevel, CallbackInfo ci) {
         if (Dreamwalk.travelling((ServerPlayer) (Object) this)) {

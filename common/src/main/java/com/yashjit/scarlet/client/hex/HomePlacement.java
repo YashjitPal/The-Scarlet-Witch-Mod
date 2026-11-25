@@ -103,7 +103,7 @@ public final class HomePlacement {
             return;
         }
         LocalPlayer player = minecraft.player;
-        if (player == null || minecraft.level == null || !player.isAlive() || !CrownItem.isWearingCrown(player) || own(player) == null) {
+        if (player == null || minecraft.level == null || !player.isAlive() || !CrownItem.hasScarletMagic(player) || own(player) == null) {
             stop();
         }
     }

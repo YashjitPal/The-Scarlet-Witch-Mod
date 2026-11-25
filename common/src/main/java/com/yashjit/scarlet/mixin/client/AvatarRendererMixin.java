@@ -5,6 +5,8 @@ import com.yashjit.scarlet.client.anim.CastPoses;
 import com.yashjit.scarlet.client.anim.FirstPersonGestures;
 import com.yashjit.scarlet.client.costume.CostumeRendering;
 import com.yashjit.scarlet.client.costume.FirstPersonCostume;
+import com.yashjit.scarlet.client.costume.SpeedLook;
+import com.mojang.math.Axis;
 import com.yashjit.scarlet.client.darkhold.DarkholdBook;
 import com.yashjit.scarlet.client.magic.Hands;
 import net.minecraft.client.Minecraft;
@@ -29,12 +31,15 @@ abstract class AvatarRendererMixin {
     private void scarlet$hideArmorUnderCostume(Avatar entity, AvatarRenderState state, float partialTicks, CallbackInfo ci) {
         CostumeRendering.hideCoveredEquipment(entity, state, partialTicks);
         CastPoses.extract(entity, state, partialTicks);
+        SpeedLook.extract(entity, state, partialTicks);
     }
 
     @Inject(method = "setupRotations(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;FF)V",
             at = @At("TAIL"))
     private void scarlet$levitationLeanAndBob(AvatarRenderState state, PoseStack poseStack, float bodyRot, float entityScale, CallbackInfo ci) {
         CastPoses.rotate(state, poseStack);
+        float stride = ((SpeedLook.Pose) state).scarlet$stride();
+        if (stride > 0) poseStack.rotateDegrees(Axis.XP, -12 * stride);
     }
 
     /**

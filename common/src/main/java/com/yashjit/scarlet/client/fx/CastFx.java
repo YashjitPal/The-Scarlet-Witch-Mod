@@ -4,6 +4,7 @@ import com.yashjit.scarlet.client.anim.CastGestures;
 import com.yashjit.scarlet.client.darkhold.CorruptionClient;
 import com.yashjit.scarlet.client.magic.Hands;
 import com.yashjit.scarlet.client.render.Glow;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.crown.CrownItem;
 import com.yashjit.scarlet.magic.Magic;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -33,7 +34,7 @@ public final class CastFx {
         double now = minecraft.level.getGameTime();
         Vec3 camera = minecraft.gameRenderer.mainCamera().position();
         for (Player player : minecraft.level.players()) {
-            if (player.isInvisible() || player.distanceToSqr(camera) > 80 * 80 || !CrownItem.isWearingCrown(player)) {
+            if (player.isInvisible() || player.distanceToSqr(camera) > 80 * 80 || !com.yashjit.scarlet.magic.Magic.canCast(player)) {
                 continue;
             }
             boolean ownFirstPerson = ScarletFx.isFirstPersonViewOf(player);
@@ -45,7 +46,7 @@ public final class CastFx {
                     if (release > released[arm.ordinal()] && now >= release) {
                         released[arm.ordinal()] = release;
                         if (now - release < 3.0) {
-                            BoltFx.release(Hands.palm(player, arm), player.getLookAngle(), ownFirstPerson, darkness);
+                            BoltFx.release(Hands.palm(player, arm), player.getLookAngle(), ownFirstPerson, darkness, Pixels.Ramp.ofCaster(player));
                         }
                     }
                 }
@@ -66,6 +67,10 @@ public final class CastFx {
      * Dust from both palms, a few specks a tick. Used while flying and while suiting up.
      */
     public static void handDust(Player player, float perHand, boolean ownFirstPerson) {
+        handDust(player, perHand, ownFirstPerson, Pixels.Ramp.ofCaster(player));
+    }
+
+    static void handDust(Player player, float perHand, boolean ownFirstPerson, Pixels.Ramp ramp) {
         RandomSource random = ScarletFx.random();
         Vec3 look = player.getLookAngle();
         for (HumanoidArm arm : HumanoidArm.values()) {
@@ -78,7 +83,7 @@ public final class CastFx {
             int count = (int) budget + (random.nextFloat() < budget % 1 ? 1 : 0);
             for (int i = 0; i < count; i++) {
                 Vec3 jitter = new Vec3(random.nextGaussian(), random.nextGaussian(), random.nextGaussian()).scale(0.05);
-                ChaosDust.spawn(palm.add(jitter), jitter.scale(0.15));
+                ChaosDust.spawn(palm.add(jitter), jitter.scale(0.15), ramp);
             }
         }
     }

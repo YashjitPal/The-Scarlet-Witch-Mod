@@ -38,8 +38,8 @@ public final class PoseBlends {
         blend.lastNanos = nanos;
         MagicState state = Magic.state(player);
         boolean shielding = state.channeling(Spell.CHAOS_SHIELD);
-        boolean holding = state.channeling(Spell.TELEKINESIS) || Ejections.holds(player);
-        boolean painting = PaintFx.painting(player);
+        boolean holding = state.channeling(Spell.TELEKINESIS) || state.channeling(Spell.SIPHON) || Ejections.holds(player);
+        boolean beaming = PaintFx.painting(player) || state.channeling(Spell.ARC_BEAM);
         boolean raising = Founding.raising(player, player.level().getGameTime()) != null;
         boolean controlling = state.channeling(Spell.MIND_CONTROL);
         boolean levitating = state.levitating();
@@ -47,7 +47,7 @@ public final class PoseBlends {
         blend.read = Ease.damp(blend.read, reading ? 1.0F : 0.0F, reading ? 9.0F : 7.0F, seconds);
         blend.shield = Ease.damp(blend.shield, shielding ? 1.0F : 0.0F, shielding ? 14.0F : 9.0F, seconds);
         blend.hold = Ease.damp(blend.hold, holding ? 1.0F : 0.0F, holding ? 12.0F : 7.0F, seconds);
-        blend.beam = Ease.damp(blend.beam, painting ? 1.0F : 0.0F, painting ? 14.0F : 7.0F, seconds);
+        blend.beam = Ease.damp(blend.beam, beaming ? 1.0F : 0.0F, beaming ? 14.0F : 7.0F, seconds);
         blend.raise = Ease.damp(blend.raise, raising ? 1.0F : 0.0F, raising ? 6.0F : 4.0F, seconds);
         blend.control = Ease.damp(blend.control, controlling ? 1.0F : 0.0F, controlling ? 10.0F : 6.0F, seconds);
         HexSnapshot parted = null;

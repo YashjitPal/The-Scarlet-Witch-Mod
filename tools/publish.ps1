@@ -11,7 +11,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 $repo = "https://github.com/YashjitPal/The-Scarlet-Witch-Mod"
 $properties = Get-Content "$root\gradle.properties"
-$version = ($properties -match '^version=') -replace '^version=', ''
+[string]$version = ($properties -match '^version=') -replace '^version=', ''
+$releaseType = if ($version -match '-(alpha|beta)(?:[.+-]|$)') { $Matches[1] } else { 'release' }
 $minecraft = ($properties -match '^minecraft_version=') -replace '^minecraft_version=', ''
 $loaders = [ordered]@{ fabric = "Fabric"; neoforge = "NeoForge" }
 $jars = @{}
@@ -156,9 +157,9 @@ if ($Modrinth) {
             changelog = $changelog
             dependencies = $dependencies
             game_versions = @($minecraft)
-            version_type = "release"
+            version_type = $releaseType
             loaders = @($loader)
-            featured = $true
+            featured = ($releaseType -eq "release")
             project_id = $project.id
             file_parts = @("jar")
             primary_file = "jar"
@@ -205,7 +206,7 @@ if ($CurseForge) {
             changelogType = "markdown"
             displayName = "Scarlet Witch $version for $($loaders[$loader])"
             gameVersions = @($shared) + $loaderId
-            releaseType = "release"
+            releaseType = $releaseType
         }
         if ($loader -eq "fabric") {
             $metadata.relations = @{ projects = @(@{ slug = "fabric-api"; type = "requiredDependency" }) }

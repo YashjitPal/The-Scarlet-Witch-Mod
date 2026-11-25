@@ -2,6 +2,7 @@ package com.yashjit.scarlet.client.darkhold;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.yashjit.scarlet.ScarletPalette;
+import com.yashjit.scarlet.client.render.Pixels;
 import com.yashjit.scarlet.client.anim.Ease;
 import com.yashjit.scarlet.client.magic.MagicHud;
 import com.yashjit.scarlet.network.DreamOptionsPayload;
@@ -43,6 +44,7 @@ public final class DreamScreen extends Screen {
     private static final int MUTED = 0xA8949A;
 
     private final double openedAt;
+    private final boolean wiccan;
     private @Nullable List<DreamOptionsPayload.Destination> destinations;
     private final List<Card> cards = new ArrayList<>();
     private float[] hover = new float[0];
@@ -52,6 +54,7 @@ public final class DreamScreen extends Screen {
     public DreamScreen() {
         super(Component.translatable("dreamwalk.scarlet.title"));
         Minecraft minecraft = Minecraft.getInstance();
+        wiccan = Pixels.Ramp.ofCaster(minecraft.player) == Pixels.Ramp.WICCAN;
         openedAt = minecraft.level == null ? 0.0 : minecraft.level.getGameTime();
     }
 
@@ -84,25 +87,25 @@ public final class DreamScreen extends Screen {
         Minecraft minecraft = Minecraft.getInstance();
         double now = minecraft.level == null ? 0.0 : minecraft.level.getGameTime() + partialTick;
         float open = Ease.outCubic(Ease.clamp01((float) ((now - openedAt) / OPEN_TICKS)));
-        graphics.fill(0, 0, width, height, ARGB.color(0.55F * open, ScarletPalette.VOID));
-        MagicHud.sprite(graphics, MagicHud.GLOW, width / 2.0F, height / 2.0F, Math.max(width, height) * 1.1F, ARGB.color(0.35F * open, ScarletPalette.ABYSS));
+        graphics.fill(0, 0, width, height, ARGB.color(0.55F * open, wiccan ? 0x080E22 : ScarletPalette.VOID));
+        MagicHud.sprite(graphics, MagicHud.GLOW, width / 2.0F, height / 2.0F, Math.max(width, height) * 1.1F, ARGB.color(0.35F * open, wiccan ? 0x142851 : ScarletPalette.ABYSS));
         layout();
         int top = (cards.isEmpty() ? height / 2 - CARD_HEIGHT / 2 : cards.getFirst().y()) - 34;
         int bottom = cards.isEmpty() ? height / 2 + CARD_HEIGHT / 2 : cards.getLast().y() + CARD_HEIGHT;
         graphics.pose().pushMatrix();
         graphics.pose().translate(width / 2.0F, top);
         graphics.pose().scale(1.25F);
-        graphics.centeredText(font, title, 0, 0, ARGB.color(open, 0xD9425E));
+        graphics.centeredText(font, title, 0, 0, ARGB.color(open, wiccan ? 0x91DBFF : 0xD9425E));
         graphics.pose().popMatrix();
         graphics.pose().pushMatrix();
         graphics.pose().translate(width / 2.0F, top + 14.0F);
         graphics.pose().scale(0.75F);
-        graphics.centeredText(font, Component.translatable("dreamwalk.scarlet.where"), 0, 0, ARGB.color(open * 0.85F, MUTED));
+        graphics.centeredText(font, Component.translatable("dreamwalk.scarlet.where"), 0, 0, ARGB.color(open * 0.85F, wiccan ? 0x9DACBF : MUTED));
         graphics.pose().popMatrix();
         if (destinations == null) {
             int dots = 1 + (int) ((now / 6.0) % 3.0);
             graphics.centeredText(font, Component.translatable("dreamwalk.scarlet.reaching").append(".".repeat(dots)), width / 2, height / 2,
-                    ARGB.color(open * 0.8F, MUTED));
+                    ARGB.color(open * 0.8F, wiccan ? 0x9DACBF : MUTED));
             return;
         }
         hovered = -1;
@@ -119,7 +122,7 @@ public final class DreamScreen extends Screen {
         graphics.pose().pushMatrix();
         graphics.pose().translate(width / 2.0F, bottom + 12.0F);
         graphics.pose().scale(0.7F);
-        graphics.centeredText(font, hint, 0, 0, ARGB.color(open * 0.7F, MUTED));
+        graphics.centeredText(font, hint, 0, 0, ARGB.color(open * 0.7F, wiccan ? 0x9DACBF : MUTED));
         graphics.pose().popMatrix();
     }
 
@@ -133,9 +136,9 @@ public final class DreamScreen extends Screen {
         int y = Math.round(card.y() - lift);
         int tint = tint(card.destination().dimension());
         float alpha = open;
-        fillRounded(graphics, x - 1, y - 1, CARD_WIDTH + 2, CARD_HEIGHT + 2, ARGB.color(alpha * (0.35F + 0.65F * hover), ScarletPalette.SICKLY));
-        fillRounded(graphics, x, y, CARD_WIDTH, CARD_HEIGHT, ARGB.color(alpha * 0.92F, 0x12040A));
-        graphics.fill(x + 2, y + 1, x + CARD_WIDTH - 2, y + 2, ARGB.color(alpha * 0.35F, 0x3A1420));
+        fillRounded(graphics, x - 1, y - 1, CARD_WIDTH + 2, CARD_HEIGHT + 2, ARGB.color(alpha * (0.35F + 0.65F * hover), wiccan ? 0x81B8DF : ScarletPalette.SICKLY));
+        fillRounded(graphics, x, y, CARD_WIDTH, CARD_HEIGHT, ARGB.color(alpha * 0.92F, wiccan ? 0x091320 : 0x12040A));
+        graphics.fill(x + 2, y + 1, x + CARD_WIDTH - 2, y + 2, ARGB.color(alpha * 0.35F, wiccan ? 0x234363 : 0x3A1420));
         float cx = x + CARD_WIDTH / 2.0F;
         float cy = y + 26.0F;
         MagicHud.sprite(graphics, MagicHud.GLOW, cx, cy, 52.0F + 8.0F * hover, ARGB.color(alpha * (0.22F + 0.3F * hover), tint));
@@ -144,24 +147,24 @@ public final class DreamScreen extends Screen {
             float angle = turn + Mth.TWO_PI * i / 40.0F;
             float glint = 0.35F + 0.65F * Math.max(0.0F, Mth.sin(angle * 3.0F + (float) now * 0.08F));
             MagicHud.bead(graphics, cx + Mth.cos(angle) * 17.0F, cy + Mth.sin(angle) * 17.0F, 1.0F,
-                    ARGB.color(alpha * (0.4F + 0.4F * hover) * glint, i % 2 == 0 ? tint : ScarletPalette.SICKLY));
+                    ARGB.color(alpha * (0.4F + 0.4F * hover) * glint, i % 2 == 0 ? tint : wiccan ? 0x81B8DF : ScarletPalette.SICKLY));
         }
         graphics.pose().pushMatrix();
         graphics.pose().translate(cx, cy);
         graphics.pose().scale(1.25F + 0.1F * hover);
         graphics.fakeItem(icon(card.destination().dimension()), -8, -8);
         graphics.pose().popMatrix();
-        graphics.centeredText(font, name(card.destination().dimension()), Math.round(cx), y + 50, ARGB.color(alpha, hover > 0.5F ? 0xF2D0D6 : TEXT));
+        graphics.centeredText(font, name(card.destination().dimension()), Math.round(cx), y + 50, ARGB.color(alpha, wiccan ? 0xCEE9FF : hover > 0.5F ? 0xF2D0D6 : TEXT));
         graphics.pose().pushMatrix();
         graphics.pose().translate(cx, y + 63.0F);
         graphics.pose().scale(0.65F);
-        graphics.centeredText(font, arrival(card.destination()), 0, 0, ARGB.color(alpha * 0.85F, MUTED));
+        graphics.centeredText(font, arrival(card.destination()), 0, 0, ARGB.color(alpha * 0.85F, wiccan ? 0x9DACBF : MUTED));
         graphics.pose().popMatrix();
         if (index < 9) {
             graphics.pose().pushMatrix();
             graphics.pose().translate(x + 5.0F, y + 4.0F);
             graphics.pose().scale(0.6F);
-            graphics.text(font, Component.literal(Integer.toString(index + 1)), 0, 0, ARGB.color(alpha * 0.6F, MUTED), false);
+            graphics.text(font, Component.literal(Integer.toString(index + 1)), 0, 0, ARGB.color(alpha * 0.6F, wiccan ? 0x9DACBF : MUTED), false);
             graphics.pose().popMatrix();
         }
     }
